@@ -188,14 +188,24 @@ async function handlePools(
       fetchOincArbmePool(oincPrice),
     ]);
 
-    // Combine all pools
+    // Combine all pools, avoiding duplicates
+    // GeckoTerminal may already have PAGE/ARBME and OINC/ARBME - check by address
     const allPools = [...arbmePools];
 
-    if (pageArbmePool) {
+    // Only add PAGE/ARBME from RPC if not already in GeckoTerminal results
+    const hasPagePool = arbmePools.some(p =>
+      p.pairAddress.toLowerCase() === PAGE_ARBME_POOL.address.toLowerCase() ||
+      p.pair.toUpperCase().includes("PAGE")
+    );
+    if (pageArbmePool && !hasPagePool) {
       allPools.push(pageArbmePool);
     }
 
-    if (oincArbmePool) {
+    // Only add OINC/ARBME from RPC if not already in GeckoTerminal results
+    const hasOincPool = arbmePools.some(p =>
+      p.pair.toUpperCase().includes("OINC")
+    );
+    if (oincArbmePool && !hasOincPool) {
       allPools.push(oincArbmePool);
     }
 
@@ -285,7 +295,7 @@ async function fetchGeckoTerminalPools(tokenAddress: string): Promise<PoolData[]
         volume24h,
         priceUsd: arbmePrice,
         priceChange24h,
-        url: `https://www.geckoterminal.com/base/pools/${attrs.address}`,
+        url: `https://dexscreener.com/base/${attrs.address}`,
         source: "geckoterminal",
       });
     }
@@ -564,7 +574,7 @@ async function fetchOincArbmePool(oincPrice: number): Promise<PoolData | null> {
       volume24h: 0,
       priceUsd: arbmePrice.toString(),
       priceChange24h: 0,
-      url: `https://app.uniswap.org/explore/pools/base/${OINC_ARBME_POOL.poolId}`,
+      url: `https://dexscreener.com/base/${OINC_ARBME_POOL.poolId}`,
       source: "rpc-v4",
     };
 
@@ -587,24 +597,24 @@ function handleManifest(): Response {
     miniapp: {
       version: "1",
       name: "ArbMe",
-      iconUrl: "https://arbme-api.dylan-259.workers.dev/icon",
+      iconUrl: "https://arbme.epicdylan.com/arbie.png",
       homeUrl: "https://arbme-api.dylan-259.workers.dev/app",
-      imageUrl: "https://arbme-api.dylan-259.workers.dev/frame-image",
-      splashImageUrl: "https://arbme-api.dylan-259.workers.dev/splash",
+      imageUrl: "https://arbme.epicdylan.com/share-image.png",
+      splashImageUrl: "https://arbme.epicdylan.com/arbie.png",
       splashBackgroundColor: "#0a0a0f",
       buttonTitle: "View Pools",
       subtitle: "Permissionless Arb Routes",
       description: "An ERC20 token that pairs with other tokens to create arb routes. LP to earn fees, arb to profit.",
       primaryCategory: "finance",
       tags: ["defi", "arbitrage", "liquidity", "base"],
-      tagline: "LP to earn fees. Arb to profit.",
-      heroImageUrl: "https://arbme-api.dylan-259.workers.dev/og-image",
+      tagline: "LP to earn. Arb to profit.",
+      heroImageUrl: "https://arbme.epicdylan.com/share-image.png",
       screenshotUrls: [
-        "https://arbme-api.dylan-259.workers.dev/screenshot"
+        "https://arbme.epicdylan.com/share-image.png"
       ],
-      ogTitle: "ArbMe - Decentralized Arbitrage Protocol",
+      ogTitle: "ArbMe - Permissionless Arb",
       ogDescription: "An ERC20 token that pairs with other tokens to create arb routes. No deals. No permission. Just LP.",
-      ogImageUrl: "https://arbme-api.dylan-259.workers.dev/og-image"
+      ogImageUrl: "https://arbme.epicdylan.com/share-image.png"
     }
   };
 
@@ -985,100 +995,195 @@ async function handleMiniApp(
       min-height: 100vh;
       padding: 1rem;
       padding-top: env(safe-area-inset-top, 0px);
+      padding-bottom: 2rem;
     }
     .header {
       text-align: center;
-      padding: 0.5rem 0 1.5rem;
+      padding: 0.5rem 0 1rem;
       border-bottom: 1px solid #1f1f2f;
       margin-bottom: 1rem;
     }
+    .logo-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+    .logo-icon {
+      width: 36px;
+      height: 36px;
+    }
     .logo {
       font-family: monospace;
-      font-size: 2rem;
+      font-size: 1.75rem;
       font-weight: bold;
       background: linear-gradient(135deg, #10b981, #f59e0b);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
-    .tagline {
-      color: #7a7a8f;
-      font-size: 0.875rem;
-      margin-top: 0.5rem;
+    .price {
+      font-family: monospace;
+      font-size: 1.25rem;
+      color: #10b981;
+      margin-top: 0.25rem;
     }
     .stats {
-      display: flex;
-      justify-content: center;
-      gap: 2rem;
-      margin-bottom: 1.5rem;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.5rem;
+      margin-bottom: 1rem;
     }
     .stat {
       text-align: center;
+      background: #0f0f18;
+      padding: 0.75rem 0.5rem;
+      border: 1px solid #1f1f2f;
     }
     .stat-value {
       font-family: monospace;
-      font-size: 1.5rem;
+      font-size: 1.1rem;
       font-weight: bold;
       color: #10b981;
     }
     .stat-label {
-      font-size: 0.75rem;
+      font-size: 0.65rem;
       color: #7a7a8f;
       text-transform: uppercase;
+      margin-top: 0.25rem;
+    }
+    .section-label {
+      font-family: monospace;
+      font-size: 0.7rem;
+      color: #10b981;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.5rem;
     }
     .pools {
       display: flex;
       flex-direction: column;
-      gap: 0.75rem;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
     }
     .pool {
       background: #0f0f18;
       border: 1px solid #1f1f2f;
-      padding: 1rem;
+      padding: 0.75rem;
+    }
+    .pool-top {
       display: flex;
-      justify-content: space-between;
-      align-items: center;
+      align-items: flex-start;
+      margin-bottom: 0.5rem;
     }
     .pool-name {
       font-family: monospace;
       font-weight: 600;
+      font-size: 0.95rem;
     }
     .pool-dex {
-      font-size: 0.75rem;
+      font-size: 0.7rem;
       color: #7a7a8f;
     }
-    .pool-tvl {
+    .pool-stats {
+      display: flex;
+      gap: 1rem;
+    }
+    .pool-stat {
+      display: flex;
+      flex-direction: column;
+    }
+    .pool-stat-label {
+      font-size: 0.6rem;
+      color: #7a7a8f;
+      text-transform: uppercase;
+    }
+    .pool-stat-value {
       font-family: monospace;
+      font-size: 0.85rem;
+      color: #e8e8f2;
+    }
+    .pool-stat-value.tvl {
       color: #10b981;
       font-weight: bold;
+    }
+    .pool-address {
+      font-family: monospace;
+      font-size: 0.65rem;
+      color: #7a7a8f;
+      margin-top: 0.5rem;
+      word-break: break-all;
+      cursor: pointer;
+    }
+    .pool-address:active {
+      color: #10b981;
+    }
+    .pool-price {
+      font-family: monospace;
+      font-size: 0.75rem;
+      color: #f59e0b;
+      margin-top: 0.25rem;
+    }
+    .pool-icons {
+      display: flex;
+      gap: 0.25rem;
+      margin-right: 0.5rem;
+    }
+    .pool-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #1f1f2f;
     }
     .loading {
       text-align: center;
       padding: 2rem;
       color: #7a7a8f;
     }
-    .cta {
+    .buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .btn {
       display: block;
       width: 100%;
       text-align: center;
-      background: #10b981;
-      color: #0a0a0f;
-      padding: 1rem;
-      margin-top: 1.5rem;
+      padding: 0.875rem;
       border: none;
       font-family: monospace;
       font-weight: bold;
-      font-size: 1rem;
+      font-size: 0.9rem;
       cursor: pointer;
+      text-decoration: none;
     }
-    .cta:active {
+    .btn-primary {
+      background: #10b981;
+      color: #0a0a0f;
+    }
+    .btn-secondary {
+      background: transparent;
+      color: #e8e8f2;
+      border: 1px solid #1f1f2f;
+    }
+    .btn:active {
       opacity: 0.8;
     }
   </style>
 </head>
 <body>
   <div class="header">
-    <div class="logo">$ARBME</div>
-    <div class="tagline">Decentralized Arbitrage Protocol</div>
+    <div class="logo-row">
+      <svg class="logo-icon" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+        <rect width="32" height="32" rx="6" fill="#0a0a0f"/>
+        <rect x="6" y="4" width="20" height="22" rx="4" fill="#10b981"/>
+        <rect x="8" y="6" width="16" height="18" rx="3" fill="#0a0a0f"/>
+        <circle cx="12" cy="13" r="2.5" fill="#10b981"/>
+        <circle cx="20" cy="13" r="2.5" fill="#10b981"/>
+        <rect x="10" y="18" width="12" height="4" rx="1.5" fill="#10b981"/>
+      </svg>
+      <div class="logo">$ARBME</div>
+    </div>
+    <div class="price" id="price">-</div>
   </div>
 
   <div class="stats">
@@ -1090,39 +1195,115 @@ async function handleMiniApp(
       <div class="stat-value" id="total-tvl">-</div>
       <div class="stat-label">TVL</div>
     </div>
+    <div class="stat">
+      <div class="stat-value" id="total-vol">-</div>
+      <div class="stat-label">24h Vol</div>
+    </div>
   </div>
 
+  <div class="section-label">Live Pools</div>
   <div class="pools" id="pools">
     <div class="loading">Loading pools...</div>
   </div>
 
-  <button class="cta" id="buy-btn">
-    Buy $ARBME
-  </button>
+  <div class="buttons">
+    <button class="btn btn-primary" id="buy-btn">Buy $ARBME</button>
+    <a href="https://arbme.epicdylan.com" target="_blank" class="btn btn-secondary">Learn More</a>
+  </div>
 
   <script type="module">
     import { sdk } from 'https://esm.sh/@farcaster/miniapp-sdk';
+
+    function formatUsd(val) {
+      if (val >= 1000000) return '$' + (val / 1000000).toFixed(2) + 'M';
+      if (val >= 1000) return '$' + (val / 1000).toFixed(1) + 'K';
+      if (val >= 1) return '$' + val.toFixed(2);
+      return '$' + val.toFixed(4);
+    }
+
+    function formatPrice(val) {
+      const num = parseFloat(val);
+      if (num >= 1) return '$' + num.toFixed(4);
+      if (num >= 0.0001) return '$' + num.toFixed(6);
+      return '$' + num.toFixed(10);
+    }
+
+    // Token colors for icons
+    const TOKEN_COLORS = {
+      'ARBME': '#10b981',
+      'WETH': '#627eea',
+      'ETH': '#627eea',
+      'USDC': '#2775ca',
+      'PAGE': '#ff6b35',
+      'OINC': '#ff69b4',
+      'cbBTC': '#f7931a',
+      'BTC': '#f7931a',
+      'CLANKER': '#8b5cf6',
+    };
+
+    function getTokenColor(symbol) {
+      const upper = symbol.toUpperCase();
+      for (const [key, color] of Object.entries(TOKEN_COLORS)) {
+        if (upper.includes(key)) return color;
+      }
+      return '#7a7a8f';
+    }
+
+    function tokenIcon(symbol) {
+      const color = getTokenColor(symbol);
+      const letter = symbol.charAt(0).toUpperCase();
+      return \`<svg class="pool-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="\${color}"/><text x="12" y="16" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">\${letter}</text></svg>\`;
+    }
 
     async function loadPools() {
       try {
         const res = await fetch('/pools');
         const data = await res.json();
 
-        document.getElementById('pool-count').textContent = data.poolCount;
-        document.getElementById('total-tvl').textContent = data.totalTvl >= 1000
-          ? '$' + (data.totalTvl / 1000).toFixed(1) + 'K'
-          : '$' + data.totalTvl.toFixed(0);
+        // Price
+        document.getElementById('price').textContent = formatPrice(data.arbmePrice);
 
+        // Stats
+        document.getElementById('pool-count').textContent = data.poolCount;
+        document.getElementById('total-tvl').textContent = formatUsd(data.totalTvl);
+
+        const totalVol = data.pools.reduce((sum, p) => sum + (p.volume24h || 0), 0);
+        document.getElementById('total-vol').textContent = formatUsd(totalVol);
+
+        // Pools
         const poolsEl = document.getElementById('pools');
-        poolsEl.innerHTML = data.pools.map(p => \`
+        poolsEl.innerHTML = data.pools.map(p => {
+          const addr = p.pairAddress || '';
+          const shortAddr = addr.length > 20 ? addr.slice(0, 10) + '...' + addr.slice(-8) : addr;
+          const tokens = p.pair.split(/\\s*\\/\\s*/);
+          const token0 = tokens[0] || '?';
+          const token1 = tokens[1] || '?';
+          return \`
           <div class="pool">
-            <div>
-              <div class="pool-name">\${p.pair}</div>
-              <div class="pool-dex">\${p.dex}</div>
+            <div class="pool-top">
+              <div class="pool-icons">
+                \${tokenIcon(token0)}
+                \${tokenIcon(token1)}
+              </div>
+              <div style="flex:1">
+                <div class="pool-name">\${p.pair}</div>
+                <div class="pool-dex">\${p.dex}</div>
+                \${p.priceUsd ? \`<div class="pool-price">ARBME: \${formatPrice(p.priceUsd)}</div>\` : ''}
+              </div>
             </div>
-            <div class="pool-tvl">$\${p.tvl >= 1000 ? (p.tvl/1000).toFixed(1) + 'K' : p.tvl.toFixed(0)}</div>
+            <div class="pool-stats">
+              <div class="pool-stat">
+                <div class="pool-stat-label">TVL</div>
+                <div class="pool-stat-value tvl">\${formatUsd(p.tvl)}</div>
+              </div>
+              <div class="pool-stat">
+                <div class="pool-stat-label">24h Vol</div>
+                <div class="pool-stat-value">\${formatUsd(p.volume24h || 0)}</div>
+              </div>
+            </div>
+            \${addr ? \`<div class="pool-address" onclick="copyAddress('\${addr}')" title="Tap to copy">\${shortAddr}</div>\` : ''}
           </div>
-        \`).join('');
+        \`}).join('');
       } catch (e) {
         document.getElementById('pools').innerHTML = '<div class="loading">Failed to load pools</div>';
       }
@@ -1130,6 +1311,18 @@ async function handleMiniApp(
 
     // ARBME token address on Base
     const ARBME_ADDRESS = '0xC647421C5Dc78D1c3960faA7A33f9aEFDF4B7B07';
+
+    // Copy address to clipboard
+    window.copyAddress = async function(addr) {
+      try {
+        await navigator.clipboard.writeText(addr);
+        // Brief visual feedback
+        event.target.style.color = '#10b981';
+        setTimeout(() => { event.target.style.color = ''; }, 500);
+      } catch (e) {
+        console.error('Copy failed:', e);
+      }
+    };
 
     // Handle buy button click - opens native swap widget
     document.getElementById('buy-btn').addEventListener('click', async () => {
