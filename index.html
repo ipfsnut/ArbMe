@@ -1245,9 +1245,16 @@
       const refreshEl = document.getElementById('pools-refresh');
 
       try {
+        console.log('[ArbMe] Fetching pools from:', API_URL);
         const response = await fetch(API_URL);
-        if (!response.ok) throw new Error('API error');
+        if (!response.ok) throw new Error('API error: ' + response.status);
         const data = await response.json();
+
+        console.log('[ArbMe] API Response:', data);
+        console.log('[ArbMe] Pool count:', data.poolCount, 'Total TVL:', data.totalTvl);
+        if (data.pools) {
+          data.pools.forEach((p, i) => console.log(`[ArbMe] Pool ${i}:`, p.pair, 'TVL:', p.tvl));
+        }
 
         if (!data.pools || data.pools.length === 0) {
           container.innerHTML = '<div class="pools-loading">No pools found yet. Be the first to LP!</div>';
