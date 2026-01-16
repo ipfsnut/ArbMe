@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+.venv/
+
+# Reference projects
+page-tracker/
+
+# Build outputs
+.next/
+deploy/
+
+# OS files
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local

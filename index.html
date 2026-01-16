@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ArbMe — The Arb Market Built on a Token</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --surface: #0f0f18;
+      --surface-2: #14141f;
+      --border: #1f1f2f;
+      --text: #e8e8f2;
+      --muted: #7a7a8f;
+      --accent: #10b981;
+      --accent-glow: #10b98140;
+      --accent-2: #f59e0b;
+      --accent-2-glow: #f59e0b35;
+      --mono: 'JetBrains Mono', monospace;
+      --sans: 'Space Grotesk', sans-serif;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    .gradient-bg {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: 
+        radial-gradient(ellipse at 30% 20%, var(--accent-glow) 0%, transparent 50%),
+        radial-gradient(ellipse at 70% 80%, var(--accent-2-glow) 0%, transparent 50%);
+      opacity: 0.5;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .content {
+      position: relative;
+      z-index: 1;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    /* Nav */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 2rem;
+    }
+
+    .nav-inner {
+      max-width: 900px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .nav-logo {
+      font-family: var(--mono);
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .nav-logo-icon {
+      width: 24px;
+      height: 24px;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 1.5rem;
+    }
+
+    .nav-links a {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover {
+      color: var(--text);
+    }
+
+    /* Hero */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 6rem 0 4rem;
+      text-align: center;
+    }
+
+    .hero-mascot {
+      width: 180px;
+      height: 180px;
+      margin-bottom: 2rem;
+      animation: float 3s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+
+    .hero-title {
+      font-family: var(--mono);
+      font-size: clamp(3rem, 10vw, 6rem);
+      font-weight: 700;
+      line-height: 1;
+      margin-bottom: 1rem;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-tagline {
+      font-family: var(--mono);
+      font-size: 0.9rem;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      margin-bottom: 1.5rem;
+    }
+
+    .hero-subtitle {
+      font-size: clamp(1.1rem, 3vw, 1.4rem);
+      color: var(--text);
+      max-width: 550px;
+      margin: 0 auto 1.5rem;
+      line-height: 1.5;
+    }
+
+    .hero-desc {
+      font-size: 1rem;
+      color: var(--muted);
+      max-width: 480px;
+      margin: 0 auto 2.5rem;
+    }
+
+    .hero-cta {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-family: var(--mono);
+      font-size: 0.9rem;
+      font-weight: 600;
+      padding: 1rem 2rem;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      transition: all 0.25s ease;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: var(--bg);
+      box-shadow: 0 0 30px var(--accent-glow);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 50px var(--accent-glow), 0 10px 30px var(--accent-glow);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-ghost:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Speech bubble statement */
+    .statement {
+      padding: 4rem 0;
+      display: flex;
+      justify-content: center;
+    }
+
+    .speech-bubble {
+      background: var(--surface);
+      border: 2px solid var(--accent);
+      border-radius: 20px;
+      padding: 2rem 2.5rem;
+      max-width: 600px;
+      position: relative;
+    }
+
+    .speech-bubble::after {
+      content: '';
+      position: absolute;
+      top: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-left: 12px solid transparent;
+      border-right: 12px solid transparent;
+      border-bottom: 12px solid var(--accent);
+    }
+
+    .speech-bubble p {
+      font-family: var(--mono);
+      font-size: 1.1rem;
+      line-height: 1.6;
+      color: var(--text);
+      text-align: center;
+    }
+
+    .speech-bubble strong {
+      color: var(--accent);
+    }
+
+    /* Section styles */
+    section {
+      padding: 5rem 0;
+    }
+
+    .section-label {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      margin-bottom: 0.75rem;
+    }
+
+    .section-title {
+      font-family: var(--mono);
+      font-size: clamp(1.5rem, 4vw, 2rem);
+      font-weight: 700;
+      margin-bottom: 1rem;
+    }
+
+    .section-desc {
+      font-size: 1.05rem;
+      color: var(--muted);
+      max-width: 600px;
+      margin-bottom: 2rem;
+    }
+
+    /* How it works */
+    .how-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 2.5rem;
+      margin: 2rem 0;
+      text-align: center;
+    }
+
+    .how-flow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-bottom: 1.5rem;
+    }
+
+    .flow-step {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      padding: 0.6rem 1rem;
+      font-family: var(--mono);
+      font-size: 0.8rem;
+    }
+
+    .flow-arrow {
+      color: var(--accent);
+      font-size: 1.25rem;
+    }
+
+    .how-box > p {
+      color: var(--muted);
+      font-size: 0.9rem;
+      max-width: 500px;
+      margin: 0 auto;
+    }
+
+    /* Two personas */
+    .personas {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      margin: 3rem 0;
+    }
+
+    @media (max-width: 700px) {
+      .personas {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .persona {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 2rem;
+      transition: all 0.3s ease;
+    }
+
+    .persona:hover {
+      transform: translateY(-4px);
+      border-color: var(--accent);
+    }
+
+    .persona.lper {
+      border-top: 3px solid var(--accent);
+    }
+
+    .persona.arber {
+      border-top: 3px solid var(--accent-2);
+    }
+
+    .persona-icon {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .persona h3 {
+      font-family: var(--mono);
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+
+    .persona .role {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 1rem;
+    }
+
+    .persona p {
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin-bottom: 1rem;
+      line-height: 1.6;
+    }
+
+    .persona ul {
+      list-style: none;
+      font-size: 0.85rem;
+    }
+
+    .persona li {
+      color: var(--muted);
+      padding: 0.35rem 0;
+      padding-left: 1.25rem;
+      position: relative;
+    }
+
+    .persona li::before {
+      content: '→';
+      position: absolute;
+      left: 0;
+      color: var(--accent);
+    }
+
+    .persona.arber li::before {
+      color: var(--accent-2);
+    }
+
+    /* Mesh visual */
+    .mesh-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 2rem;
+      margin: 2rem 0;
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Stats */
+    .stats {
+      display: flex;
+      gap: 3rem;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin: 2rem 0;
+      padding: 1.5rem 0;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .stat {
+      text-align: center;
+    }
+
+    .stat-num {
+      font-family: var(--mono);
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .stat-label {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Guidelines */
+    .guidelines {
+      margin: 2rem 0;
+    }
+
+    .guide {
+      display: flex;
+      gap: 1rem;
+      padding: 1.25rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .guide:last-child {
+      border-bottom: none;
+    }
+
+    .guide-num {
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--accent);
+      flex-shrink: 0;
+      width: 24px;
+    }
+
+    .guide-content h4 {
+      font-family: var(--mono);
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+
+    .guide-content p {
+      font-size: 0.875rem;
+      color: var(--muted);
+    }
+
+    /* Callout */
+    .callout {
+      background: var(--surface);
+      border: 1px solid var(--accent);
+      border-left: 3px solid var(--accent);
+      padding: 1.5rem;
+      margin: 2rem 0;
+    }
+
+    .callout p {
+      margin: 0;
+      font-size: 0.95rem;
+    }
+
+    .callout strong {
+      color: var(--accent);
+    }
+
+    /* Warning */
+    .warning {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+    }
+
+    .warning-title {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.75rem;
+    }
+
+    .warning p {
+      font-size: 0.875rem;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    /* CTA */
+    .cta-section {
+      text-align: center;
+      padding: 5rem 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .cta-mascot {
+      width: 100px;
+      height: 100px;
+      margin-bottom: 1.5rem;
+    }
+
+    .cta-title {
+      font-family: var(--mono);
+      font-size: clamp(1.75rem, 5vw, 2.5rem);
+      font-weight: 700;
+      margin-bottom: 1rem;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .cta-desc {
+      font-size: 1rem;
+      color: var(--muted);
+      margin-bottom: 2rem;
+      max-width: 400px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .cta-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2.5rem 0;
+    }
+
+    .footer-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+    }
+
+    .footer-brand {
+      font-family: var(--mono);
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .footer-tagline {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    .footer-ca {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--muted);
+    }
+
+    .footer-ca span {
+      color: var(--accent);
+      word-break: break-all;
+    }
+
+    /* Responsive */
+    @media (max-width: 600px) {
+      .container {
+        padding: 1.5rem;
+      }
+
+      nav {
+        padding: 1rem;
+      }
+
+      .nav-links {
+        gap: 1rem;
+      }
+
+      .nav-links a {
+        font-size: 0.7rem;
+      }
+
+      .hero-mascot {
+        width: 140px;
+        height: 140px;
+      }
+
+      .how-box {
+        padding: 1.5rem;
+      }
+
+      .flow-step {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.7rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="gradient-bg"></div>
+
+  <nav>
+    <div class="nav-inner">
+      <div class="nav-logo">
+        <img class="nav-logo-icon" src="arbie.png" alt="Arbie">
+        $ARBME
+      </div>
+      <div class="nav-links">
+        <a href="#how">How It Works</a>
+        <a href="#lpers">For LPers</a>
+        <a href="#arbers">For Arbers</a>
+        <a href="#risks">Risks</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="content">
+    <div class="container">
+
+      <!-- Hero -->
+      <header class="hero">
+        <img class="hero-mascot" src="arbie.png" alt="Arbie the mascot">
+        <h1 class="hero-title">ArbMe</h1>
+        <div class="hero-tagline">An Experimental Decentralized Arbitrage Protocol Built On A Token</div>
+        <p class="hero-subtitle">
+          An ERC20 token that pairs with other tokens to create arb routes. No deals. No permission. Just LP.
+        </p>
+        <p class="hero-desc">
+          Anyone can provide liquidity to any token that needs it. $ARBME sits in the middle,
+          connecting pools into a mesh of routes. Value tracks volume and pair selection.
+        </p>
+        <div class="hero-cta">
+          <a href="#" class="btn btn-primary">Buy $ARBME</a>
+          <a href="#how" class="btn btn-ghost">How It Works ↓</a>
+        </div>
+      </header>
+
+      <!-- Statement -->
+      <div class="statement">
+        <div class="speech-bubble">
+          <p>
+            Most tokens hate getting arbed. <strong>$ARBME embraces it.</strong><br>
+            More LPers → more pools → more routes → more fees. No gatekeepers.
+          </p>
+        </div>
+      </div>
+
+      <!-- How it works -->
+      <section id="how">
+        <div class="section-label">The Basics</div>
+        <h2 class="section-title">How ArbMe Works</h2>
+        <p class="section-desc">
+          $ARBME sits between trading pairs. When prices diverge, arbers route through
+          to capture the difference. LPers provide the liquidity. Fees flow.
+        </p>
+
+        <div class="how-box">
+          <div class="how-flow">
+            <span class="flow-step">DEGEN pumps</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-step">ARBME pool has cheap DEGEN</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-step">Arber routes through</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-step">Fees generated</span>
+          </div>
+          <p>
+            Every pool connected to $ARBME creates routes to every other pool.
+            5 pools = 10 routes. The mesh compounds.
+          </p>
+        </div>
+
+        <div class="callout">
+          <p>
+            <strong>$ARBME isn't trying to be the main route.</strong> It's permissionless overflow liquidity—anyone
+            can create a pool for any token without asking. Arbers find it when they need it.
+          </p>
+        </div>
+      </section>
+
+      <!-- Two sided market -->
+      <section>
+        <div class="section-label">Two-Sided Market</div>
+        <h2 class="section-title">LPers & Arbers</h2>
+        <p class="section-desc">
+          A decentralized protocol where two groups coordinate without intermediaries.
+        </p>
+
+        <div class="personas">
+          <div class="persona lper">
+            <div class="persona-icon">🌊</div>
+            <h3>LPers</h3>
+            <div class="role">Provide liquidity, earn fees</div>
+            <p>
+              See a token that needs liquidity? Just create a pool. No proposals,
+              no waiting, no permission. You build the paths, you collect fees.
+            </p>
+            <ul>
+              <li>Permissionless pool creation</li>
+              <li>Pick your pairs, set your exposure</li>
+              <li>No lockups, withdraw anytime</li>
+              <li>You take the IL risk</li>
+            </ul>
+          </div>
+          <div class="persona arber">
+            <div class="persona-icon">⚡</div>
+            <h3>Arbers</h3>
+            <div class="role">Find deals, extract profit</div>
+            <p>
+              You want cheap tokens, fast. $ARBME pools lag behind main DEX during
+              spikes. That's your edge.
+            </p>
+            <ul>
+              <li>Mispriced pools during volatility</li>
+              <li>Multiple routes through the mesh</li>
+              <li>Cheap gas on Base (~$0.01)</li>
+              <li>Small arbs are viable</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- The Mesh -->
+      <section>
+        <div class="section-label">Network Effects</div>
+        <h2 class="section-title">Every Pool Makes the Mesh Stronger</h2>
+        <p class="section-desc">
+          When you LP against $ARBME, you're contributing to a shared network.
+          Your pool creates routes for everyone. The mesh grows together.
+        </p>
+
+        <div class="mesh-box">
+          <svg width="380" height="300" viewBox="0 0 380 300">
+            <!-- Connections to center -->
+            <line x1="190" y1="150" x2="190" y2="35" stroke="#10b981" stroke-width="2" opacity="0.7"/>
+            <line x1="190" y1="150" x2="320" y2="80" stroke="#10b981" stroke-width="2" opacity="0.7"/>
+            <line x1="190" y1="150" x2="320" y2="220" stroke="#10b981" stroke-width="2" opacity="0.7"/>
+            <line x1="190" y1="150" x2="190" y2="265" stroke="#10b981" stroke-width="2" opacity="0.7"/>
+            <line x1="190" y1="150" x2="60" y2="220" stroke="#10b981" stroke-width="2" opacity="0.7"/>
+            <line x1="190" y1="150" x2="60" y2="80" stroke="#10b981" stroke-width="2" opacity="0.7"/>
+            
+            <!-- Cross connections (the routes created) -->
+            <line x1="190" y1="35" x2="320" y2="80" stroke="#f59e0b" stroke-width="1" opacity="0.3" stroke-dasharray="4,4"/>
+            <line x1="320" y1="80" x2="320" y2="220" stroke="#f59e0b" stroke-width="1" opacity="0.3" stroke-dasharray="4,4"/>
+            <line x1="320" y1="220" x2="190" y2="265" stroke="#f59e0b" stroke-width="1" opacity="0.3" stroke-dasharray="4,4"/>
+            <line x1="190" y1="265" x2="60" y2="220" stroke="#f59e0b" stroke-width="1" opacity="0.3" stroke-dasharray="4,4"/>
+            <line x1="60" y1="220" x2="60" y2="80" stroke="#f59e0b" stroke-width="1" opacity="0.3" stroke-dasharray="4,4"/>
+            <line x1="60" y1="80" x2="190" y2="35" stroke="#f59e0b" stroke-width="1" opacity="0.3" stroke-dasharray="4,4"/>
+            
+            <!-- ARBIE center (mini mascot) -->
+            <rect x="165" y="120" width="50" height="55" rx="10" fill="#10b981"/>
+            <rect x="170" y="125" width="40" height="45" rx="8" fill="#0a0a0f"/>
+            <circle cx="182" cy="143" r="6" fill="#10b981"/>
+            <circle cx="198" cy="143" r="6" fill="#10b981"/>
+            <rect x="175" y="155" width="30" height="10" rx="3" fill="#10b981"/>
+            
+            <!-- Outer tokens -->
+            <circle cx="190" cy="35" r="16" fill="#0a0a0f" stroke="#f59e0b" stroke-width="2"/>
+            <text x="190" y="39" text-anchor="middle" fill="#f59e0b" font-family="JetBrains Mono" font-size="8">ETH</text>
+            
+            <circle cx="320" cy="80" r="16" fill="#0a0a0f" stroke="#f59e0b" stroke-width="2"/>
+            <text x="320" y="84" text-anchor="middle" fill="#f59e0b" font-family="JetBrains Mono" font-size="7">CLANKER</text>
+            
+            <circle cx="320" cy="220" r="16" fill="#0a0a0f" stroke="#f59e0b" stroke-width="2"/>
+            <text x="320" y="224" text-anchor="middle" fill="#f59e0b" font-family="JetBrains Mono" font-size="8">DEGEN</text>
+            
+            <circle cx="190" cy="265" r="16" fill="#0a0a0f" stroke="#f59e0b" stroke-width="2"/>
+            <text x="190" y="269" text-anchor="middle" fill="#f59e0b" font-family="JetBrains Mono" font-size="8">USDC</text>
+            
+            <circle cx="60" cy="220" r="16" fill="#0a0a0f" stroke="#f59e0b" stroke-width="2"/>
+            <text x="60" y="224" text-anchor="middle" fill="#f59e0b" font-family="JetBrains Mono" font-size="8">HIGHER</text>
+            
+            <circle cx="60" cy="80" r="16" fill="#0a0a0f" stroke="#f59e0b" stroke-width="2"/>
+            <text x="60" y="84" text-anchor="middle" fill="#f59e0b" font-family="JetBrains Mono" font-size="8">TOKEN</text>
+          </svg>
+        </div>
+
+        <div class="stats">
+          <div class="stat">
+            <div class="stat-num">2</div>
+            <div class="stat-label">pools → 1 route</div>
+          </div>
+          <div class="stat">
+            <div class="stat-num">5</div>
+            <div class="stat-label">pools → 10 routes</div>
+          </div>
+          <div class="stat">
+            <div class="stat-num">10</div>
+            <div class="stat-label">pools → 45 routes</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- For LPers -->
+      <section id="lpers">
+        <div class="section-label">For LPers</div>
+        <h2 class="section-title">Guidelines</h2>
+        <p class="section-desc">
+          You're building a decentralized liquidity network. Here's how to contribute.
+        </p>
+
+        <div class="guidelines">
+          <div class="guide">
+            <div class="guide-num">01</div>
+            <div class="guide-content">
+              <h4>Minimum: $250 per pool</h4>
+              <p>Below this, arb profit doesn't justify the gas. $250+ makes your pool viable. More depth = more traffic.</p>
+            </div>
+          </div>
+          <div class="guide">
+            <div class="guide-num">02</div>
+            <div class="guide-content">
+              <h4>Pick volatile pairs</h4>
+              <p>$ARBME earns from movement. Pair it with high-volume tokens that pump and dump. Stablecoins won't generate traffic.</p>
+            </div>
+          </div>
+          <div class="guide">
+            <div class="guide-num">03</div>
+            <div class="guide-content">
+              <h4>Understand IL</h4>
+              <p>If your paired token dumps 80%, you're holding mostly that token. Only LP with tokens you'd hold anyway.</p>
+            </div>
+          </div>
+          <div class="guide">
+            <div class="guide-num">04</div>
+            <div class="guide-content">
+              <h4>You're in control</h4>
+              <p>No lockups. No staking contracts. Your LP is yours. Withdraw whenever you want.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- For Arbers -->
+      <section id="arbers">
+        <div class="section-label">For Arbers</div>
+        <h2 class="section-title">Finding Deals</h2>
+        <p class="section-desc">
+          $ARBME pools lag behind main DEX during spikes. That's your window.
+        </p>
+
+        <div class="guidelines">
+          <div class="guide">
+            <div class="guide-num">01</div>
+            <div class="guide-content">
+              <h4>Watch for spikes</h4>
+              <p>When a token pumps 20%+ fast, main pools get drained. $ARBME pools still have inventory at the old-ish price.</p>
+            </div>
+          </div>
+          <div class="guide">
+            <div class="guide-num">02</div>
+            <div class="guide-content">
+              <h4>Check pool depth</h4>
+              <p>Thin pools can't handle big trades. $250 pool = small arbs. $2k+ pool = real volume.</p>
+            </div>
+          </div>
+          <div class="guide">
+            <div class="guide-num">03</div>
+            <div class="guide-content">
+              <h4>Multi-hop routes work</h4>
+              <p>Sometimes the best path is TOKEN A → ARBME → TOKEN B → ARBME → ETH. More hops, more fees, but better net price during chaos.</p>
+            </div>
+          </div>
+          <div class="guide">
+            <div class="guide-num">04</div>
+            <div class="guide-content">
+              <h4>Base gas is cheap</h4>
+              <p>~$0.01 per tx means small arbs work. A $5 profit on a $300 trade is viable here.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Risks -->
+      <section id="risks">
+        <div class="section-label">Risks</div>
+        <h2 class="section-title">What Can Go Wrong</h2>
+
+        <div class="warning">
+          <div class="warning-title">$ARBME Price Goes Both Ways</div>
+          <p>
+            When paired tokens pump, arbers buy $ARBME to get the deal. Price rises.
+            When paired tokens dump, arbers sell $ARBME to exit. Price falls.
+            $ARBME absorbs the volatility of its pairs—up AND down.
+          </p>
+        </div>
+
+        <div class="warning">
+          <div class="warning-title">IL Is Real</div>
+          <p>
+            Impermanent loss isn't just a scary term. If your paired token dumps 90%,
+            you're holding a bag of it. Fees might not cover it. Be ready.
+          </p>
+        </div>
+
+        <div class="warning">
+          <div class="warning-title">This Is An Experiment</div>
+          <p>
+            ArbMe is new. Unproven. The mesh thesis makes sense in theory, but real-world
+            performance is unknown. If nobody LPs, it stays small. If nobody arbs, no fees.
+            Don't put in what you can't lose.
+          </p>
+        </div>
+      </section>
+
+      <!-- CTA -->
+      <section class="cta-section">
+        <img class="cta-mascot" src="arbie.png" alt="Arbie">
+        <h2 class="cta-title">Join the Mesh</h2>
+        <p class="cta-desc">
+          LP to earn fees. Arb to profit. Build routes together.
+        </p>
+        <div class="cta-buttons">
+          <a href="#" class="btn btn-primary">Buy $ARBME</a>
+          <a href="#" class="btn btn-ghost">BaseScan</a>
+          <a href="#" class="btn btn-ghost">DexScreener</a>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <div class="container">
+        <div class="footer-inner">
+          <div>
+            <div class="footer-brand">$ARBME</div>
+            <div class="footer-tagline">Decentralized Arbitrage Protocol</div>
+          </div>
+          <div class="footer-ca">
+            CA: <span>TBD — Deploying Soon</span>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+  </div>
+</body>
+</html>
