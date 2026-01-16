@@ -1177,33 +1177,11 @@
           </div>
         </div>
 
-        <div class="pools-controls">
-          <div style="display: flex; align-items: center; gap: 1rem;">
-            <button class="pools-refresh-btn" id="refresh-btn" onclick="manualRefresh()">
-              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-              </svg>
-              <span>Refresh</span>
-            </button>
-            <span class="pools-status" id="pools-status"></span>
-          </div>
-          <div class="pools-auto-refresh">
-            <label>
-              <input type="checkbox" id="auto-refresh" checked>
-              Auto-refresh
-            </label>
-            <select id="refresh-interval">
-              <option value="30">30s</option>
-              <option value="60" selected>1m</option>
-              <option value="120">2m</option>
-              <option value="300">5m</option>
-            </select>
-          </div>
-        </div>
-
         <div id="pools-container">
           <div class="pools-loading">Loading pools...</div>
         </div>
+
+        <div class="pools-refresh" id="pools-refresh"></div>
       </section>
 
       <!-- CTA -->
@@ -1242,9 +1220,6 @@
   <script>
     const API_URL = 'https://arbme-api.dylan-259.workers.dev/pools';
 
-    let isLoading = false;
-    let autoRefreshInterval = null;
-
     function formatUsd(value) {
       if (value >= 1000000) return '$' + (value / 1000000).toFixed(2) + 'M';
       if (value >= 1000) return '$' + (value / 1000).toFixed(2) + 'K';
@@ -1263,33 +1238,14 @@
       return dexNames[dexId] || dexId;
     }
 
-    function setLoading(loading) {
-      isLoading = loading;
-      const btn = document.getElementById('refresh-btn');
-      if (loading) {
-        btn.classList.add('loading');
-        btn.disabled = true;
-        btn.querySelector('span').textContent = 'Refreshing...';
-      } else {
-        btn.classList.remove('loading');
-        btn.disabled = false;
-        btn.querySelector('span').textContent = 'Refresh';
-      }
-    }
-
-    async function fetchPools(forceRefresh = false) {
-      if (isLoading) return;
-
+    async function fetchPools() {
       const container = document.getElementById('pools-container');
       const poolCount = document.getElementById('pool-count');
       const totalTvl = document.getElementById('total-tvl');
-      const statusEl = document.getElementById('pools-status');
-
-      setLoading(true);
+      const refreshEl = document.getElementById('pools-refresh');
 
       try {
-        const url = forceRefresh ? `${API_URL}?refresh=true` : API_URL;
-        const response = await fetch(url);
+        const response = await fetch(API_URL);
         if (!response.ok) throw new Error('API error');
         const data = await response.json();
 
@@ -1318,12 +1274,11 @@
         `;
 
         for (const pool of data.pools) {
-          const sourceTag = pool.source === 'rpc' ? ' <span style="color: var(--accent); font-size: 0.7rem;">(RPC)</span>' : '';
           html += `
             <tr>
               <td class="pool-pair">${pool.pair}</td>
               <td class="pool-dex">${formatDex(pool.dex)}</td>
-              <td class="pool-tvl">${formatUsd(pool.tvl)}${sourceTag}</td>
+              <td class="pool-tvl">${formatUsd(pool.tvl)}</td>
               <td class="pool-volume">${formatUsd(pool.volume24h)}</td>
               <td><a href="${pool.url}" target="_blank" class="pool-link">View</a></td>
             </tr>
@@ -1333,50 +1288,21 @@
         html += '</tbody></table>';
         container.innerHTML = html;
 
-        // Show status
+        // Show refresh time
         const cacheHit = response.headers.get('X-Cache') === 'HIT';
-        const time = new Date(data.lastUpdated).toLocaleTimeString();
-        statusEl.innerHTML = `Updated: ${time}${cacheHit ? ' <span class="cached">(cached)</span>' : ''}`;
+        refreshEl.textContent = `Last updated: ${new Date(data.lastUpdated).toLocaleTimeString()} ${cacheHit ? '(cached)' : ''}`;
 
       } catch (error) {
         container.innerHTML = '<div class="pools-error">Failed to load pools. Please refresh the page.</div>';
         console.error('Failed to fetch pools:', error);
-      } finally {
-        setLoading(false);
       }
     }
 
-    function manualRefresh() {
-      fetchPools(true); // Force refresh bypasses cache
-    }
-
-    function setupAutoRefresh() {
-      const checkbox = document.getElementById('auto-refresh');
-      const select = document.getElementById('refresh-interval');
-
-      function updateInterval() {
-        if (autoRefreshInterval) {
-          clearInterval(autoRefreshInterval);
-          autoRefreshInterval = null;
-        }
-
-        if (checkbox.checked) {
-          const seconds = parseInt(select.value);
-          autoRefreshInterval = setInterval(() => fetchPools(false), seconds * 1000);
-          select.disabled = false;
-        } else {
-          select.disabled = true;
-        }
-      }
-
-      checkbox.addEventListener('change', updateInterval);
-      select.addEventListener('change', updateInterval);
-      updateInterval();
-    }
-
-    // Initialize
+    // Fetch on load
     fetchPools();
-    setupAutoRefresh();
+
+    // Refresh every 60 seconds
+    setInterval(fetchPools, 60000);
   </script>
 </body>
 </html>

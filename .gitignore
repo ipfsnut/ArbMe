@@ -3,6 +3,9 @@ node_modules/
 .venv/
 worker/node_modules/
 
+# Cloudflare Wrangler
+.wrangler/
+
 # Reference projects
 page-tracker/
 
