@@ -123,41 +123,9 @@ app.get('/.well-known/farcaster.json', (req, res) => {
   });
 });
 
-// Miniapp page - Serve inline HTML (TODO: Extract to separate file)
-app.get('/app', async (_req, res) => {
-  // For now, serving a simple message
-  // The miniapp HTML is 12k+ lines and embedded in worker
-  // Will need to extract it to a separate file or build process
-  res.send(`
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ArbMe - Liquidity Pools</title>
-  <style>
-    body {
-      background: #0a0a0f;
-      color: #e8e8f2;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      margin: 0;
-      text-align: center;
-    }
-  </style>
-</head>
-<body>
-  <div>
-    <h1>ArbMe Miniapp</h1>
-    <p>Under construction - coming soon</p>
-    <p><a href="/" style="color: #60a5fa">View Landing Page</a></p>
-  </div>
-</body>
-</html>
-  `);
+// Miniapp page - Serve from static file
+app.get('/app', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../public/app.html'));
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -168,7 +136,7 @@ app.get('/app', async (_req, res) => {
 app.use(express.static(path.join(__dirname, '../public')));
 
 // Root - landing page
-app.get('/', (req, res) => {
+app.get('/', (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
