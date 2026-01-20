@@ -1,0 +1,38 @@
+{
+  "name": "frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "deploy": "npm run build && wrangler pages deploy dist --project-name=arbme-frontend",
+    "deploy:preview": "npm run build && wrangler pages deploy dist --project-name=arbme-frontend --branch=preview"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.90.19",
+    "@uniswap/universal-router-sdk": "^4.29.3",
+    "@uniswap/v4-sdk": "^1.25.5",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "viem": "^2.44.4",
+    "wagmi": "^3.3.4"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.5",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "eslint": "^9.39.1",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.5.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.46.4",
+    "vite": "^7.2.4",
+    "wrangler": "^4.59.2"
+  }
+}

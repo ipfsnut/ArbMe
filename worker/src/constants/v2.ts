@@ -7,10 +7,16 @@ import { TOKEN_METADATA } from './tokens';
 const { PAGE, ARBME, CLANKER } = TOKEN_METADATA;
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// V2 Contract Addresses (Base)
+// V2 Contract Addresses (Base Mainnet)
+// Uniswap V2 Router and Factory deployed on Base
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// Uniswap V2 Router - handles swaps, adding/removing liquidity
+// https://basescan.org/address/0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24
 export const V2_ROUTER = "0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24";
+
+// Uniswap V2 Factory - creates and tracks V2 pairs
+// https://basescan.org/address/0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6
 export const V2_FACTORY = "0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6";
 
 // ═══════════════════════════════════════════════════════════════════════════════

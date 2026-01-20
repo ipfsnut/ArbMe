@@ -312,6 +312,7 @@ export class TradeExecutor {
 
     // Send approval transaction
     const hash = await this.walletClient.writeContract({
+      chain: base,
       address: token,
       abi: ERC20_ABI,
       functionName: 'approve',

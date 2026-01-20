@@ -4,18 +4,35 @@
 
 import { TOKEN_METADATA, TOKENS } from './tokens';
 
-const { ARBME, USDC, cbBTC, CLANKER, PAGE, OINC } = TOKEN_METADATA;
+const { ARBME, /* USDC, */ cbBTC, CLANKER, PAGE, OINC } = TOKEN_METADATA;
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// V4 Contract Addresses (Base)
+// V4 Contract Addresses (Base Mainnet)
+// Uniswap V4 - singleton architecture with hooks support
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// StateView - read-only contract to query pool state (slot0, liquidity, etc)
+// https://basescan.org/address/0xa3c0c9b65bad0b08107aa264b0f3db444b867a71
 export const STATE_VIEW = "0xa3c0c9b65bad0b08107aa264b0f3db444b867a71";
+
+// PoolManager - singleton that manages all V4 pools
+// https://basescan.org/address/0x498581ff718922c3f8e6a244956af099b2652b2b
 export const POOL_MANAGER = "0x498581ff718922c3f8e6a244956af099b2652b2b";
+
+// PositionManager - manages V4 liquidity positions as NFTs
+// https://basescan.org/address/0x7c5f5a4bbd8fd63184577525326123b519429bdc
 export const V4_POSITION_MANAGER = "0x7c5f5a4bbd8fd63184577525326123b519429bdc";
 
-// Shared contracts used by V4
+// ═══════════════════════════════════════════════════════════════════════════════
+// Shared Contracts (used by V4 and other protocols)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Permit2 - Uniswap's token approval manager (shared across V3/V4)
+// https://basescan.org/address/0x000000000022D473030F116dDEE9F6B43aC78BA3
 export const PERMIT2 = "0x000000000022D473030F116dDEE9F6B43aC78BA3";
+
+// WETH - Wrapped ETH on Base (canonical address)
+// https://basescan.org/address/0x4200000000000000000000000000000000000006
 export const WETH = "0x4200000000000000000000000000000000000006";
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -93,17 +110,18 @@ export const OINC_ARBME_POOL = {
 
 // All V4 ARBME pools
 export const V4_ARBME_POOLS: V4PoolConfig[] = [
-  {
-    name: `${USDC.symbol} / ${ARBME.symbol}`,
-    poolId: "0x3b201840a275805ae6d4576df49027c24f2590c6c7d3aad81834b4d4e2f06bb9",
-    token0: USDC.address,
-    token1: ARBME.address,
-    token0Symbol: USDC.symbol,
-    token1Symbol: ARBME.symbol,
-    token0Decimals: USDC.decimals,   // 6 - from single source!
-    token1Decimals: ARBME.decimals,  // 18 - from single source
-    fee: 10000,
-  },
+  // DISABLED: USDC causes incorrect amounts in Uniswap frontend due to 6 decimals
+  // {
+  //   name: `USDC / ${ARBME.symbol}`,
+  //   poolId: "0x3b201840a275805ae6d4576df49027c24f2590c6c7d3aad81834b4d4e2f06bb9",
+  //   token0: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+  //   token1: ARBME.address,
+  //   token0Symbol: "USDC",
+  //   token1Symbol: ARBME.symbol,
+  //   token0Decimals: 6,
+  //   token1Decimals: ARBME.decimals,
+  //   fee: 10000,
+  // },
   {
     name: `${ARBME.symbol} / ${cbBTC.symbol}`,
     poolId: "0x01a4eaafd201e07ba4ce80488c2a7770019aada7995957592524811364217e2a",
@@ -161,8 +179,8 @@ export const KNOWN_V4_POOLS: Record<string, string> = {
   [`${TOKENS.OINC.toLowerCase()}-${ARBME.address.toLowerCase()}-10000-200`]: "0x7c49e36001206a7bb059ceaa5d1ed5485b332eac55fd3efff5e667b72329dd83",
   // CLANKER/PAGE 1% pool
   ["0x1bc0c42215582d5a085795f4badbac3ff36d1bcb-0xc4730f86d1f86ce0712a7b17ee919db7defad7fe-10000-200"]: "0xe8e9437a8191c59839f82121191a37b424f8417f0b3cfdea3277bfec7e8ffe45",
-  // USDC/ARBME 1% pool
-  ["0x833589fcd6edb6e08f4c7c32d4f71b54bda02913-0xc647421c5dc78d1c3960faa7a33f9aefdf4b7b07-10000-200"]: "0x3b201840a275805ae6d4576df49027c24f2590c6c7d3aad81834b4d4e2f06bb9",
+  // DISABLED: USDC/ARBME 1% pool (USDC has 6 decimals - causes incorrect amounts)
+  // ["0x833589fcd6edb6e08f4c7c32d4f71b54bda02913-0xc647421c5dc78d1c3960faa7a33f9aefdf4b7b07-10000-200"]: "0x3b201840a275805ae6d4576df49027c24f2590c6c7d3aad81834b4d4e2f06bb9",
   // ARBME/cbBTC 1% pool
   ["0xc647421c5dc78d1c3960faa7a33f9aefdf4b7b07-0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf-10000-200"]: "0x01a4eaafd201e07ba4ce80488c2a7770019aada7995957592524811364217e2a",
   // CLANKER/ARBME 3% pool

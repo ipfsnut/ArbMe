@@ -3,10 +3,16 @@
  */
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// V3 Contract Addresses (Base)
+// V3 Contract Addresses (Base Mainnet)
+// Uniswap V3 contracts for concentrated liquidity
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// NonfungiblePositionManager - manages V3 liquidity positions as NFTs
+// https://basescan.org/address/0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1
 export const V3_POSITION_MANAGER = "0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1";
+
+// SwapRouter02 - handles V3 swaps with optimized routing
+// https://basescan.org/address/0x2626664c2603336E57B271c5C0b26F421741e481
 export const V3_SWAP_ROUTER = "0x2626664c2603336E57B271c5C0b26F421741e481";
 
 // ═══════════════════════════════════════════════════════════════════════════════

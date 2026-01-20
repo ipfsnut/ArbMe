@@ -108,6 +108,7 @@ async function testSwapSDK() {
 
   try {
     const hash = await walletClient.writeContract({
+      chain: base,
       address: CONTRACTS.UNIVERSAL_ROUTER,
       abi: [{
         inputs: [

@@ -12,6 +12,7 @@ import {
   formatUnits,
   parseUnits,
 } from 'viem';
+import { base } from 'viem/chains';
 import { V4Planner, Actions } from '@uniswap/v4-sdk';
 import { RoutePlanner, CommandType } from '@uniswap/universal-router-sdk';
 
@@ -164,6 +165,7 @@ export async function approveTokenForPermit2(
   console.log(`🔓 Approving ${token} for Permit2...`);
 
   const hash = await client.writeContract({
+    chain: base,
     address: token,
     abi: ERC20_ABI,
     functionName: 'approve',
@@ -200,6 +202,7 @@ export async function approveRouterViaPermit2(
   console.log(`🔓 Approving UniversalRouter via Permit2...`);
 
   const hash = await client.writeContract({
+    chain: base,
     address: CONTRACTS.PERMIT2,
     abi: PERMIT2_ABI,
     functionName: 'approve',
@@ -275,6 +278,7 @@ export async function executeV4SwapSDK(
     console.log('Step 3: Executing swap...');
 
     const hash = await client.writeContract({
+      chain: base,
       address: CONTRACTS.UNIVERSAL_ROUTER,
       abi: [{
         inputs: [

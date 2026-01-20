@@ -51,18 +51,6 @@ import {
   GET_RESERVES,
 } from './constants';
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// UNISWAP SDK IMPORTS (with decimal safety rails)
-// ═══════════════════════════════════════════════════════════════════════════════
-
-import {
-  encodeV4MintPosition,
-  validateV4PoolInit,
-  type V4MintPositionParams,
-} from './lib/v4-pool-operations';
-
-import { validateTokenPair } from './lib/uniswap-sdk-wrapper';
-
 interface Env {
   ARBME_TOKEN: string;
   CACHE_TTL: string;
@@ -438,23 +426,6 @@ async function handlePools(
       );
       if (!alreadyExists) {
         allPools.push(v4Pool);
-      }
-    }
-
-    // Enrich GeckoTerminal V4 pools with fee data from our config
-    for (const pool of allPools) {
-      if (pool.dex.includes('V4') && !pool.fee && pool.token0 && pool.token1) {
-        // Try to match against V4_ARBME_POOLS by token addresses
-        const t0 = pool.token0.toLowerCase();
-        const t1 = pool.token1.toLowerCase();
-        const matchingConfig = V4_ARBME_POOLS.find(cfg => {
-          const cfg0 = cfg.token0.toLowerCase();
-          const cfg1 = cfg.token1.toLowerCase();
-          return (t0 === cfg0 && t1 === cfg1) || (t0 === cfg1 && t1 === cfg0);
-        });
-        if (matchingConfig) {
-          pool.fee = matchingConfig.fee;
-        }
       }
     }
 
@@ -1994,15 +1965,6 @@ async function handleMiniApp(
     .pool-badge.v2 { background: rgba(99, 102, 241, 0.15); color: #818cf8; }
     .pool-badge.v3 { background: rgba(236, 72, 153, 0.15); color: #f472b6; }
     .pool-badge.v4 { background: rgba(16, 185, 129, 0.15); color: var(--accent); }
-    .pool-badge.low-liq { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
-    .pool-fee-badge {
-      font-size: 0.5625rem;
-      padding: 0.125rem 0.375rem;
-      border-radius: 4px;
-      font-weight: 600;
-      background: rgba(245, 158, 11, 0.15);
-      color: #f59e0b;
-    }
     .pool-add-btn {
       width: 36px;
       height: 36px;
@@ -4420,8 +4382,7 @@ async function handleMiniApp(
      */
     function formatFromRaw(raw, decimals) {
       if (raw === null || raw === undefined) return 0;
-      // CRITICAL: null check before numeric comparison (null < 0 is false!)
-      if (decimals === null || decimals === undefined || decimals < 0 || decimals > 24) return 0;
+      if (decimals < 0 || decimals > 24) return 0;
       try {
         let rawNum;
         if (typeof raw === 'bigint') {
@@ -4452,8 +4413,7 @@ async function handleMiniApp(
      */
     function toRawAmount(amount, decimals) {
       if (amount === null || amount === undefined) return BigInt(0);
-      // CRITICAL: null check before numeric comparison (null < 0 is false!)
-      if (decimals === null || decimals === undefined || decimals < 0 || decimals > 24) return BigInt(0);
+      if (decimals < 0 || decimals > 24) return BigInt(0);
       try {
         const amountNum = typeof amount === 'string' ? parseFloat(amount) : amount;
         if (!Number.isFinite(amountNum) || amountNum < 0) return BigInt(0);
@@ -4652,12 +4612,6 @@ async function handleMiniApp(
       const rawPrice = sqrtPriceX96ToRawPrice(sqrtPriceX96);
       if (rawPrice === 0) return 0;
 
-      // CRITICAL: null check for decimals to prevent NaN results
-      if (decimals0 === null || decimals0 === undefined || decimals1 === null || decimals1 === undefined) {
-        console.warn('[ArbMe] sqrtPriceX96ToPrice: Missing decimals, cannot calculate price');
-        return 0;
-      }
-
       // Adjust for decimal difference
       const decimalAdjust = Math.pow(10, decimals0 - decimals1);
       return rawPrice * decimalAdjust;
@@ -4847,13 +4801,6 @@ async function handleMiniApp(
      */
     function parsePositionAmount(rawAmount, decimals) {
       if (!rawAmount) return 0;
-
-      // CRITICAL: If decimals is null/undefined, we cannot safely format the amount
-      // Math.pow(10, null) = 1, which would show raw values as if they were formatted!
-      if (decimals === null || decimals === undefined) {
-        console.warn('[ArbMe] parsePositionAmount: Missing decimals, returning 0');
-        return 0;
-      }
 
       try {
         const raw = typeof rawAmount === 'bigint' ? rawAmount : BigInt(rawAmount);
@@ -5350,27 +5297,10 @@ async function handleMiniApp(
         token0Amount: 0,
         token1Amount: 0,
         inRange: true,
-        currentTick: 0,
-        decimalsUnknown: false
+        currentTick: 0
       };
 
       if (!slot0 || !slot0.sqrtPriceX96 || !position.liquidity || position.liquidity === '0') {
-        return result;
-      }
-
-      // CRITICAL: If decimals are null/undefined, we cannot safely calculate amounts
-      // Math.pow(10, null) = 1, which would show raw values as if they were formatted!
-      if (decimals0 === null || decimals0 === undefined || decimals1 === null || decimals1 === undefined) {
-        console.warn('[ArbMe] calculatePositionAmounts: Missing decimals, cannot calculate amounts safely');
-        result.decimalsUnknown = true;
-        // Still calculate in-range status
-        try {
-          const sqrtPriceX96 = BigInt(slot0.sqrtPriceX96);
-          result.currentTick = slot0.tick || sqrtPriceX96ToTick(sqrtPriceX96);
-          result.inRange = isPositionInRange(result.currentTick, position.tickLower, position.tickUpper);
-        } catch (e) {
-          console.error('[ArbMe] calculatePositionAmounts tick error:', e);
-        }
         return result;
       }
 
@@ -6049,11 +5979,9 @@ async function handleMiniApp(
             const slot0 = v3PoolSlot0Cache[poolKey];
 
             // Use consolidated utility for position amount calculation (P2.13)
-            // When slot0 is unavailable, use null for inRange to indicate "unknown" state
-            const hasPoolData = !!(slot0 && v3pos.hasLiquidity && v3pos.liquidity !== '0');
-            const posAmounts = hasPoolData
+            const posAmounts = (slot0 && v3pos.hasLiquidity && v3pos.liquidity !== '0')
               ? calculatePositionAmounts(slot0, v3pos, decimals0, decimals1)
-              : { token0Amount: 0, token1Amount: 0, inRange: null, currentTick: 0 };
+              : { token0Amount: 0, token1Amount: 0, inRange: true, currentTick: 0 };
 
             // Calculate pool share using consolidated utility (P2.13)
             let poolShare = 0;
@@ -6089,10 +6017,9 @@ async function handleMiniApp(
               tokensOwed1: tokensOwed1,
               hasUnclaimedFees: tokensOwed0Raw > BigInt(0) || tokensOwed1Raw > BigInt(0),
               isV3: true,
-              isClosed: !v3pos.hasLiquidity || v3pos.liquidity === '0',
+              isClosed: !v3pos.hasLiquidity,
               poolShare: poolShare,
               poolAddress: slot0?.poolAddress || '',
-              poolDataAvailable: hasPoolData,
             });
           }
         }
@@ -6160,11 +6087,9 @@ async function handleMiniApp(
               const slot0 = v4PoolSlot0Cache[poolKey];
 
               // Use consolidated utility for position amount calculation (P2.13)
-              // When slot0 is unavailable, use null for inRange to indicate "unknown" state
-              const hasPoolData = !!(slot0 && v4pos.hasLiquidity && v4pos.liquidity !== '0');
-              const posAmounts = hasPoolData
+              const posAmounts = (slot0 && v4pos.hasLiquidity && v4pos.liquidity !== '0')
                 ? calculatePositionAmounts(slot0, v4pos, decimals0, decimals1)
-                : { token0Amount: 0, token1Amount: 0, inRange: null, currentTick: 0 };
+                : { token0Amount: 0, token1Amount: 0, inRange: true, currentTick: 0 };
 
               // Calculate pool share using consolidated utility (P2.13)
               let poolShare = 0;
@@ -6202,10 +6127,9 @@ async function handleMiniApp(
                 tokensOwed1: tokensOwed1,
                 hasUnclaimedFees: tokensOwed0Raw > BigInt(0) || tokensOwed1Raw > BigInt(0),
                 isV4: true,
-                isClosed: !v4pos.hasLiquidity || v4pos.liquidity === '0',
+                isClosed: !v4pos.hasLiquidity,
                 poolShare: poolShare,
                 poolId: slot0?.poolId || '',
-                poolDataAvailable: hasPoolData,
               });
             }
           }
@@ -6321,18 +6245,8 @@ async function handleMiniApp(
         }
 
         // Helper to build pool stats HTML
-        function buildPoolStats(pool, position) {
-          if (!pool) {
-            // Check if this is a non-ARBME pool (we only track ARBME pools)
-            const isArbmePool = position && (
-              position.token0?.toUpperCase() === 'ARBME' ||
-              position.token1?.toUpperCase() === 'ARBME'
-            );
-            const message = isArbmePool
-              ? 'Pool data temporarily unavailable'
-              : 'Non-ARBME pool - market data not tracked';
-            return \`<div class="position-pool-stats"><div class="pool-stat"><div class="pool-stat-label">\${message}</div></div></div>\`;
-          }
+        function buildPoolStats(pool) {
+          if (!pool) return '<div class="position-pool-stats"><div class="pool-stat"><div class="pool-stat-label">Pool data unavailable</div></div></div>';
           // Use actual pool fee rate (convert from basis points like 3000=0.3%, 10000=1%)
           const feeRate = pool.fee ? (pool.fee / 1000000) : (pool.dex?.includes('V3') || pool.dex?.includes('V4') ? 0.003 : 0.003);
           const apr = pool.tvl > 0 && pool.volume24h > 0 ? ((pool.volume24h * feeRate / pool.tvl) * 365 * 100) : 0;
@@ -6411,33 +6325,18 @@ async function handleMiniApp(
               // Calculate USD value from token amounts
               const price0 = tokenPrices[pos.token0Address?.toLowerCase()] || 0;
               const price1 = tokenPrices[pos.token1Address?.toLowerCase()] || 0;
-              const hasTokens = (pos.token0Amount || 0) > 0 || (pos.token1Amount || 0) > 0;
-              const hasPrices = price0 > 0 || price1 > 0;
               const positionUsdValue = (pos.token0Amount || 0) * price0 + (pos.token1Amount || 0) * price1;
-              let usdDisplay;
-              if (positionUsdValue > 0.01) {
-                usdDisplay = '$' + positionUsdValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-              } else if (positionUsdValue > 0) {
-                usdDisplay = '<$0.01';
-              } else if (hasTokens && !hasPrices) {
-                usdDisplay = 'Price N/A';
-              } else {
-                usdDisplay = '--';
-              }
+              const usdDisplay = positionUsdValue > 0.01
+                ? '$' + positionUsdValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                : positionUsdValue > 0 ? '<$0.01' : '--';
 
-              // In-range badge - handle null (unknown) state when pool data unavailable
-              let rangeBadge = '';
-              if (!pos.isClosed) {
-                if (pos.inRange === true) {
-                  rangeBadge = '<span class="position-badge in-range">In Range</span>';
-                } else if (pos.inRange === false) {
-                  rangeBadge = '<span class="position-badge out-of-range">Out of Range</span>';
-                }
-                // When inRange is null, don't show any badge (pool data unavailable)
-              }
+              // In-range badge
+              const rangeBadge = pos.isClosed ? '' : (pos.inRange
+                ? '<span class="position-badge in-range">In Range</span>'
+                : '<span class="position-badge out-of-range">Out of Range</span>');
 
               return \`
-                <div class="position-card \${pos.isClosed ? 'closed' : ''} \${pos.inRange === false && !pos.isClosed ? 'out-of-range' : ''}">
+                <div class="position-card \${pos.isClosed ? 'closed' : ''} \${!pos.inRange && !pos.isClosed ? 'out-of-range' : ''}">
                   <div class="position-top">
                     <div class="position-pair">
                       <div class="position-icons">
@@ -6454,7 +6353,7 @@ async function handleMiniApp(
                       <div class="position-value-label">My Value</div>
                     </div>
                   </div>
-                  \${buildPoolStats(matchingPool, pos)}
+                  \${buildPoolStats(matchingPool)}
                   \${feesData.html}
                   <div class="position-details">
                     <div class="position-detail">
@@ -6509,7 +6408,7 @@ async function handleMiniApp(
                     <div class="position-value-label">My Value</div>
                   </div>
                 </div>
-                \${buildPoolStats(matchingPool, pos)}
+                \${buildPoolStats(matchingPool)}
                 <div class="position-details">
                   <div class="position-detail">
                     <div class="position-detail-value">\${formatNumber(pos.token0Amount)}</div>
@@ -6577,12 +6476,6 @@ async function handleMiniApp(
         const aprDisplay = apr > 0 ? apr.toFixed(1) + '%' : '--';
         const aprClass = apr >= 100 ? 'apr-high' : apr >= 20 ? 'apr-medium' : '';
 
-        // Format fee tier for display (e.g., 10000 -> "1%", 30000 -> "3%")
-        const feeDisplay = p.fee ? (p.fee / 10000).toFixed(p.fee % 10000 === 0 ? 0 : 2) + '%' : '';
-        const feeBadge = feeDisplay ? '<span class="pool-fee-badge">' + feeDisplay + '</span>' : '';
-        // Low liquidity warning for pools with TVL < $1
-        const lowLiqBadge = p.tvl < 1 ? '<span class="pool-badge low-liq">Low Liq</span>' : '';
-
         return \`
         <div class="pool">
           <div class="pool-top">
@@ -6595,8 +6488,6 @@ async function handleMiniApp(
               <div class="pool-meta">
                 <span class="pool-dex">\${p.dex.replace('Uniswap ', '')}</span>
                 \${getVersionBadge(p.dex)}
-                \${feeBadge}
-                \${lowLiqBadge}
               </div>
               \${priceHtml}
             </div>
@@ -8401,81 +8292,33 @@ async function handleMiniApp(
 
         console.log('[ArbMe] executePoolCreation - isNewPool:', isNewPool, 'liquidity:', liquidity.toString());
 
-        // ═══════════════════════════════════════════════════════════════════════
-        // BUILD TRANSACTION USING UNISWAP SDK (with decimal validation)
-        // ═══════════════════════════════════════════════════════════════════════
-
+        // Build transaction
         const deadline = Math.floor(Date.now() / 1000) + 1200;
+        const currency0Hex = currency0.slice(2).toLowerCase().padStart(64, '0');
+        const currency1Hex = currency1.slice(2).toLowerCase().padStart(64, '0');
+        const feePadded = fee.toString(16).padStart(64, '0');
+        const tickSpacingPadded = (tickSpacing >= 0 ? tickSpacing : (0x1000000 + tickSpacing)).toString(16).padStart(64, '0');
+        const hooksAddress = '0'.padStart(64, '0');
 
-        // STEP 1: Validate token pair using SDK safety rails
-        console.log('[ArbMe SDK] Validating token pair before encoding...');
-        const token0Info = {
-          address: currency0,
-          symbol: sym0,
-          decimals: dec0,
-        };
-        const token1Info = {
-          address: currency1,
-          symbol: sym1,
-          decimals: dec1,
-        };
+        const tickLowerEncoded = encodeInt24(tickLower);
+        const tickUpperEncoded = encodeInt24(tickUpper);
+        const liquidityPadded = liquidity.toString(16).padStart(64, '0');
+        const amount0MaxPadded = amount0Raw.toString(16).padStart(64, '0');
+        const amount1MaxPadded = amount1Raw.toString(16).padStart(64, '0');
+        const recipientPadded = connectedWallet.slice(2).toLowerCase().padStart(64, '0');
+        const hookDataOffsetValue = (12 * 32).toString(16).padStart(64, '0');
+        const hookDataLength = '0'.padStart(64, '0');
 
-        const pairValidation = validateTokenPair(token0Info, token1Info);
+        const mintParams = currency0Hex + currency1Hex + feePadded + tickSpacingPadded + hooksAddress +
+          tickLowerEncoded + tickUpperEncoded + liquidityPadded + amount0MaxPadded + amount1MaxPadded +
+          recipientPadded + hookDataOffsetValue + hookDataLength;
+        const settleParams = currency0Hex + currency1Hex;
 
-        if (!pairValidation.valid) {
-          console.error('[ArbMe SDK] Token validation FAILED:', pairValidation.error);
-          throw new Error('Token validation failed: ' + pairValidation.error);
-        }
-
-        // Log any warnings (e.g., non-18 decimal whitelisted tokens)
-        if (pairValidation.warnings) {
-          pairValidation.warnings.forEach(warning => {
-            console.warn('[ArbMe SDK]', warning);
-          });
-        }
-
-        console.log('[ArbMe SDK] ✅ Token pair validated - safe to proceed');
-
-        // STEP 2: Build mint position using SDK
-        console.log('[ArbMe SDK] Encoding V4 mint position with official Uniswap SDK...');
-
-        const mintPositionParams: V4MintPositionParams = {
-          token0: token0Info,
-          token1: token1Info,
-          fee,
-          tickSpacing,
-          tickLower,
-          tickUpper,
-          liquidity,
-          amount0Max: amount0Raw,
-          amount1Max: amount1Raw,
-          amount0Min: BigInt(0), // Could add slippage here
-          amount1Min: BigInt(0),
-          recipient: connectedWallet,
-        };
-
-        const encoded = encodeV4MintPosition(mintPositionParams);
-
-        if (!encoded.validation.valid) {
-          console.error('[ArbMe SDK] Encoding validation FAILED:', encoded.validation.error);
-          throw new Error('SDK encoding failed: ' + encoded.validation.error);
-        }
-
-        console.log('[ArbMe SDK] ✅ V4 actions encoded successfully');
-        console.log('[ArbMe SDK]   Actions:', encoded.actions);
-        console.log('[ArbMe SDK]   Params:', encoded.params.length, 'items');
-
-        // STEP 3: Build modifyLiquidities calldata from SDK output
-        // The SDK gives us actions (hex string) and params (array of hex strings)
-        // We need to encode this as unlockData for modifyLiquidities(bytes unlockData, uint256 deadline)
-
-        const actionsHex = encoded.actions.startsWith('0x') ? encoded.actions.slice(2) : encoded.actions;
-        const paramsArray = encoded.params.map(p => p.startsWith('0x') ? p.slice(2) : p);
-
-        // Encode as per V4Planner's unlockData structure
-        const actionsLength = actionsHex.length / 2;
+        const actionsBytes = '020d';
+        const paramsArray = [mintParams, settleParams];
+        const actionsLength = actionsBytes.length / 2;
         const actionsLengthPadded = actionsLength.toString(16).padStart(64, '0');
-        const actionsPadded = actionsHex.padEnd(Math.ceil(actionsHex.length / 2) * 2, '0');
+        const actionsPadded = actionsBytes.padEnd(64, '0');
         const offsetActions = (64).toString(16).padStart(64, '0');
         const offsetParams = (64 + 32 + 32).toString(16).padStart(64, '0');
         const numParams = paramsArray.length;
@@ -8507,8 +8350,6 @@ async function handleMiniApp(
         const unlockDataPadded = unlockData.padEnd(Math.ceil(unlockData.length / 64) * 64, '0');
         const callData = modifyLiqSelector + unlockDataOffset + deadlinePadded + unlockDataLength + unlockDataPadded;
         const modifyLiqCallData = '0x' + callData.slice(2);
-
-        console.log('[ArbMe SDK] ✅ modifyLiquidities calldata built');
 
         let finalCallData;
         if (isNewPool) {
@@ -11394,91 +11235,85 @@ async function handleMiniApp(
         // Deadline: 20 minutes from now
         const deadline = Math.floor(Date.now() / 1000) + 1200;
 
-        // ═══════════════════════════════════════════════════════════════════════
-        // BUILD TRANSACTION USING UNISWAP SDK (with decimal validation)
-        // ═══════════════════════════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════════════════════
+        // ENCODE modifyLiquidities CALL
+        // ═══════════════════════════════════════════════════════════════
 
-        setV4AddTxStatus('Building transaction with SDK...', 'pending');
+        // Actions depend on whether we're creating a new pool
+        // INITIALIZE_POOL (0x00), MINT_POSITION (0x02), SETTLE_PAIR (0x0d)
+        const actions = isNewPool ? '00020d' : '020d';
 
-        // STEP 1: Validate token pair using SDK safety rails
-        console.log('[ArbMe SDK] Validating token pair before encoding...');
-        const token0Info = {
-          address: v4AddPool.token0,
-          symbol: v4AddPool.token0Symbol,
-          decimals: v4AddPool.token0Decimals,
-        };
-        const token1Info = {
-          address: v4AddPool.token1,
-          symbol: v4AddPool.token1Symbol,
-          decimals: v4AddPool.token1Decimals,
-        };
+        // PoolKey encoding: (address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks)
+        const currency0 = v4AddPool.token0.slice(2).toLowerCase().padStart(64, '0');
+        const currency1 = v4AddPool.token1.slice(2).toLowerCase().padStart(64, '0');
+        const feePadded = v4AddSelectedFee.toString(16).padStart(64, '0');
+        const tickSpacingPadded = (tickSpacing >= 0 ? tickSpacing : (0x1000000 + tickSpacing)).toString(16).padStart(64, '0');
+        const hooksAddress = (v4AddPool.hooks || '0x0000000000000000000000000000000000000000').slice(2).toLowerCase().padStart(64, '0');
 
-        const pairValidation = validateTokenPair(token0Info, token1Info);
+        // MINT_POSITION params: (PoolKey, tickLower, tickUpper, liquidity, amount0Max, amount1Max, recipient, hookData)
+        // PoolKey: (currency0, currency1, fee, tickSpacing, hooks) - 5 * 32 = 160 bytes
+        // Other params: tickLower, tickUpper, liquidity, amount0Max, amount1Max, recipient - 6 * 32 = 192 bytes
+        // hookData offset: at byte 352 (11 * 32), points to byte 384 (12 * 32) where hookData starts
+        // Total static part: 12 * 32 = 384 bytes
+        const tickLowerEncoded = encodeInt24(tickLower);
+        const tickUpperEncoded = encodeInt24(tickUpper);
+        const liquidityPadded = liquidity.toString(16).padStart(64, '0');
+        const amount0MaxPadded = amount0Raw.toString(16).padStart(64, '0');
+        const amount1MaxPadded = amount1Raw.toString(16).padStart(64, '0');
+        const recipientPadded = connectedWallet.slice(2).toLowerCase().padStart(64, '0');
+        // hookData offset: 12 * 32 = 384 = 0x180 (pointing to after all static fields)
+        const hookDataOffsetValue = (12 * 32).toString(16).padStart(64, '0');
+        // Empty hookData: length = 0
+        const hookDataLength = '0'.padStart(64, '0');
 
-        if (!pairValidation.valid) {
-          console.error('[ArbMe SDK] Token validation FAILED:', pairValidation.error);
-          throw new Error('Token validation failed: ' + pairValidation.error);
-        }
+        // params[0] for MINT_POSITION
+        // ABI encode: (PoolKey struct fields) + other params + hookData offset + hookData (length + content)
+        const mintParams =
+          currency0 +
+          currency1 +
+          feePadded +
+          tickSpacingPadded +
+          hooksAddress +
+          tickLowerEncoded +
+          tickUpperEncoded +
+          liquidityPadded +
+          amount0MaxPadded +
+          amount1MaxPadded +
+          recipientPadded +
+          hookDataOffsetValue +
+          hookDataLength; // Empty hookData (just length = 0)
 
-        // Log any warnings (e.g., non-18 decimal whitelisted tokens)
-        if (pairValidation.warnings) {
-          pairValidation.warnings.forEach(warning => {
-            console.warn('[ArbMe SDK]', warning);
-          });
-        }
+        // SETTLE_PAIR params: (currency0, currency1)
+        const settleParams = currency0 + currency1;
 
-        console.log('[ArbMe SDK] ✅ Token pair validated - safe to proceed');
+        // modifyLiquidities always uses MINT_POSITION (0x02) + SETTLE_PAIR (0x0d)
+        // For new pools, we'll call initializePool separately via multicall
+        const actionsBytes = '020d'; // MINT_POSITION + SETTLE_PAIR
+        const paramsArray = [mintParams, settleParams];
 
-        // STEP 2: Build mint position using SDK
-        console.log('[ArbMe SDK] Encoding V4 mint position with official Uniswap SDK...');
-
-        const mintPositionParams: V4MintPositionParams = {
-          token0: token0Info,
-          token1: token1Info,
-          fee: v4AddSelectedFee,
-          tickSpacing,
-          tickLower,
-          tickUpper,
-          liquidity,
-          amount0Max: amount0Raw,
-          amount1Max: amount1Raw,
-          amount0Min: BigInt(0), // Could add slippage here
-          amount1Min: BigInt(0),
-          recipient: connectedWallet,
-        };
-
-        const encoded = encodeV4MintPosition(mintPositionParams);
-
-        if (!encoded.validation.valid) {
-          console.error('[ArbMe SDK] Encoding validation FAILED:', encoded.validation.error);
-          throw new Error('SDK encoding failed: ' + encoded.validation.error);
-        }
-
-        console.log('[ArbMe SDK] ✅ V4 actions encoded successfully');
-        console.log('[ArbMe SDK]   Actions:', encoded.actions);
-        console.log('[ArbMe SDK]   Params:', encoded.params.length, 'items');
-
-        // STEP 3: Build modifyLiquidities calldata from SDK output
-        const actionsHex = encoded.actions.startsWith('0x') ? encoded.actions.slice(2) : encoded.actions;
-        const paramsArray = encoded.params.map(p => p.startsWith('0x') ? p.slice(2) : p);
-
-        // Encode as per V4Planner's unlockData structure
-        const actionsLength = actionsHex.length / 2;
+        // Encode params array with dynamic offsets
+        const actionsLength = actionsBytes.length / 2;
         const actionsLengthPadded = actionsLength.toString(16).padStart(64, '0');
-        const actionsPadded = actionsHex.padEnd(Math.ceil(actionsHex.length / 2) * 2, '0');
+        const actionsPadded = actionsBytes.padEnd(64, '0');
+
         const offsetActions = (64).toString(16).padStart(64, '0');
         const offsetParams = (64 + 32 + 32).toString(16).padStart(64, '0');
+
+        // Build params array encoding
         const numParams = paramsArray.length;
         const paramsArrayLength = numParams.toString(16).padStart(64, '0');
 
+        // Calculate offsets for each param
         let paramOffsets = [];
-        let currentOffset = numParams * 32;
+        let currentOffset = numParams * 32; // Start after all offset words
         for (let i = 0; i < numParams; i++) {
           paramOffsets.push(currentOffset.toString(16).padStart(64, '0'));
+          const paramLen = paramsArray[i].length / 2;
           const paddedLen = Math.ceil(paramsArray[i].length / 64) * 32;
-          currentOffset += 32 + paddedLen;
+          currentOffset += 32 + paddedLen; // length word + padded data
         }
 
+        // Encode each param with length prefix
         let paramsData = '';
         for (let i = 0; i < numParams; i++) {
           const paramBytes = paramsArray[i];
@@ -11489,7 +11324,15 @@ async function handleMiniApp(
         }
 
         const paramsArrayEncoded = paramsArrayLength + paramOffsets.join('') + paramsData;
-        const unlockData = offsetActions + offsetParams + actionsLengthPadded + actionsPadded + paramsArrayEncoded;
+
+        const unlockData =
+          offsetActions +
+          offsetParams +
+          actionsLengthPadded +
+          actionsPadded +
+          paramsArrayEncoded;
+
+        // modifyLiquidities(bytes unlockData, uint256 deadline) selector: 0xdd46508f
         const modifyLiqSelector = '0xdd46508f';
 
         // Encode the final call
