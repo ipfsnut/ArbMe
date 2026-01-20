@@ -167,31 +167,43 @@ export async function getTokenPrice(tokenAddress: string): Promise<number> {
 export async function getTokenPrices(tokenAddresses: string[]): Promise<Map<string, number>> {
   const prices = new Map<string, number>();
 
+  console.log(`[Tokens] Fetching prices for ${tokenAddresses.length} tokens from GeckoTerminal...`);
+
   // GeckoTerminal supports batch queries
   try {
     const addressList = tokenAddresses.join(',');
     const url = `https://api.geckoterminal.com/api/v2/simple/networks/base/token_price/${addressList}`;
+    console.log(`[Tokens] GeckoTerminal URL: ${url}`);
+
     const response = await fetch(url);
+    console.log(`[Tokens] GeckoTerminal response status: ${response.status}`);
 
     if (!response.ok) {
       console.error(`[Tokens] Batch price fetch failed: ${response.status}`);
+      const errorText = await response.text();
+      console.error(`[Tokens] Error response: ${errorText}`);
       return prices;
     }
 
     const data = await response.json() as any;
     const tokenPrices = data?.data?.attributes?.token_prices || {};
+    console.log(`[Tokens] GeckoTerminal returned prices for ${Object.keys(tokenPrices).length} tokens`);
 
     for (const address of tokenAddresses) {
       const normalizedAddress = address.toLowerCase();
       const price = tokenPrices[normalizedAddress];
       if (price) {
         prices.set(normalizedAddress, parseFloat(price));
+        console.log(`[Tokens] ${address}: $${parseFloat(price)}`);
+      } else {
+        console.warn(`[Tokens] No price found for ${address}`);
       }
     }
   } catch (error) {
     console.error('[Tokens] Batch price fetch failed:', error);
   }
 
+  console.log(`[Tokens] Returning ${prices.size} prices`);
   return prices;
 }
 
