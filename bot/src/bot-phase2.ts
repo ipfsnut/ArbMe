@@ -289,7 +289,7 @@ async function executeTrade(opportunity: TradeOpportunity, prices: PriceFeed): P
     // Get quote
     console.log('\n📊 Getting swap quote...');
     const quote = await getSwapQuote(
-      publicClient,
+      publicClient as any,
       poolId,
       amountIn,
       opportunity.tokenIn,

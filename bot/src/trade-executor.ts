@@ -312,7 +312,8 @@ export class TradeExecutor {
 
     // Send approval transaction
     const hash = await this.walletClient.writeContract({
-      chain: base,
+      account: this.account,
+      chain: null,
       address: token,
       abi: ERC20_ABI,
       functionName: 'approve',
@@ -430,7 +431,7 @@ export class TradeExecutor {
 
       const swapResult = await executeV4SwapSDK(
         this.walletClient,
-        this.publicClient,
+        this.publicClient as any,
         {
           poolKey,
           zeroForOne,

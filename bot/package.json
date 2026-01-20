@@ -17,7 +17,7 @@
     "@uniswap/universal-router-sdk": "^4.29.3",
     "@uniswap/v4-sdk": "^1.25.5",
     "dotenv": "^16.4.5",
-    "viem": "^2.21.54"
+    "viem": "^1.21.4"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

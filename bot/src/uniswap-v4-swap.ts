@@ -17,7 +17,6 @@ import {
   parseUnits,
   formatUnits,
 } from 'viem';
-import { base } from 'viem/chains';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONTRACTS
@@ -225,7 +224,8 @@ export async function approveTokenForPermit2(
   console.log(`🔓 Approving ${token} for Permit2...`);
 
   const hash = await client.writeContract({
-    chain: base,
+    account,
+    chain: null,
     address: token,
     abi: ERC20_ABI,
     functionName: 'approve',
@@ -266,7 +266,8 @@ export async function approveRouterViaPermit2(
   console.log(`🔓 Approving UniversalRouter via Permit2...`);
 
   const hash = await client.writeContract({
-    chain: base,
+    account,
+    chain: null,
     address: CONTRACTS.PERMIT2,
     abi: PERMIT2_ABI,
     functionName: 'approve',
@@ -413,7 +414,8 @@ export async function executeV4Swap(
     // Manual gas limit to avoid over-estimation
     // V4 swaps on Base typically use ~200k gas
     const hash = await client.writeContract({
-      chain: base,
+      account,
+      chain: null,
       address: CONTRACTS.UNIVERSAL_ROUTER,
       abi: UNIVERSAL_ROUTER_ABI,
       functionName: 'execute',
