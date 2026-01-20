@@ -10057,6 +10057,16 @@
     // Init
     async function init() {
       console.log('[ArbMe] Initializing...');
+
+      // CRITICAL: Call ready() ASAP to prevent infinite loading screen
+      try {
+        await sdk.actions.ready();
+        console.log('[ArbMe] SDK ready signal sent');
+      } catch (e) {
+        console.error('[ArbMe] Failed to send ready signal:', e);
+      }
+
+      // Now load pools and connect wallet
       await loadPools();
 
       // Auto-connect wallet in Farcaster context
@@ -10074,8 +10084,7 @@
       const content = document.getElementById('positions-content');
       content.style.maxHeight = content.scrollHeight + 'px';
 
-      await sdk.actions.ready();
-      console.log('[ArbMe] Ready');
+      console.log('[ArbMe] Initialization complete');
     }
     init();
   </script>
