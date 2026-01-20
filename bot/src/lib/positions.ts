@@ -4,6 +4,7 @@
 
 import { createPublicClient, http, Address, formatUnits } from 'viem';
 import { base } from 'viem/chains';
+import { getTokenMetadata, getTokenPrices, calculateUsdValue } from './tokens.js';
 
 // Contract addresses
 const V2_ROUTER = '0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24';
@@ -158,6 +159,9 @@ export async function fetchUserPositions(
     // Fetch V4 positions (TODO: implement when V4 position structure is clear)
     // const v4Positions = await fetchV4Positions(client, walletAddress as Address);
     // positions.push(...v4Positions);
+
+    // Enrich with token metadata and prices
+    await enrichPositionsWithMetadata(positions, alchemyKey);
   } catch (error) {
     console.error('[Positions] Error fetching positions:', error);
   }
@@ -311,4 +315,62 @@ async function fetchV3Positions(client: any, wallet: Address): Promise<Position[
   }
 
   return positions;
+}
+
+/**
+ * Enrich positions with token symbols, decimals, and USD values
+ */
+async function enrichPositionsWithMetadata(
+  positions: Position[],
+  alchemyKey?: string
+): Promise<void> {
+  if (positions.length === 0) return;
+
+  // Collect all unique token addresses
+  const tokenAddresses = new Set<string>();
+  for (const position of positions) {
+    tokenAddresses.add(position.token0.toLowerCase());
+    tokenAddresses.add(position.token1.toLowerCase());
+  }
+
+  console.log(`[Positions] Fetching metadata for ${tokenAddresses.size} tokens...`);
+
+  // Fetch token metadata in parallel
+  const metadataPromises = Array.from(tokenAddresses).map((address) =>
+    getTokenMetadata(address, alchemyKey)
+  );
+  const metadataResults = await Promise.all(metadataPromises);
+
+  // Build metadata map
+  const metadataMap = new Map<string, { symbol: string; decimals: number }>();
+  for (const metadata of metadataResults) {
+    metadataMap.set(metadata.address.toLowerCase(), {
+      symbol: metadata.symbol,
+      decimals: metadata.decimals,
+    });
+  }
+
+  // Fetch token prices
+  const priceMap = await getTokenPrices(Array.from(tokenAddresses));
+
+  // Enrich each position
+  for (const position of positions) {
+    const token0Meta = metadataMap.get(position.token0.toLowerCase());
+    const token1Meta = metadataMap.get(position.token1.toLowerCase());
+    const token0Price = priceMap.get(position.token0.toLowerCase()) || 0;
+    const token1Price = priceMap.get(position.token1.toLowerCase()) || 0;
+
+    if (token0Meta && token1Meta) {
+      // Update pair name with symbols
+      position.pair = `${token0Meta.symbol} / ${token1Meta.symbol}`;
+
+      // For V2 positions, we have reserves data - calculate USD value
+      // For now, just update the pair name. USD calculation would require fetching reserves.
+
+      // TODO: Calculate actual USD values for V2 positions using reserves
+      // TODO: Calculate USD values for V3 positions using liquidity and tick ranges
+    }
+  }
+
+  console.log(`[Positions] Enriched ${positions.length} positions with metadata`);
 }
