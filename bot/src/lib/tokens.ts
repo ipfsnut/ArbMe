@@ -147,7 +147,7 @@ export async function getTokenPrice(tokenAddress: string): Promise<number> {
       return 0;
     }
 
-    const data = await response.json();
+    const data = await response.json() as any;
     const priceData = data?.data?.attributes?.token_prices?.[tokenAddress.toLowerCase()];
 
     if (priceData) {
@@ -178,7 +178,7 @@ export async function getTokenPrices(tokenAddresses: string[]): Promise<Map<stri
       return prices;
     }
 
-    const data = await response.json();
+    const data = await response.json() as any;
     const tokenPrices = data?.data?.attributes?.token_prices || {};
 
     for (const address of tokenAddresses) {

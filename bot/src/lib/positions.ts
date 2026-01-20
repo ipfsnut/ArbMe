@@ -112,6 +112,53 @@ const V3_NFT_ABI = [
   },
 ] as const;
 
+const V4_NFT_ABI = [
+  {
+    name: 'balanceOf',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'owner', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    name: 'tokenOfOwnerByIndex',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'owner', type: 'address' },
+      { name: 'index', type: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    name: 'getPoolAndPositionInfo',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'tokenId', type: 'uint256' }],
+    outputs: [
+      {
+        name: 'poolKey',
+        type: 'tuple',
+        components: [
+          { name: 'currency0', type: 'address' },
+          { name: 'currency1', type: 'address' },
+          { name: 'fee', type: 'uint24' },
+          { name: 'tickSpacing', type: 'int24' },
+          { name: 'hooks', type: 'address' },
+        ],
+      },
+      { name: 'info', type: 'uint256' }, // PositionInfo is bit-packed uint256
+    ],
+  },
+  {
+    name: 'getPositionLiquidity',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'tokenId', type: 'uint256' }],
+    outputs: [{ name: 'liquidity', type: 'uint128' }],
+  },
+] as const;
+
 export interface Position {
   id: string;
   version: 'V2' | 'V3' | 'V4';
@@ -156,9 +203,9 @@ export async function fetchUserPositions(
     const v3Positions = await fetchV3Positions(client, walletAddress as Address);
     positions.push(...v3Positions);
 
-    // Fetch V4 positions (TODO: implement when V4 position structure is clear)
-    // const v4Positions = await fetchV4Positions(client, walletAddress as Address);
-    // positions.push(...v4Positions);
+    // Fetch V4 positions
+    const v4Positions = await fetchV4Positions(client, walletAddress as Address);
+    positions.push(...v4Positions);
 
     // Enrich with token metadata and prices
     await enrichPositionsWithMetadata(positions, alchemyKey);
@@ -312,6 +359,101 @@ async function fetchV3Positions(client: any, wallet: Address): Promise<Position[
     }
   } catch (error) {
     console.error('[Positions] Error fetching V3 positions:', error);
+  }
+
+  return positions;
+}
+
+/**
+ * Fetch V4 NFT positions
+ */
+async function fetchV4Positions(client: any, wallet: Address): Promise<Position[]> {
+  const positions: Position[] = [];
+
+  try {
+    // Get number of V4 positions
+    const balance = await client.readContract({
+      address: V4_POSITION_MANAGER as Address,
+      abi: V4_NFT_ABI,
+      functionName: 'balanceOf',
+      args: [wallet],
+    });
+
+    const count = Number(balance);
+    console.log(`[Positions] User has ${count} V4 positions`);
+
+    // Helper function to extract tick values from bit-packed PositionInfo
+    const extractTicks = (packedInfo: bigint): { tickLower: number; tickUpper: number } => {
+      // PositionInfo layout: poolId (200 bits) | tickUpper (24 bits) | tickLower (24 bits) | hasSubscriber (8 bits)
+      const tickLowerMask = BigInt(0xFFFFFF); // 24 bits
+      const tickUpperMask = BigInt(0xFFFFFF) << BigInt(24);
+
+      const tickLowerRaw = Number((packedInfo & tickLowerMask));
+      const tickUpperRaw = Number(((packedInfo & tickUpperMask) >> BigInt(24)));
+
+      // Convert from unsigned to signed (int24 range: -8388608 to 8388607)
+      const tickLower = tickLowerRaw > 0x7FFFFF ? tickLowerRaw - 0x1000000 : tickLowerRaw;
+      const tickUpper = tickUpperRaw > 0x7FFFFF ? tickUpperRaw - 0x1000000 : tickUpperRaw;
+
+      return { tickLower, tickUpper };
+    };
+
+    // Enumerate positions
+    for (let i = 0; i < count; i++) {
+      try {
+        // Get token ID
+        const tokenId = await client.readContract({
+          address: V4_POSITION_MANAGER as Address,
+          abi: V4_NFT_ABI,
+          functionName: 'tokenOfOwnerByIndex',
+          args: [wallet, BigInt(i)],
+        });
+
+        // Get position details
+        const [poolKey, packedInfo] = await client.readContract({
+          address: V4_POSITION_MANAGER as Address,
+          abi: V4_NFT_ABI,
+          functionName: 'getPoolAndPositionInfo',
+          args: [tokenId],
+        });
+
+        // Get liquidity
+        const liquidity = await client.readContract({
+          address: V4_POSITION_MANAGER as Address,
+          abi: V4_NFT_ABI,
+          functionName: 'getPositionLiquidity',
+          args: [tokenId],
+        });
+
+        const { currency0, currency1, fee } = poolKey as any;
+        const { tickLower, tickUpper } = extractTicks(packedInfo as bigint);
+
+        if (liquidity > 0n) {
+          const feePercent = Number(fee) / 10000;
+
+          positions.push({
+            id: `v4-${tokenId}`,
+            version: 'V4',
+            pair: `Token Pair`, // TODO: Get token symbols
+            poolAddress: V4_POSITION_MANAGER,
+            token0: currency0 as string,
+            token1: currency1 as string,
+            liquidity: `${formatUnits(liquidity, 0)} liquidity`,
+            liquidityUsd: 0, // TODO: Calculate from tick ranges and token prices
+            feesEarned: 'N/A', // TODO: Calculate uncollected fees
+            feesEarnedUsd: 0,
+            priceRangeLow: `Tick ${tickLower}`,
+            priceRangeHigh: `Tick ${tickUpper}`,
+            inRange: undefined, // TODO: Check current tick vs range
+            tokenId: tokenId.toString(),
+          });
+        }
+      } catch (error) {
+        console.error(`[Positions] Error fetching V4 position ${i}:`, error);
+      }
+    }
+  } catch (error) {
+    console.error('[Positions] Error fetching V4 positions:', error);
   }
 
   return positions;
