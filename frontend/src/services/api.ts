@@ -37,3 +37,26 @@ export async function fetchPosition(id: string, wallet: string): Promise<Positio
   }
   return res.json();
 }
+
+/**
+ * Build fee collection transaction
+ */
+export async function buildCollectFeesTransaction(positionId: string, recipient: string): Promise<{
+  to: string;
+  data: string;
+  value: string;
+}> {
+  const res = await fetch(`${API_BASE}/api/collect-fees`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ positionId, recipient }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to build transaction: ${res.statusText}`);
+  }
+
+  return res.json();
+}

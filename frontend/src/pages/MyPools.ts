@@ -3,11 +3,12 @@
  */
 
 import { store } from '../store';
-import { fetchPositions } from '../services/api';
+import { fetchPositions, buildCollectFeesTransaction } from '../services/api';
 import { formatUsd, truncateAddress } from '../utils/format';
 import { ROUTES } from '../utils/constants';
 import type { Position } from '../utils/types';
 import { AppHeader } from '../components/AppHeader';
+import { sdk } from '@farcaster/miniapp-sdk';
 
 /**
  * Load user positions
@@ -36,6 +37,69 @@ async function loadPositions(): Promise<void> {
       error: 'Failed to load positions. Please try again.',
       loading: false,
     });
+  }
+}
+
+/**
+ * Collect fees from a position
+ */
+async function collectFees(positionId: string, buttonElement: HTMLButtonElement): Promise<void> {
+  const { wallet } = store.getState();
+
+  if (!wallet) {
+    alert('Wallet not connected');
+    return;
+  }
+
+  try {
+    // Disable button and show loading state
+    buttonElement.disabled = true;
+    buttonElement.textContent = 'Building transaction...';
+
+    console.log('[MyPools] Building collect fees transaction for:', positionId);
+
+    // Build the transaction
+    const transaction = await buildCollectFeesTransaction(positionId, wallet);
+
+    console.log('[MyPools] Transaction built:', transaction);
+
+    // Get Ethereum provider
+    buttonElement.textContent = 'Awaiting approval...';
+    const provider = await sdk.wallet.getEthereumProvider();
+
+    if (!provider) {
+      throw new Error('No Ethereum provider available');
+    }
+
+    // Send transaction
+    console.log('[MyPools] Sending transaction...');
+    const txHash = await provider.request({
+      method: 'eth_sendTransaction',
+      params: [{
+        from: wallet as `0x${string}`,
+        to: transaction.to as `0x${string}`,
+        data: transaction.data as `0x${string}`,
+        value: transaction.value as `0x${string}`,
+      }],
+    });
+
+    console.log('[MyPools] Transaction sent:', txHash);
+    buttonElement.textContent = 'Confirming...';
+
+    // Wait a moment for the transaction to potentially confirm
+    // Then reload positions to show updated fees
+    setTimeout(async () => {
+      await loadPositions();
+      alert('Fees collected successfully!');
+    }, 3000);
+
+  } catch (error) {
+    console.error('[MyPools] Failed to collect fees:', error);
+    alert(`Failed to collect fees: ${error instanceof Error ? error.message : 'Unknown error'}`);
+
+    // Re-enable button
+    buttonElement.disabled = false;
+    buttonElement.textContent = 'Collect Fees';
   }
 }
 
@@ -104,6 +168,23 @@ if (typeof window !== 'undefined') {
       }
     }
   }) as EventListener);
+
+  // Setup collect fees button listeners after DOM updates
+  // We use event delegation on the document since buttons are dynamically rendered
+  let collectFeesListenerAttached = false;
+  if (!collectFeesListenerAttached) {
+    document.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      if (target.classList.contains('collect-fees-btn')) {
+        const button = target as HTMLButtonElement;
+        const positionId = button.dataset.positionId;
+        if (positionId) {
+          collectFees(positionId, button);
+        }
+      }
+    });
+    collectFeesListenerAttached = true;
+  }
 }
 
 /**
