@@ -49,6 +49,7 @@ export function AppHeader(): string {
       <div class="arbme-price-display">
         <span class="price-label text-secondary">$ARBME Price</span>
         <span class="price-value">${priceDisplay}</span>
+        <button id="buy-arbme-btn" class="buy-arbme-btn">Buy $ARBME</button>
       </div>
     </header>
   `;

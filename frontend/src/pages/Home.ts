@@ -146,12 +146,11 @@ export function HomePage(_params: Record<string, string>): string {
         ${poolCards}
       </div>
 
-      <div class="home-actions">
-        <button id="buy-arbme-btn" class="button-primary">Buy $ARBME</button>
-        ${store.getState().wallet ? `
-          <a href="#${ROUTES.MY_POOLS}" class="button-secondary">My Positions</a>
-        ` : ''}
-      </div>
+      ${store.getState().wallet ? `
+        <div class="home-actions">
+          <a href="#${ROUTES.MY_POOLS}" class="button-secondary">View My Positions</a>
+        </div>
+      ` : ''}
     </div>
   `;
 }
