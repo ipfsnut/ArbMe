@@ -30,8 +30,8 @@ export async function fetchPositions(wallet: string): Promise<Position[]> {
 /**
  * Fetch single position details
  */
-export async function fetchPosition(id: string): Promise<Position> {
-  const res = await fetch(`${API_BASE}/api/position/${id}`);
+export async function fetchPosition(id: string, wallet: string): Promise<Position> {
+  const res = await fetch(`${API_BASE}/api/position/${id}?wallet=${wallet}`);
   if (!res.ok) {
     throw new Error(`Failed to fetch position: ${res.statusText}`);
   }

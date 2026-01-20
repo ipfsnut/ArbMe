@@ -7,6 +7,7 @@ import { fetchPosition } from '../services/api';
 import { formatUsd, formatNumber } from '../utils/format';
 import { ROUTES } from '../utils/constants';
 import type { Position } from '../utils/types';
+import { AppHeader } from '../components/AppHeader';
 
 let currentPosition: Position | null = null;
 let isLoading = false;
@@ -15,11 +16,19 @@ let isLoading = false;
  * Load position details
  */
 async function loadPosition(id: string): Promise<void> {
+  const { wallet } = store.getState();
+
+  if (!wallet) {
+    console.error('[PositionDetail] No wallet connected');
+    store.setState({ error: 'Wallet not connected' });
+    return;
+  }
+
   isLoading = true;
   store.setState({ error: null });
 
   try {
-    currentPosition = await fetchPosition(id);
+    currentPosition = await fetchPosition(id, wallet);
     isLoading = false;
     // Re-render
     const app = document.getElementById('app');
@@ -43,10 +52,11 @@ export function PositionDetailPage(params: Record<string, string>): string {
   if (!id) {
     return `
       <div class="position-detail-page">
-        <header class="page-header">
-          <a href="#${ROUTES.MY_POOLS}" class="back-button">← Back</a>
-          <h1>Position Details</h1>
-        </header>
+        ${AppHeader()}
+        <div class="page-subheader">
+          <a href="#${ROUTES.MY_POOLS}" class="back-button">← Back to Positions</a>
+          <h2>Position Details</h2>
+        </div>
         <div class="error-banner">Invalid position ID</div>
       </div>
     `;
@@ -60,10 +70,11 @@ export function PositionDetailPage(params: Record<string, string>): string {
   if (isLoading || !currentPosition) {
     return `
       <div class="position-detail-page">
-        <header class="page-header">
-          <a href="#${ROUTES.MY_POOLS}" class="back-button">← Back</a>
-          <h1>Position Details</h1>
-        </header>
+        ${AppHeader()}
+        <div class="page-subheader">
+          <a href="#${ROUTES.MY_POOLS}" class="back-button">← Back to Positions</a>
+          <h2>Position Details</h2>
+        </div>
 
         <div class="loading-state">
           <div class="spinner"></div>
@@ -82,10 +93,11 @@ export function PositionDetailPage(params: Record<string, string>): string {
 
   return `
     <div class="position-detail-page">
-      <header class="page-header">
-        <a href="#${ROUTES.MY_POOLS}" class="back-button">← Back</a>
-        <h1>Position #${id.slice(0, 8)}</h1>
-      </header>
+      ${AppHeader()}
+      <div class="page-subheader">
+        <a href="#${ROUTES.MY_POOLS}" class="back-button">← Back to Positions</a>
+        <h2>${position.pair} Position</h2>
+      </div>
 
       ${error ? `<div class="error-banner">${error}</div>` : ''}
 
