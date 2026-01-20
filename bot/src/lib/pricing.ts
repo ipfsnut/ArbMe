@@ -272,7 +272,8 @@ async function discoverWethPair(tokenAddress: string): Promise<PricingPool | nul
     const data = await response.json() as any;
     const pools = data?.data || [];
 
-    // Find highest TVL pool paired with WETH
+    // Find highest TVL pool paired with WETH, preferring V2/V3 over V4
+    // (V4 pools require fee/tickSpacing/hooks which GeckoTerminal doesn't provide)
     let bestPool: any = null;
     let bestTvl = 0;
 
@@ -280,11 +281,28 @@ async function discoverWethPair(tokenAddress: string): Promise<PricingPool | nul
       const attrs = pool.attributes;
       const tvl = parseFloat(attrs.reserve_in_usd) || 0;
       const poolName = attrs.name.toLowerCase();
+      const dexId = pool.relationships.dex.data.id.toLowerCase();
 
       // Look for WETH pairs
-      if (poolName.includes('weth') && tvl > bestTvl) {
-        bestPool = pool;
-        bestTvl = tvl;
+      if (poolName.includes('weth') && tvl > 0) {
+        const isV4 = dexId.includes('v4');
+        const isV3 = dexId.includes('v3');
+        const isV2 = !isV4 && !isV3;
+
+        // Prefer V2/V3 over V4 (V4 requires extra params we don't have)
+        // If we find a V2/V3 pool with decent TVL, use it even if V4 has higher TVL
+        if (isV2 || isV3) {
+          if (tvl > bestTvl || (bestPool && bestPool.isV4)) {
+            bestPool = pool;
+            bestPool.isV4 = false;
+            bestTvl = tvl;
+          }
+        } else if (isV4 && !bestPool) {
+          // Only use V4 if no V2/V3 pool found
+          bestPool = pool;
+          bestPool.isV4 = true;
+          bestTvl = tvl;
+        }
       }
     }
 
@@ -298,6 +316,12 @@ async function discoverWethPair(tokenAddress: string): Promise<PricingPool | nul
     let poolType: 'V2' | 'V3' | 'V4' = 'V2';
     if (dexId.includes('v4')) poolType = 'V4';
     else if (dexId.includes('v3')) poolType = 'V3';
+
+    // Skip V4 pools since we don't have the required parameters
+    if (poolType === 'V4') {
+      console.warn(`[Pricing] Skipping V4 pool for ${tokenAddress} (missing fee/tickSpacing/hooks)`);
+      return null;
+    }
 
     // Extract token addresses from GeckoTerminal IDs
     const baseTokenId = bestPool.relationships.base_token.data.id;
