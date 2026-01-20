@@ -5,32 +5,34 @@
 import { sdk } from '@farcaster/miniapp-sdk';
 
 /**
- * Get wallet address from Farcaster context
+ * Get wallet address from Farcaster Ethereum provider
  * @returns Wallet address or null if not available
  */
 export async function getWalletAddress(): Promise<string | null> {
   try {
-    const context = await sdk.context;
+    console.log('[Wallet] Getting Ethereum provider...');
 
-    if (!context?.user) {
-      console.log('[Wallet] No user in context');
+    // Get the Ethereum provider from Farcaster SDK
+    const provider = await sdk.wallet.getEthereumProvider();
+
+    if (!provider) {
+      console.log('[Wallet] No Ethereum provider available');
       return null;
     }
 
-    // SDK types are incomplete, so we use any here
-    const user = context.user as any;
+    console.log('[Wallet] Provider available, requesting accounts...');
 
-    // Try verified addresses first
-    if (user.verifiedAddresses?.ethAddresses?.length > 0) {
-      return user.verifiedAddresses.ethAddresses[0];
+    // Request accounts using EIP-1193 standard
+    const accounts = await provider.request({
+      method: 'eth_requestAccounts'
+    }) as string[];
+
+    if (accounts && accounts.length > 0) {
+      console.log('[Wallet] Account found:', accounts[0]);
+      return accounts[0];
     }
 
-    // Fall back to custody address
-    if (user.custodyAddress) {
-      return user.custodyAddress;
-    }
-
-    console.log('[Wallet] No wallet address found');
+    console.log('[Wallet] No accounts returned');
     return null;
   } catch (error) {
     console.error('[Wallet] Error getting wallet:', error);
