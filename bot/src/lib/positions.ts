@@ -734,7 +734,16 @@ async function enrichConcentratedLiquidityPosition(
   const slot0Data = await fetchPoolSqrtPrice(position, alchemyKey);
 
   if (!slot0Data) {
-    console.warn(`[Positions] Cannot fetch pool price for position ${position.id}`);
+    console.warn(`[Positions] Cannot fetch pool price for position ${position.id}, skipping amount calculation`);
+    // Can't calculate amounts without current price, but we can still estimate from token prices
+    // For now, just use a rough estimate based on liquidity value
+    if (price0 > 0 && price1 > 0) {
+      const liquidity = BigInt(position.liquidity.replace(/[^\d]/g, ''));
+      // Very rough estimate: assume 50/50 split
+      const roughValue = (Number(liquidity) / 1e18) * Math.sqrt(price0 * price1) * 2;
+      position.liquidityUsd = roughValue;
+      position.liquidity = `~${roughValue.toFixed(2)} USD est`;
+    }
     return;
   }
 
