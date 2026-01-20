@@ -75,6 +75,15 @@ export {
   type V4PoolConfig,
 } from './v4';
 
+// Featured pools configuration
+export {
+  FEATURED_POOLS,
+  matchesFeaturedPool,
+  findMatchingFeaturedPool,
+  getFeaturedPoolsSorted,
+  type FeaturedPoolConfig,
+} from './featured-pools';
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // Combined SELECTORS for backwards compatibility
 // ═══════════════════════════════════════════════════════════════════════════════

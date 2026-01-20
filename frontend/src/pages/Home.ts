@@ -1,11 +1,11 @@
 /**
- * Home Page - Primary ARBME pools
+ * Home Page - Featured ARBME pools
  */
 
 import { store } from '../store';
 import { fetchPools } from '../services/api';
 import { formatUsd, formatPrice, formatChange, formatArbmeMarketCap } from '../utils/format';
-import { PRIMARY_POOLS, ROUTES } from '../utils/constants';
+import { FEATURED_POOLS, ROUTES, type FeaturedPoolConfig } from '../utils/constants';
 import type { Pool } from '../utils/types';
 
 /**
@@ -34,20 +34,42 @@ async function loadPools(): Promise<void> {
 }
 
 /**
- * Find primary pools from loaded data
+ * Check if a pool matches a featured pool config by token addresses.
+ * Matches both orderings (token0/token1 can be swapped).
  */
-function getPrimaryPools(): { weth: Pool | null; clanker: Pool | null } {
+function matchesTokenPair(pool: Pool, config: FeaturedPoolConfig): boolean {
+  if (!pool.token0 || !pool.token1) return false;
+
+  const p0 = pool.token0.toLowerCase();
+  const p1 = pool.token1.toLowerCase();
+  const c0 = config.token0Address.toLowerCase();
+  const c1 = config.token1Address.toLowerCase();
+
+  return (p0 === c0 && p1 === c1) || (p0 === c1 && p1 === c0);
+}
+
+/**
+ * Find featured pools from loaded data.
+ * Returns pools sorted by priority (as defined in FEATURED_POOLS config).
+ */
+function getFeaturedPools(): Pool[] {
   const { pools } = store.getState();
+  const featuredPools: Pool[] = [];
 
-  const weth = pools.find((p) =>
-    p.pair.toUpperCase().includes(PRIMARY_POOLS.ARBME_WETH)
-  ) || null;
+  // Find matching pools for each featured pool config
+  for (const config of FEATURED_POOLS) {
+    const match = pools.find(p => matchesTokenPair(p, config));
+    if (match) {
+      featuredPools.push(match);
+    }
+  }
 
-  const clanker = pools.find((p) =>
-    p.pair.toUpperCase().includes(PRIMARY_POOLS.ARBME_CLANKER)
-  ) || null;
-
-  return { weth, clanker };
+  // Sort by priority from config
+  return featuredPools.sort((a, b) => {
+    const aConfig = FEATURED_POOLS.find(c => matchesTokenPair(a, c));
+    const bConfig = FEATURED_POOLS.find(c => matchesTokenPair(b, c));
+    return (aConfig?.priority || 999) - (bConfig?.priority || 999);
+  });
 }
 
 /**
@@ -106,7 +128,7 @@ export function HomePage(_params: Record<string, string>): string {
     loadPools();
   }
 
-  const { weth, clanker } = getPrimaryPools();
+  const featuredPools = getFeaturedPools();
 
   // Format ARBME market cap (price × 100B supply)
   const marketCapDisplay = globalStats
@@ -116,6 +138,11 @@ export function HomePage(_params: Record<string, string>): string {
   const tvlDisplay = globalStats
     ? formatUsd(globalStats.totalTvl)
     : '...';
+
+  // Render pool cards - show loading placeholders if no pools yet
+  const poolCards = featuredPools.length > 0
+    ? featuredPools.map(pool => PoolCard(pool)).join('')
+    : FEATURED_POOLS.map(() => PoolCard(null)).join('');
 
   return `
     <div class="home-page">
@@ -143,8 +170,7 @@ export function HomePage(_params: Record<string, string>): string {
       ${error ? `<div class="error-banner">${error}</div>` : ''}
 
       <div class="pools-grid">
-        ${PoolCard(weth)}
-        ${PoolCard(clanker)}
+        ${poolCards}
       </div>
 
       <div class="home-actions">

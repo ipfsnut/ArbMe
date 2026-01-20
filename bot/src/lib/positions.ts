@@ -366,6 +366,7 @@ async function fetchV3Positions(client: any, wallet: Address): Promise<Position[
 
 /**
  * Fetch V4 NFT positions
+ * Note: V4 Position Manager does not implement ERC721Enumerable, so we use Transfer events
  */
 async function fetchV4Positions(client: any, wallet: Address): Promise<Position[]> {
   const positions: Position[] = [];
@@ -381,6 +382,61 @@ async function fetchV4Positions(client: any, wallet: Address): Promise<Position[
 
     const count = Number(balance);
     console.log(`[Positions] User has ${count} V4 positions`);
+
+    if (count === 0) {
+      return positions;
+    }
+
+    // V4 doesn't support tokenOfOwnerByIndex, so we need to query Transfer events
+    // Get all Transfer events where user received tokens
+    const receivedLogs = await client.getLogs({
+      address: V4_POSITION_MANAGER as Address,
+      event: {
+        type: 'event',
+        name: 'Transfer',
+        inputs: [
+          { indexed: true, name: 'from', type: 'address' },
+          { indexed: true, name: 'to', type: 'address' },
+          { indexed: true, name: 'tokenId', type: 'uint256' },
+        ],
+      },
+      args: {
+        to: wallet,
+      },
+      fromBlock: BigInt(0),
+      toBlock: 'latest',
+    });
+
+    // Get all Transfer events where user sent tokens
+    const sentLogs = await client.getLogs({
+      address: V4_POSITION_MANAGER as Address,
+      event: {
+        type: 'event',
+        name: 'Transfer',
+        inputs: [
+          { indexed: true, name: 'from', type: 'address' },
+          { indexed: true, name: 'to', type: 'address' },
+          { indexed: true, name: 'tokenId', type: 'uint256' },
+        ],
+      },
+      args: {
+        from: wallet,
+      },
+      fromBlock: BigInt(0),
+      toBlock: 'latest',
+    });
+
+    // Calculate owned token IDs
+    const receivedTokens = new Set(receivedLogs.map((log: any) => log.args.tokenId.toString()));
+    const sentTokens = new Set(sentLogs.map((log: any) => log.args.tokenId.toString()));
+
+    // Remove sent tokens from received to get current holdings
+    for (const tokenId of sentTokens) {
+      receivedTokens.delete(tokenId);
+    }
+
+    const ownedTokenIds = Array.from(receivedTokens);
+    console.log(`[Positions] Found ${ownedTokenIds.length} V4 token IDs via event logs`);
 
     // Helper function to extract tick values from bit-packed PositionInfo
     const extractTicks = (packedInfo: bigint): { tickLower: number; tickUpper: number } => {
@@ -398,16 +454,10 @@ async function fetchV4Positions(client: any, wallet: Address): Promise<Position[
       return { tickLower, tickUpper };
     };
 
-    // Enumerate positions
-    for (let i = 0; i < count; i++) {
+    // Fetch details for each owned position
+    for (const tokenIdStr of ownedTokenIds) {
       try {
-        // Get token ID
-        const tokenId = await client.readContract({
-          address: V4_POSITION_MANAGER as Address,
-          abi: V4_NFT_ABI,
-          functionName: 'tokenOfOwnerByIndex',
-          args: [wallet, BigInt(i)],
-        });
+        const tokenId = BigInt(tokenIdStr as string);
 
         // Get position details
         const [poolKey, packedInfo] = await client.readContract({
@@ -449,7 +499,7 @@ async function fetchV4Positions(client: any, wallet: Address): Promise<Position[
           });
         }
       } catch (error) {
-        console.error(`[Positions] Error fetching V4 position ${i}:`, error);
+        console.error(`[Positions] Error fetching V4 position ${tokenIdStr}:`, error);
       }
     }
   } catch (error) {
