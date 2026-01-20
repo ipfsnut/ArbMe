@@ -2425,8 +2425,24 @@
   </div>
 
   <script type="module">
-    import { sdk } from 'https://esm.sh/@farcaster/miniapp-sdk';
-    import { ethers } from 'https://esm.sh/ethers@6.11.1';
+    console.log('[ArbMe] Script loading...');
+
+    let sdk, ethers;
+    try {
+      const sdkModule = await import('https://esm.sh/@farcaster/miniapp-sdk');
+      sdk = sdkModule.sdk;
+      console.log('[ArbMe] SDK loaded:', !!sdk);
+    } catch (e) {
+      console.error('[ArbMe] Failed to load SDK:', e);
+    }
+
+    try {
+      const ethersModule = await import('https://esm.sh/ethers@6.11.1');
+      ethers = ethersModule;
+      console.log('[ArbMe] Ethers loaded:', !!ethers);
+    } catch (e) {
+      console.error('[ArbMe] Failed to load ethers:', e);
+    }
 
     /**
      * ═══════════════════════════════════════════════════════════════════════════
