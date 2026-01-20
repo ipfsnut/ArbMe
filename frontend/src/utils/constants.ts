@@ -7,8 +7,8 @@ export const WETH_ADDRESS = '0x4200000000000000000000000000000000000006';
 export const CLANKER_ADDRESS = '0x1bc0c42215582d5a085795f4badbac3ff36d1bcb';
 
 export const PRIMARY_POOLS = {
-  ARBME_WETH: 'ARBME/WETH',
-  ARBME_CLANKER: 'ARBME/CLANKER',
+  ARBME_WETH: 'ARBME / WETH',
+  ARBME_CLANKER: 'CLANKER / ARBME',
 } as const;
 
 export const API_BASE = import.meta.env.VITE_API_URL || 'https://arbme.epicdylan.com';
