@@ -12,7 +12,9 @@
     "balance": "tsx src/check-balance.ts",
     "test:swap": "tsx src/test-swap.ts test",
     "build": "tsc",
-    "test": "tsx src/test-rpc.ts"
+    "test": "tsx src/test-rpc.ts",
+    "deploy:frontend": "cd ../frontend && npm run build && cd ../bot && rm -rf public/app/* && cp -r ../frontend/dist/* public/app/ && echo '✅ Frontend deployed to bot/public/app/'",
+    "deploy": "npm run deploy:frontend && git add . && git commit -m 'Deploy frontend build' && git push"
   },
   "dependencies": {
     "@types/cors": "^2.8.19",

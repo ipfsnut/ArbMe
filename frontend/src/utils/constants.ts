@@ -11,7 +11,7 @@ export const PRIMARY_POOLS = {
   ARBME_CLANKER: 'ARBME/CLANKER',
 } as const;
 
-export const API_BASE = import.meta.env.DEV ? '' : '';
+export const API_BASE = import.meta.env.VITE_API_URL || 'https://arbme-api.dylan-259.workers.dev';
 
 export const ROUTES = {
   HOME: '/',
