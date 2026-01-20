@@ -219,19 +219,11 @@ export async function fetchUserPositions(
     // Enrich with token metadata and prices
     await enrichPositionsWithMetadata(positions, alchemyKey);
 
-    // Filter out closed positions (0 liquidity)
-    const openPositions = positions.filter(pos => {
-      // Check if position has actual liquidity (not closed)
-      const liquidityNum = parseFloat(pos.liquidity.replace(/[^\d.]/g, ''));
-      return liquidityNum > 0 && pos.liquidityUsd > 0;
-    });
-
-    console.log(`[Positions] Filtered out ${positions.length - openPositions.length} closed positions`);
-
     // Sort by TVL descending (highest value first)
-    openPositions.sort((a, b) => b.liquidityUsd - a.liquidityUsd);
+    // Note: Positions with 0 liquidity are already filtered at source (V2/V3/V4 fetch functions)
+    positions.sort((a, b) => b.liquidityUsd - a.liquidityUsd);
 
-    return openPositions;
+    return positions;
   } catch (error) {
     console.error('[Positions] Error fetching positions:', error);
     return [];
