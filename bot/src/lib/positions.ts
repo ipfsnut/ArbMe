@@ -2,7 +2,7 @@
  * Fetch user's Uniswap positions across V2, V3, and V4
  */
 
-import { createPublicClient, http, Address, formatUnits } from 'viem';
+import { createPublicClient, http, Address, formatUnits, keccak256 } from 'viem';
 import { base } from 'viem/chains';
 import { getTokenMetadata, getTokenPrices, calculateUsdValue } from './tokens.js';
 
@@ -177,6 +177,11 @@ export interface Position {
   fee?: number; // Fee tier for V3/V4 positions
   tickSpacing?: number; // Tick spacing for V4 positions
   hooks?: string; // Hooks address for V4 positions
+  // V2-specific data for USD calculation
+  v2Balance?: bigint;
+  v2TotalSupply?: bigint;
+  v2Reserve0?: bigint;
+  v2Reserve1?: bigint;
 }
 
 /**
@@ -274,9 +279,14 @@ async function fetchV2Positions(client: any, wallet: Address): Promise<Position[
           token0: token0 as string,
           token1: token1 as string,
           liquidity: liquidityDisplay,
-          liquidityUsd: 0, // TODO: Calculate from reserves and token prices
+          liquidityUsd: 0, // Will be calculated in enrichment
           feesEarned: 'N/A',
           feesEarnedUsd: 0,
+          // Store V2 data for USD calculation
+          v2Balance: balance,
+          v2TotalSupply: totalSupply as bigint,
+          v2Reserve0: reserves[0] as bigint,
+          v2Reserve1: reserves[1] as bigint,
         });
       }
     } catch (error) {
@@ -578,9 +588,32 @@ async function enrichPositionsWithMetadata(
       // Update pair name with symbols
       position.pair = `${token0Meta.symbol} / ${token1Meta.symbol}`;
 
+      // Calculate USD values for V2 positions
+      if (position.version === 'V2' && position.v2Balance && position.v2TotalSupply && position.v2Reserve0 && position.v2Reserve1) {
+        enrichV2Position(
+          position,
+          token0Meta.decimals,
+          token1Meta.decimals,
+          token0Price,
+          token1Price
+        );
+      }
+
       // Calculate USD values for V3/V4 positions
       if ((position.version === 'V3' || position.version === 'V4') && position.fee !== undefined) {
         await enrichConcentratedLiquidityPosition(
+          position,
+          token0Meta.decimals,
+          token1Meta.decimals,
+          token0Price,
+          token1Price,
+          alchemyKey
+        );
+      }
+
+      // Calculate uncollected fees for V4 positions
+      if (position.version === 'V4' && position.tokenId && position.fee !== undefined && position.tickSpacing !== undefined && position.hooks) {
+        await enrichV4Fees(
           position,
           token0Meta.decimals,
           token1Meta.decimals,
@@ -593,6 +626,49 @@ async function enrichPositionsWithMetadata(
   }
 
   console.log(`[Positions] Enriched ${positions.length} positions with metadata`);
+}
+
+/**
+ * Enrich V2 position with USD values calculated from reserves
+ */
+function enrichV2Position(
+  position: Position,
+  decimals0: number,
+  decimals1: number,
+  price0: number,
+  price1: number
+): void {
+  if (!position.v2Balance || !position.v2TotalSupply || !position.v2Reserve0 || !position.v2Reserve1) {
+    return;
+  }
+
+  try {
+    // Calculate user's share of the pool
+    const shareRatio = Number(position.v2Balance) / Number(position.v2TotalSupply);
+
+    // Calculate user's token amounts
+    const userAmount0 = Number(position.v2Reserve0) * shareRatio;
+    const userAmount1 = Number(position.v2Reserve1) * shareRatio;
+
+    // Convert to human-readable amounts
+    const token0Amount = userAmount0 / Math.pow(10, decimals0);
+    const token1Amount = userAmount1 / Math.pow(10, decimals1);
+
+    // Calculate USD values
+    const amount0Usd = token0Amount * price0;
+    const amount1Usd = token1Amount * price1;
+    const totalUsd = amount0Usd + amount1Usd;
+
+    // Update position
+    position.liquidityUsd = totalUsd;
+    position.liquidity = `${token0Amount.toFixed(6)} / ${token1Amount.toFixed(6)}`;
+
+    console.log(
+      `[Positions] V2 ${position.id}: $${totalUsd.toFixed(2)} (${token0Amount.toFixed(4)} + ${token1Amount.toFixed(4)})`
+    );
+  } catch (error) {
+    console.error(`[Positions] Error calculating V2 amounts for ${position.id}:`, error);
+  }
 }
 
 /**
@@ -615,13 +691,19 @@ async function enrichConcentratedLiquidityPosition(
     return;
   }
 
-  // Fetch current pool price (sqrtPriceX96)
-  const sqrtPriceX96 = await fetchPoolSqrtPrice(position, alchemyKey);
+  // Fetch current pool price (sqrtPriceX96) and tick
+  const slot0Data = await fetchPoolSqrtPrice(position, alchemyKey);
 
-  if (!sqrtPriceX96) {
+  if (!slot0Data) {
     console.warn(`[Positions] Cannot fetch pool price for position ${position.id}`);
     return;
   }
+
+  const { sqrtPriceX96, tick: currentTick } = slot0Data;
+
+  // Calculate inRange status
+  const inRange = currentTick >= tickLower && currentTick <= tickUpper;
+  position.inRange = inRange;
 
   // Calculate token amounts from liquidity
   try {
@@ -650,10 +732,112 @@ async function enrichConcentratedLiquidityPosition(
     position.liquidity = `${token0Amount.toFixed(6)} / ${token1Amount.toFixed(6)}`;
 
     console.log(
-      `[Positions] Calculated ${position.id}: $${totalUsd.toFixed(2)} (${token0Amount.toFixed(4)} + ${token1Amount.toFixed(4)})`
+      `[Positions] Calculated ${position.id}: $${totalUsd.toFixed(2)} (${token0Amount.toFixed(4)} + ${token1Amount.toFixed(4)}) - ${inRange ? 'IN RANGE' : 'OUT OF RANGE'}`
     );
   } catch (error) {
     console.error(`[Positions] Error calculating amounts for ${position.id}:`, error);
+  }
+}
+
+/**
+ * Enrich V4 position with uncollected fees
+ */
+async function enrichV4Fees(
+  position: Position,
+  decimals0: number,
+  decimals1: number,
+  price0: number,
+  price1: number,
+  alchemyKey?: string
+): Promise<void> {
+  if (!position.tokenId || !position.fee || !position.tickSpacing || !position.hooks) {
+    return;
+  }
+
+  const tickLower = extractTickFromString(position.priceRangeLow);
+  const tickUpper = extractTickFromString(position.priceRangeHigh);
+
+  if (tickLower === null || tickUpper === null) {
+    console.warn(`[Positions] Cannot calculate fees - invalid ticks for position ${position.id}`);
+    return;
+  }
+
+  const rpcUrl = alchemyKey
+    ? `https://base-mainnet.g.alchemy.com/v2/${alchemyKey}`
+    : 'https://mainnet.base.org';
+
+  const client = createPublicClient({
+    chain: base,
+    transport: http(rpcUrl),
+  });
+
+  try {
+    // Calculate pool ID and position ID
+    const poolId = calculateV4PoolId(
+      position.token0,
+      position.token1,
+      position.fee,
+      position.tickSpacing,
+      position.hooks
+    );
+
+    const positionId = calculateV4PositionId(
+      V4_POSITION_MANAGER,
+      tickLower,
+      tickUpper,
+      position.tokenId
+    );
+
+    // Fetch fee growth inside the tick range
+    const [feeGrowthInside0, feeGrowthInside1] = await client.readContract({
+      address: V4_STATE_VIEW as Address,
+      abi: V4_STATE_VIEW_ABI,
+      functionName: 'getFeeGrowthInside',
+      args: [poolId, tickLower, tickUpper],
+    });
+
+    // Fetch position info (liquidity, last fee growth)
+    const [posLiquidity, feeGrowthInside0Last, feeGrowthInside1Last] = await client.readContract({
+      address: V4_STATE_VIEW as Address,
+      abi: V4_STATE_VIEW_ABI,
+      functionName: 'getPositionInfo',
+      args: [poolId, positionId],
+    });
+
+    // Use on-chain liquidity for accurate fee calculation
+    const liquidity = BigInt(position.liquidity.replace(/[^\d]/g, ''));
+    const actualLiquidity = posLiquidity > BigInt(0) ? posLiquidity : liquidity;
+
+    // Calculate fees: (feeGrowthCurrent - feeGrowthLast) * liquidity / 2^128
+    const Q128 = BigInt(2) ** BigInt(128);
+    const feeGrowthDelta0 = feeGrowthInside0 >= feeGrowthInside0Last
+      ? feeGrowthInside0 - feeGrowthInside0Last
+      : BigInt(0);
+    const feeGrowthDelta1 = feeGrowthInside1 >= feeGrowthInside1Last
+      ? feeGrowthInside1 - feeGrowthInside1Last
+      : BigInt(0);
+
+    const fees0Raw = (feeGrowthDelta0 * actualLiquidity) / Q128;
+    const fees1Raw = (feeGrowthDelta1 * actualLiquidity) / Q128;
+
+    // Convert to human-readable amounts
+    const fees0 = Number(fees0Raw) / Math.pow(10, decimals0);
+    const fees1 = Number(fees1Raw) / Math.pow(10, decimals1);
+
+    // Calculate USD values
+    const fees0Usd = fees0 * price0;
+    const fees1Usd = fees1 * price1;
+    const totalFeesUsd = fees0Usd + fees1Usd;
+
+    // Update position
+    position.feesEarned = `${fees0.toFixed(6)} / ${fees1.toFixed(6)}`;
+    position.feesEarnedUsd = totalFeesUsd;
+
+    console.log(
+      `[Positions] V4 fees ${position.id}: $${totalFeesUsd.toFixed(2)} (${fees0.toFixed(6)} + ${fees1.toFixed(6)})`
+    );
+  } catch (error) {
+    console.error(`[Positions] Error calculating V4 fees for ${position.id}:`, error);
   }
 }
 
@@ -707,7 +891,7 @@ const V3_FACTORY_ABI = [
   },
 ] as const;
 
-// V4 StateView ABI (getSlot0)
+// V4 StateView ABI (getSlot0, getFeeGrowthInside, getPositionInfo)
 const V4_STATE_VIEW_ABI = [
   {
     name: 'getSlot0',
@@ -733,18 +917,90 @@ const V4_STATE_VIEW_ABI = [
       { name: 'lpFee', type: 'uint24' },
     ],
   },
+  {
+    name: 'getFeeGrowthInside',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'poolId', type: 'bytes32' },
+      { name: 'tickLower', type: 'int24' },
+      { name: 'tickUpper', type: 'int24' },
+    ],
+    outputs: [
+      { name: 'feeGrowthInside0X128', type: 'uint256' },
+      { name: 'feeGrowthInside1X128', type: 'uint256' },
+    ],
+  },
+  {
+    name: 'getPositionInfo',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'poolId', type: 'bytes32' },
+      { name: 'positionId', type: 'bytes32' },
+    ],
+    outputs: [
+      { name: 'liquidity', type: 'uint128' },
+      { name: 'feeGrowthInside0LastX128', type: 'uint256' },
+      { name: 'feeGrowthInside1LastX128', type: 'uint256' },
+    ],
+  },
 ] as const;
 
 const V3_FACTORY = '0x33128a8fC17869897dcE68Ed026d694621f6FDfD';
 const V4_STATE_VIEW = '0x30654c69b7b07645c04576e0fa787c25d66be07c';
 
+// Helper to calculate V4 pool ID
+function calculateV4PoolId(
+  currency0: string,
+  currency1: string,
+  fee: number,
+  tickSpacing: number,
+  hooks: string
+): `0x${string}` {
+  const poolKeyEncoded =
+    currency0.slice(2).toLowerCase().padStart(64, '0') +
+    currency1.slice(2).toLowerCase().padStart(64, '0') +
+    fee.toString(16).padStart(64, '0') +
+    tickSpacing.toString(16).padStart(64, '0') +
+    hooks.slice(2).toLowerCase().padStart(64, '0');
+
+  return keccak256(`0x${poolKeyEncoded}` as `0x${string}`);
+}
+
+// Helper to encode int24 for position ID calculation
+function encodeInt24(val: number): string {
+  if (val < 0) {
+    // Two's complement for negative numbers
+    const twosComp = (1 << 24) + val;
+    return twosComp.toString(16).padStart(6, '0');
+  }
+  return val.toString(16).padStart(6, '0');
+}
+
+// Helper to calculate V4 position ID
+function calculateV4PositionId(
+  positionManager: string,
+  tickLower: number,
+  tickUpper: number,
+  tokenId: string
+): `0x${string}` {
+  const positionIdInput =
+    positionManager.slice(2).toLowerCase() +
+    encodeInt24(tickLower) +
+    encodeInt24(tickUpper) +
+    BigInt(tokenId).toString(16).padStart(64, '0');
+
+  return keccak256(`0x${positionIdInput}` as `0x${string}`);
+}
+
 /**
- * Fetch current sqrtPriceX96 for a pool
+ * Fetch current sqrtPriceX96 and tick for a pool
  */
 async function fetchPoolSqrtPrice(
   position: Position,
   alchemyKey?: string
-): Promise<bigint | null> {
+): Promise<{ sqrtPriceX96: bigint; tick: number } | null> {
   const rpcUrl = alchemyKey
     ? `https://base-mainnet.g.alchemy.com/v2/${alchemyKey}`
     : 'https://mainnet.base.org';
@@ -771,7 +1027,10 @@ async function fetchPoolSqrtPrice(
           functionName: 'slot0',
         });
 
-        return slot0[0] as bigint; // sqrtPriceX96
+        return {
+          sqrtPriceX96: slot0[0] as bigint,
+          tick: Number(slot0[1]),
+        };
       }
 
       console.warn(`[Positions] V3 pool not found for ${position.token0}/${position.token1} fee=${position.fee}`);
@@ -793,7 +1052,10 @@ async function fetchPoolSqrtPrice(
         args: [poolKey],
       });
 
-      return slot0[0] as bigint; // sqrtPriceX96
+      return {
+        sqrtPriceX96: slot0[0] as bigint,
+        tick: Number(slot0[1]),
+      };
     }
 
     console.warn(`[Positions] Missing pool parameters for ${position.version} position ${position.id}`);
