@@ -12,13 +12,10 @@ import type { Pool } from '../utils/types';
  * Load pools data
  */
 async function loadPools(): Promise<void> {
-  console.log('[Home] loadPools() called');
   store.setState({ loading: true, error: null });
 
   try {
-    console.log('[Home] Fetching pools from API...');
     const data = await fetchPools();
-    console.log('[Home] Pools fetched:', data);
     store.setState({ pools: data.pools, loading: false });
   } catch (error) {
     console.error('[Home] Failed to load pools:', error);
@@ -95,13 +92,10 @@ function PoolCard(pool: Pool | null): string {
  * Render Home page
  */
 export function HomePage(_params: Record<string, string>): string {
-  console.log('[Home] Rendering HomePage');
   const { loading, error } = store.getState();
-  console.log('[Home] State:', { loading, error, poolCount: store.getState().pools.length });
 
   // Trigger data load
   if (!loading && store.getState().pools.length === 0) {
-    console.log('[Home] Loading pools...');
     loadPools();
   }
 
