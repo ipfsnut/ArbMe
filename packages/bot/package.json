@@ -1,0 +1,29 @@
+{
+  "name": "@arbme/bot",
+  "version": "1.0.0",
+  "description": "ARBME arbitrage bot service",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "dev": "tsx watch src/server.ts",
+    "phase2": "tsx src/bot-phase2.ts",
+    "phase2:dry": "DRY_RUN=true tsx src/bot-phase2.ts"
+  },
+  "dependencies": {
+    "@types/express": "^5.0.6",
+    "@uniswap/universal-router-sdk": "^4.29.3",
+    "@uniswap/v4-sdk": "^1.25.5",
+    "dotenv": "^16.4.5",
+    "express": "^5.2.1",
+    "viem": "^1.21.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
