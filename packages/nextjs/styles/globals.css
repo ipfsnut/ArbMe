@@ -874,6 +874,17 @@
   color: var(--text-secondary);
 }
 
+.fee-warning {
+  margin-top: var(--spacing-md);
+  padding: var(--spacing-md);
+  background: rgba(255, 193, 7, 0.1);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  color: #ffb84d;
+  text-align: center;
+}
+
 /* Amount Inputs */
 .amount-inputs {
   display: flex;

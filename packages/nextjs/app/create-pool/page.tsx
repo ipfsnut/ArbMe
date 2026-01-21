@@ -22,11 +22,13 @@ interface Token {
   priceUsd?: number
 }
 
-// Common tokens on Base
+// USDC address for blocking from Uniswap
+const USDC_ADDRESS = '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913'
+
+// Common tokens on Base (USDC excluded - use Aerodrome for USDC pairs)
 const COMMON_TOKENS = [
   { address: ARBME_ADDRESS, symbol: 'ARBME', decimals: 18 },
   { address: '0x4200000000000000000000000000000000000006', symbol: 'WETH', decimals: 18 },
-  { address: '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913', symbol: 'USDC', decimals: 6 },
   { address: '0x1bc0c42215582d5a085795f4badbac3ff36d1bcb', symbol: 'CLANKER', decimals: 18 },
   { address: '0x59e058780dd8a6017061596a62288b6438edbe68', symbol: 'OINC', decimals: 18 },
   { address: '0x2b5050f01d64fbb3e4ac44dc07f0732bfb5ecadf', symbol: 'QR', decimals: 18 },
@@ -36,10 +38,17 @@ const COMMON_TOKENS = [
 
 // Fee tiers with descriptions
 const FEE_TIERS = [
-  { value: 100, label: '0.01%', desc: 'Stablecoins' },
-  { value: 500, label: '0.05%', desc: 'Correlated' },
-  { value: 3000, label: '0.30%', desc: 'Standard' },
-  { value: 10000, label: '1.00%', desc: 'Exotic' },
+  { value: 100, label: '0.01%', desc: 'Stablecoins', warning: null },
+  { value: 500, label: '0.05%', desc: 'Correlated', warning: null },
+  { value: 3000, label: '0.30%', desc: 'Standard', warning: null },
+  { value: 10000, label: '1.00%', desc: 'Exotic', warning: null },
+  { value: 30000, label: '3.00%', desc: 'High Fee', warning: 'Higher fees may reduce trading volume' },
+  { value: 50000, label: '5.00%', desc: 'Very High', warning: 'Significantly reduced volume expected' },
+  { value: 100000, label: '10.00%', desc: 'Premium', warning: 'Volume will be very low' },
+  { value: 150000, label: '15.00%', desc: 'Ultra Premium', warning: 'Minimal volume expected' },
+  { value: 200000, label: '20.00%', desc: 'Extreme', warning: 'Almost no volume expected' },
+  { value: 250000, label: '25.00%', desc: 'Maximum', warning: 'Virtually no trading volume' },
+  { value: 500000, label: '50.00%', desc: 'Prohibitive', warning: 'No realistic trading expected' },
 ]
 
 export default function CreatePoolPage() {
@@ -113,6 +122,10 @@ export default function CreatePoolPage() {
   function handleCustomAddressA() {
     const address = customAddressA.trim()
     if (address && address.startsWith('0x')) {
+      if (address.toLowerCase() === USDC_ADDRESS.toLowerCase()) {
+        setState({ error: 'USDC pairs are not supported on Uniswap. Use Aerodrome for USDC pools.' })
+        return
+      }
       setTokenA({
         address,
         symbol: 'CUSTOM',
@@ -124,6 +137,10 @@ export default function CreatePoolPage() {
   function handleCustomAddressB() {
     const address = customAddressB.trim()
     if (address && address.startsWith('0x')) {
+      if (address.toLowerCase() === USDC_ADDRESS.toLowerCase()) {
+        setState({ error: 'USDC pairs are not supported on Uniswap. Use Aerodrome for USDC pools.' })
+        return
+      }
       setTokenB({
         address,
         symbol: 'CUSTOM',
@@ -512,6 +529,11 @@ export default function CreatePoolPage() {
                   </button>
                 ))}
               </div>
+              {FEE_TIERS.find(t => t.value === feeTier)?.warning && (
+                <div className="fee-warning">
+                  ⚠️ {FEE_TIERS.find(t => t.value === feeTier)?.warning}
+                </div>
+              )}
             </div>
           </div>
         )}
