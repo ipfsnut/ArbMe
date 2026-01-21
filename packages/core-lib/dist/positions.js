@@ -301,6 +301,9 @@ async function fetchV3Positions(client, wallet) {
                         inRange: undefined, // TODO: Check current tick vs range
                         tokenId: tokenId.toString(),
                         fee: Number(fee),
+                        // Store raw values for fee USD calculation
+                        v3TokensOwed0: tokensOwed0,
+                        v3TokensOwed1: tokensOwed1,
                     });
                 }
             }
@@ -548,14 +551,13 @@ function enrichV2Position(position, decimals0, decimals1, price0, price1) {
         return;
     }
     try {
-        // Calculate user's share of the pool
-        const shareRatio = Number(position.v2Balance) / Number(position.v2TotalSupply);
-        // Calculate user's token amounts
-        const userAmount0 = Number(position.v2Reserve0) * shareRatio;
-        const userAmount1 = Number(position.v2Reserve1) * shareRatio;
-        // Convert to human-readable amounts
-        const token0Amount = userAmount0 / Math.pow(10, decimals0);
-        const token1Amount = userAmount1 / Math.pow(10, decimals1);
+        // Calculate user's token amounts in BigInt to avoid precision loss
+        // userAmount = (balance * reserve) / totalSupply
+        const userAmount0Wei = (position.v2Balance * position.v2Reserve0) / position.v2TotalSupply;
+        const userAmount1Wei = (position.v2Balance * position.v2Reserve1) / position.v2TotalSupply;
+        // Convert to human-readable amounts (now safe to convert to Number)
+        const token0Amount = Number(userAmount0Wei) / Math.pow(10, decimals0);
+        const token1Amount = Number(userAmount1Wei) / Math.pow(10, decimals1);
         // Calculate USD values
         const amount0Usd = token0Amount * price0;
         const amount1Usd = token1Amount * price1;
@@ -619,6 +621,22 @@ async function enrichConcentratedLiquidityPosition(position, decimals0, decimals
     }
     catch (error) {
         console.error(`[Positions] Error calculating amounts for ${position.id}:`, error);
+    }
+    // Calculate V3 fees USD value if tokensOwed are available
+    if (position.version === 'V3' && position.v3TokensOwed0 !== undefined && position.v3TokensOwed1 !== undefined) {
+        try {
+            const fees0 = Number(position.v3TokensOwed0) / Math.pow(10, decimals0);
+            const fees1 = Number(position.v3TokensOwed1) / Math.pow(10, decimals1);
+            const fees0Usd = fees0 * price0;
+            const fees1Usd = fees1 * price1;
+            const totalFeesUsd = fees0Usd + fees1Usd;
+            position.feesEarnedUsd = totalFeesUsd;
+            position.feesEarned = `${fees0.toFixed(6)} / ${fees1.toFixed(6)}`;
+            console.log(`[Positions] V3 fees ${position.id}: $${totalFeesUsd.toFixed(2)} (${fees0.toFixed(6)} + ${fees1.toFixed(6)})`);
+        }
+        catch (error) {
+            console.error(`[Positions] Error calculating V3 fees for ${position.id}:`, error);
+        }
     }
 }
 /**

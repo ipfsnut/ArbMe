@@ -23,6 +23,8 @@ export interface Position {
     v2TotalSupply?: bigint;
     v2Reserve0?: bigint;
     v2Reserve1?: bigint;
+    v3TokensOwed0?: bigint;
+    v3TokensOwed1?: bigint;
 }
 /**
  * Fetch all positions for a wallet address

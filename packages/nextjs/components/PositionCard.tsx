@@ -52,7 +52,7 @@ export default function PositionCard({
         <div className="position-arrow">→</div>
       </Link>
 
-      {onCollectFees && (
+      {onCollectFees && position.version !== 'V2' && (
         <button
           className="collect-fees-btn"
           onClick={() => onCollectFees(position.id)}
