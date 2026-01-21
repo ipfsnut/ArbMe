@@ -241,6 +241,12 @@ function startNextServer() {
 
 startNextServer();
 
+// Proxy /_next/* static assets to Next.js (for when assetPrefix isn't set)
+app.use('/_next', createProxyMiddleware({
+  target: 'http://localhost:3001',
+  changeOrigin: true,
+}));
+
 // Proxy /app/* requests to Next.js
 app.use('/app', createProxyMiddleware({
   target: 'http://localhost:3001',
