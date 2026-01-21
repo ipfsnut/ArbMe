@@ -12,8 +12,14 @@ import {
   checkApprovals,
   buildApprovalTransaction,
   buildCreatePoolTransaction,
+  fetchTokenBalance,
+  fetchPoolPrice,
+  calculateLiquidityRatio,
 } from '@/services/api'
 import sdk from '@farcaster/frame-sdk'
+import { QuickSelectButtons } from '@/components/QuickSelectButtons'
+import { SlippageControl } from '@/components/SlippageControl'
+import { Footer } from '@/components/Footer'
 
 interface Token {
   address: string
@@ -74,6 +80,14 @@ export default function CreatePoolPage() {
   const [poolExists, setPoolExists] = useState(false)
   const [currentStep, setCurrentStep] = useState<string>('')
   const [poolAddress, setPoolAddress] = useState<string>('')
+  const [balanceA, setBalanceA] = useState<string>('')
+  const [balanceB, setBalanceB] = useState<string>('')
+  const [loadingBalanceA, setLoadingBalanceA] = useState(false)
+  const [loadingBalanceB, setLoadingBalanceB] = useState(false)
+  const [currentPrice, setCurrentPrice] = useState<number | null>(null)
+  const [priceDisplay, setPriceDisplay] = useState<string>('')
+  const [slippageTolerance, setSlippageTolerance] = useState(0.5)
+  const [autoCalculating, setAutoCalculating] = useState(false)
 
   useEffect(() => {
     loadWallet()
@@ -178,6 +192,137 @@ export default function CreatePoolPage() {
     }
   }, [tokenB?.address])
 
+  // Fetch balance for token A
+  useEffect(() => {
+    if (!wallet || !tokenA?.address || version === 'aerodrome') {
+      setBalanceA('')
+      return
+    }
+
+    setLoadingBalanceA(true)
+    fetchTokenBalance(tokenA.address, wallet)
+      .then(({ balanceFormatted }) => {
+        setBalanceA(balanceFormatted)
+      })
+      .catch(err => {
+        console.error('[CreatePool] Failed to fetch balance A:', err)
+      })
+      .finally(() => {
+        setLoadingBalanceA(false)
+      })
+  }, [wallet, tokenA?.address, version])
+
+  // Fetch balance for token B
+  useEffect(() => {
+    if (!wallet || !tokenB?.address || version === 'aerodrome') {
+      setBalanceB('')
+      return
+    }
+
+    setLoadingBalanceB(true)
+    fetchTokenBalance(tokenB.address, wallet)
+      .then(({ balanceFormatted }) => {
+        setBalanceB(balanceFormatted)
+      })
+      .catch(err => {
+        console.error('[CreatePool] Failed to fetch balance B:', err)
+      })
+      .finally(() => {
+        setLoadingBalanceB(false)
+      })
+  }, [wallet, tokenB?.address, version])
+
+  // Fetch pool price when tokens or fee tier changes
+  useEffect(() => {
+    if (!tokenA?.address || !tokenB?.address || version === 'aerodrome') {
+      setCurrentPrice(null)
+      setPriceDisplay('')
+      return
+    }
+
+    fetchPoolPrice({
+      version,
+      token0: tokenA.address,
+      token1: tokenB.address,
+      fee: version !== 'v2' ? feeTier : undefined,
+    })
+      .then(({ exists, price, priceDisplay }) => {
+        if (exists && price) {
+          setCurrentPrice(price)
+          setPriceDisplay(priceDisplay || '')
+        } else {
+          setCurrentPrice(null)
+          setPriceDisplay('')
+        }
+      })
+      .catch(err => {
+        console.error('[CreatePool] Failed to fetch pool price:', err)
+      })
+  }, [tokenA?.address, tokenB?.address, version, feeTier])
+
+  // Auto-calculate amount B when amount A changes
+  useEffect(() => {
+    if (!amountA || !tokenA || !tokenB || parseFloat(amountA) === 0 || autoCalculating || version === 'aerodrome') {
+      return
+    }
+
+    // If pool doesn't exist yet, user sets both amounts manually
+    if (!currentPrice) {
+      return
+    }
+
+    setAutoCalculating(true)
+    calculateLiquidityRatio({
+      version,
+      token0: tokenA.address,
+      token1: tokenB.address,
+      fee: version !== 'v2' ? feeTier : undefined,
+      amount0: amountA,
+      decimals0: tokenA.decimals,
+      decimals1: tokenB.decimals,
+    })
+      .then(({ amount1 }) => {
+        setAmountB(amount1)
+      })
+      .catch(err => {
+        console.error('[CreatePool] Failed to calculate amount B:', err)
+      })
+      .finally(() => {
+        setAutoCalculating(false)
+      })
+  }, [amountA, tokenA, tokenB, version, feeTier, currentPrice])
+
+  // Auto-calculate amount A when amount B changes
+  useEffect(() => {
+    if (!amountB || !tokenA || !tokenB || parseFloat(amountB) === 0 || autoCalculating || version === 'aerodrome') {
+      return
+    }
+
+    if (!currentPrice) {
+      return
+    }
+
+    setAutoCalculating(true)
+    calculateLiquidityRatio({
+      version,
+      token0: tokenA.address,
+      token1: tokenB.address,
+      fee: version !== 'v2' ? feeTier : undefined,
+      amount1: amountB,
+      decimals0: tokenA.decimals,
+      decimals1: tokenB.decimals,
+    })
+      .then(({ amount0 }) => {
+        setAmountA(amount0)
+      })
+      .catch(err => {
+        console.error('[CreatePool] Failed to calculate amount A:', err)
+      })
+      .finally(() => {
+        setAutoCalculating(false)
+      })
+  }, [amountB, tokenA, tokenB, version, feeTier, currentPrice])
+
   // Detect USDC pairs and switch to Aerodrome
   useEffect(() => {
     const isUsdcA = tokenA?.address?.toLowerCase() === USDC_ADDRESS.toLowerCase()
@@ -278,16 +423,34 @@ export default function CreatePoolPage() {
         const approvalTxs: any[] = []
 
         if (approvalStatus.token0NeedsApproval) {
+          const approval = await buildApprovalTransaction(
+            tokenA.address,
+            spender,
+            amount0Wei, // Exact amount
+            false       // Not unlimited
+          )
+
           approvalTxs.push({
-            ...(await buildApprovalTransaction(tokenA.address, spender)),
+            ...approval,
             tokenSymbol: tokenA.symbol,
           })
+
+          console.log(`[CreatePool] Will approve exactly ${amountA} ${tokenA.symbol}`)
         }
         if (approvalStatus.token1NeedsApproval) {
+          const approval = await buildApprovalTransaction(
+            tokenB.address,
+            spender,
+            amount1Wei, // Exact amount
+            false       // Not unlimited
+          )
+
           approvalTxs.push({
-            ...(await buildApprovalTransaction(tokenB.address, spender)),
+            ...approval,
             tokenSymbol: tokenB.symbol,
           })
+
+          console.log(`[CreatePool] Will approve exactly ${amountB} ${tokenB.symbol}`)
         }
 
         for (let i = 0; i < approvalTxs.length; i++) {
@@ -322,7 +485,7 @@ export default function CreatePoolPage() {
         fee: version !== 'v2' ? feeTier : undefined,
         price,
         recipient: wallet,
-        slippageTolerance: 0.5,
+        slippageTolerance: slippageTolerance,
       })
 
       console.log(`[CreatePool] Built ${transactions.length} transaction(s)`)
@@ -567,6 +730,14 @@ export default function CreatePoolPage() {
           </div>
         )}
 
+        {version !== 'aerodrome' && (
+          <SlippageControl
+            value={slippageTolerance}
+            onChange={setSlippageTolerance}
+            pairType="standard"
+          />
+        )}
+
         <div className="create-section">
           <h3 className="section-title">Initial Liquidity</h3>
 
@@ -577,7 +748,20 @@ export default function CreatePoolPage() {
               <div className="input-group">
                 <div className="input-label">
                   <span>{tokenA.symbol} Amount</span>
-                  <span className="input-balance">Balance: --</span>
+                  <span className="input-balance">
+                    Balance: {loadingBalanceA ? (
+                      <span className="spinner-small"></span>
+                    ) : balanceA ? (
+                      <>
+                        {parseFloat(balanceA).toFixed(6)} {tokenA.symbol}
+                        {parseFloat(balanceA) < parseFloat(amountA || '0') && (
+                          <span className="text-error"> (Insufficient)</span>
+                        )}
+                      </>
+                    ) : (
+                      '--'
+                    )}
+                  </span>
                 </div>
                 <div className="input-wrapper">
                   <input
@@ -590,12 +774,33 @@ export default function CreatePoolPage() {
                   />
                   <span className="input-token-label">{tokenA.symbol}</span>
                 </div>
+                {balanceA && tokenA && version !== 'aerodrome' && (
+                  <QuickSelectButtons
+                    balance={balanceA}
+                    decimals={tokenA.decimals}
+                    onAmountSelect={setAmountA}
+                    disabled={isCreating}
+                  />
+                )}
               </div>
 
               <div className="input-group">
                 <div className="input-label">
                   <span>{tokenB.symbol} Amount</span>
-                  <span className="input-balance">Balance: --</span>
+                  <span className="input-balance">
+                    Balance: {loadingBalanceB ? (
+                      <span className="spinner-small"></span>
+                    ) : balanceB ? (
+                      <>
+                        {parseFloat(balanceB).toFixed(6)} {tokenB.symbol}
+                        {parseFloat(balanceB) < parseFloat(amountB || '0') && (
+                          <span className="text-error"> (Insufficient)</span>
+                        )}
+                      </>
+                    ) : (
+                      '--'
+                    )}
+                  </span>
                 </div>
                 <div className="input-wrapper">
                   <input
@@ -608,6 +813,14 @@ export default function CreatePoolPage() {
                   />
                   <span className="input-token-label">{tokenB.symbol}</span>
                 </div>
+                {balanceB && tokenB && version !== 'aerodrome' && (
+                  <QuickSelectButtons
+                    balance={balanceB}
+                    decimals={tokenB.decimals}
+                    onAmountSelect={setAmountB}
+                    disabled={isCreating}
+                  />
+                )}
               </div>
 
               {initialPrice && (
@@ -638,6 +851,8 @@ export default function CreatePoolPage() {
           </p>
         </div>
       </div>
+
+      <Footer />
     </div>
   )
 }

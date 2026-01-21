@@ -10,12 +10,15 @@ import {
   buildIncreaseLiquidityTransaction,
   buildDecreaseLiquidityTransaction,
   buildBurnPositionTransaction,
+  fetchTokenBalance,
 } from '@/services/api'
 import { formatUsd } from '@/utils/format'
 import type { Position } from '@/utils/types'
 import { AppHeader } from '@/components/AppHeader'
+import { Footer } from '@/components/Footer'
 import Link from 'next/link'
-import sdk from '@farcaster/miniapp-sdk'
+import sdk from '@farcaster/frame-sdk'
+import { QuickSelectButtons } from '@/components/QuickSelectButtons'
 
 type ActionMode = 'view' | 'add' | 'remove' | 'close'
 
@@ -36,6 +39,12 @@ export default function PositionDetailPage() {
 
   // Remove liquidity inputs
   const [removePercentage, setRemovePercentage] = useState(100)
+
+  // Balance tracking
+  const [balance0, setBalance0] = useState<string>('')
+  const [balance1, setBalance1] = useState<string>('')
+  const [loadingBalance0, setLoadingBalance0] = useState(false)
+  const [loadingBalance1, setLoadingBalance1] = useState(false)
 
   useEffect(() => {
     if (wallet && id) {
@@ -61,6 +70,63 @@ export default function PositionDetailPage() {
       console.error('[PositionDetail] Failed to load position:', err)
       setLoading(false)
     }
+  }
+
+  // Fetch balance for token0
+  useEffect(() => {
+    if (!wallet || !position) {
+      setBalance0('')
+      return
+    }
+
+    const token0Address = position.token0?.symbol ? getTokenAddress(position.token0.symbol) : null
+    if (!token0Address) return
+
+    setLoadingBalance0(true)
+    fetchTokenBalance(token0Address, wallet)
+      .then(({ balanceFormatted }) => {
+        setBalance0(balanceFormatted)
+      })
+      .catch(err => {
+        console.error('[PositionDetail] Failed to fetch balance 0:', err)
+      })
+      .finally(() => {
+        setLoadingBalance0(false)
+      })
+  }, [wallet, position])
+
+  // Fetch balance for token1
+  useEffect(() => {
+    if (!wallet || !position) {
+      setBalance1('')
+      return
+    }
+
+    const token1Address = position.token1?.symbol ? getTokenAddress(position.token1.symbol) : null
+    if (!token1Address) return
+
+    setLoadingBalance1(true)
+    fetchTokenBalance(token1Address, wallet)
+      .then(({ balanceFormatted }) => {
+        setBalance1(balanceFormatted)
+      })
+      .catch(err => {
+        console.error('[PositionDetail] Failed to fetch balance 1:', err)
+      })
+      .finally(() => {
+        setLoadingBalance1(false)
+      })
+  }, [wallet, position])
+
+  // Helper function to get token address from symbol (simplified)
+  function getTokenAddress(symbol: string): string | null {
+    // This would need to be properly implemented based on your token list
+    const COMMON_TOKENS: Record<string, string> = {
+      'WETH': '0x4200000000000000000000000000000000000006',
+      'ARBME': '0x...',  // Add actual ARBME address
+      // Add other common tokens
+    }
+    return COMMON_TOKENS[symbol] || null
   }
 
   async function handleCollectFees() {
@@ -423,7 +489,23 @@ export default function PositionDetailPage() {
           <div className="liquidity-form">
             <h3>Add Liquidity</h3>
             <div className="form-group">
-              <label>{position.token0.symbol} Amount</label>
+              <div className="input-label">
+                <label>{position.token0.symbol} Amount</label>
+                <span className="input-balance">
+                  Balance: {loadingBalance0 ? (
+                    <span className="spinner-small"></span>
+                  ) : balance0 ? (
+                    <>
+                      {parseFloat(balance0).toFixed(6)}
+                      {parseFloat(balance0) < parseFloat(amount0Input || '0') && (
+                        <span className="text-error"> (Insufficient)</span>
+                      )}
+                    </>
+                  ) : (
+                    '--'
+                  )}
+                </span>
+              </div>
               <input
                 type="number"
                 value={amount0Input}
@@ -432,9 +514,33 @@ export default function PositionDetailPage() {
                 step="0.000001"
                 disabled={processing}
               />
+              {balance0 && (
+                <QuickSelectButtons
+                  balance={balance0}
+                  decimals={18}
+                  onAmountSelect={setAmount0Input}
+                  disabled={processing}
+                />
+              )}
             </div>
             <div className="form-group">
-              <label>{position.token1.symbol} Amount</label>
+              <div className="input-label">
+                <label>{position.token1.symbol} Amount</label>
+                <span className="input-balance">
+                  Balance: {loadingBalance1 ? (
+                    <span className="spinner-small"></span>
+                  ) : balance1 ? (
+                    <>
+                      {parseFloat(balance1).toFixed(6)}
+                      {parseFloat(balance1) < parseFloat(amount1Input || '0') && (
+                        <span className="text-error"> (Insufficient)</span>
+                      )}
+                    </>
+                  ) : (
+                    '--'
+                  )}
+                </span>
+              </div>
               <input
                 type="number"
                 value={amount1Input}
@@ -443,6 +549,14 @@ export default function PositionDetailPage() {
                 step="0.000001"
                 disabled={processing}
               />
+              {balance1 && (
+                <QuickSelectButtons
+                  balance={balance1}
+                  decimals={18}
+                  onAmountSelect={setAmount1Input}
+                  disabled={processing}
+                />
+              )}
             </div>
             <div className="form-actions">
               <button
@@ -557,6 +671,8 @@ export default function PositionDetailPage() {
           </div>
         )}
       </div>
+
+      <Footer />
     </div>
   )
 }

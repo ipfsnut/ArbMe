@@ -7,6 +7,7 @@ import { fetchPools } from '@/services/api'
 import { FEATURED_POOLS, type FeaturedPoolConfig } from '@/utils/constants'
 import type { Pool } from '@/utils/types'
 import { AppHeader } from '@/components/AppHeader'
+import { Footer } from '@/components/Footer'
 import PoolCard from '@/components/PoolCard'
 import Link from 'next/link'
 
@@ -143,6 +144,8 @@ export default function HomePage() {
           <a href="/app/create-pool" className="button-secondary">Create New Pool</a>
         </div>
       )}
+
+      <Footer />
     </div>
   )
 }

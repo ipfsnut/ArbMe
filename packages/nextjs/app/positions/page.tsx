@@ -7,9 +7,10 @@ import { fetchPositions, buildCollectFeesTransaction } from '@/services/api'
 import { truncateAddress } from '@/utils/format'
 import type { Position } from '@/utils/types'
 import { AppHeader } from '@/components/AppHeader'
+import { Footer } from '@/components/Footer'
 import PositionCard from '@/components/PositionCard'
 import Link from 'next/link'
-import sdk from '@farcaster/miniapp-sdk'
+import sdk from '@farcaster/frame-sdk'
 
 const POSITIONS_PER_PAGE = 10
 
@@ -199,6 +200,8 @@ export default function MyPoolsPage() {
           )}
         </>
       )}
+
+      <Footer />
     </div>
   )
 }
