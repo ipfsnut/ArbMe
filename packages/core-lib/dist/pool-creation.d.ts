@@ -36,16 +36,6 @@ export interface V2CreatePoolParams {
     recipient: Address;
     slippageTolerance?: number;
 }
-export interface AerodromeCreatePoolParams {
-    token0: Address;
-    token1: Address;
-    fee: number;
-    sqrtPriceX96: bigint;
-    amount0: string;
-    amount1: string;
-    recipient: Address;
-    slippageTolerance?: number;
-}
 export declare const V2_FACTORY: Address;
 export declare const V2_ROUTER: Address;
 export declare const V3_FACTORY: Address;
@@ -53,10 +43,6 @@ export declare const V3_POSITION_MANAGER: Address;
 export declare const V4_POOL_MANAGER: Address;
 export declare const V4_POSITION_MANAGER: Address;
 export declare const V4_STATE_VIEW: Address;
-export declare const AERO_SLIPSTREAM_FACTORY: Address;
-export declare const AERO_SLIPSTREAM_ROUTER: Address;
-export declare const AERO_SLIPSTREAM_POSITION_MANAGER: Address;
-export declare const UNISWAP_FEE_TO_AERO_TICK_SPACING: Record<number, number>;
 /**
  * Convert price ratio to Q64.96 sqrt price format
  * @param price - Price as token1/token0 ratio (where token0 < token1)
@@ -136,20 +122,4 @@ export declare function buildV3MintPositionTransaction(params: V3CreatePoolParam
  * Build V2 create pool & add liquidity transaction
  */
 export declare function buildV2CreatePoolTransaction(params: V2CreatePoolParams): Transaction;
-/**
- * Check if Aerodrome Slipstream pool exists
- */
-export declare function checkAeroPoolExists(token0: Address, token1: Address, tickSpacing: number): Promise<{
-    exists: boolean;
-    pool?: Address;
-}>;
-/**
- * Build Aerodrome Slipstream pool initialization transaction
- * Note: Aerodrome may auto-create pools, so this may not be needed
- */
-export declare function buildAeroInitializePoolTransaction(params: AerodromeCreatePoolParams): Transaction;
-/**
- * Build Aerodrome Slipstream mint position transaction
- */
-export declare function buildAeroMintPositionTransaction(params: AerodromeCreatePoolParams): Transaction;
 export {};
