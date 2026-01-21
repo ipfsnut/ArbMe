@@ -90,6 +90,8 @@ export default function CreatePoolPage() {
   const [slippageTolerance, setSlippageTolerance] = useState(0.5)
   const [autoCalculating, setAutoCalculating] = useState(false)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [customPriceA, setCustomPriceA] = useState('')
+  const [customPriceB, setCustomPriceB] = useState('')
 
   useEffect(() => {
     loadWallet()
@@ -718,6 +720,56 @@ export default function CreatePoolPage() {
           pairType="standard"
         />
 
+        {/* Custom Token Price Input */}
+        {((tokenA && tokenA.symbol === 'CUSTOM') || (tokenB && tokenB.symbol === 'CUSTOM')) && (
+          <div className="create-section">
+            <h3 className="section-title">Custom Token Pricing</h3>
+            <div className="warning-banner">
+              ⚠️ Unable to fetch price data for custom tokens. Please manually enter the current USD price.
+              <br />
+              <small>Make sure you enter accurate prices to ensure proper liquidity ratios.</small>
+            </div>
+
+            {tokenA && tokenA.symbol === 'CUSTOM' && (
+              <div className="input-group">
+                <div className="input-label">
+                  <span>{tokenA.address.slice(0, 6)}...{tokenA.address.slice(-4)} Price (USD)</span>
+                </div>
+                <div className="input-wrapper">
+                  <span className="input-token-label">$</span>
+                  <input
+                    type="number"
+                    className="amount-input"
+                    placeholder="0.00"
+                    step="0.000001"
+                    value={customPriceA}
+                    onChange={(e) => setCustomPriceA(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+
+            {tokenB && tokenB.symbol === 'CUSTOM' && (
+              <div className="input-group">
+                <div className="input-label">
+                  <span>{tokenB.address.slice(0, 6)}...{tokenB.address.slice(-4)} Price (USD)</span>
+                </div>
+                <div className="input-wrapper">
+                  <span className="input-token-label">$</span>
+                  <input
+                    type="number"
+                    className="amount-input"
+                    placeholder="0.00"
+                    step="0.000001"
+                    value={customPriceB}
+                    onChange={(e) => setCustomPriceB(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="create-section">
           <h3 className="section-title">Initial Liquidity</h3>
 
@@ -747,7 +799,7 @@ export default function CreatePoolPage() {
                   <input
                     type="number"
                     className="amount-input"
-                    placeholder="0.0"
+                    placeholder={balanceA ? `Balance: ${parseFloat(balanceA).toFixed(6)}` : '0.0'}
                     step="any"
                     value={amountA}
                     onChange={(e) => setAmountA(e.target.value)}
@@ -786,7 +838,7 @@ export default function CreatePoolPage() {
                   <input
                     type="number"
                     className="amount-input"
-                    placeholder="0.0"
+                    placeholder={balanceB ? `Balance: ${parseFloat(balanceB).toFixed(6)}` : '0.0'}
                     step="any"
                     value={amountB}
                     onChange={(e) => setAmountB(e.target.value)}

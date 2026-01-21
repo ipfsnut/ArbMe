@@ -9,6 +9,7 @@ import type { Pool } from '@/utils/types'
 import { AppHeader } from '@/components/AppHeader'
 import { Footer } from '@/components/Footer'
 import PoolCard from '@/components/PoolCard'
+import { formatPrice } from '@/utils/format'
 import Link from 'next/link'
 
 export default function HomePage() {
@@ -99,7 +100,7 @@ export default function HomePage() {
             <div className="hero-stat">
               <div className="hero-stat-label">Price</div>
               <div className="hero-stat-value">
-                {loading ? '...' : `$${arbmePrice.toFixed(6)}`}
+                {loading ? '...' : formatPrice(arbmePrice)}
               </div>
             </div>
             <div className="hero-stat">

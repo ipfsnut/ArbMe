@@ -510,7 +510,7 @@ export default function PositionDetailPage() {
                 type="number"
                 value={amount0Input}
                 onChange={(e) => setAmount0Input(e.target.value)}
-                placeholder="0.0"
+                placeholder={balance0 ? `Balance: ${parseFloat(balance0).toFixed(6)}` : '0.0'}
                 step="0.000001"
                 disabled={processing}
               />
@@ -545,7 +545,7 @@ export default function PositionDetailPage() {
                 type="number"
                 value={amount1Input}
                 onChange={(e) => setAmount1Input(e.target.value)}
-                placeholder="0.0"
+                placeholder={balance1 ? `Balance: ${parseFloat(balance1).toFixed(6)}` : '0.0'}
                 step="0.000001"
                 disabled={processing}
               />
