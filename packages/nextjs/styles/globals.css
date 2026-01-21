@@ -144,7 +144,7 @@
 }
 
 .back-button:hover {
-  background: rgba(99, 102, 241, 0.1);
+  background: var(--accent-glow);
   text-decoration: none;
 }
 
@@ -392,8 +392,6 @@
 
 /* Hero Section */
 .hero-section {
-  background: linear-gradient(135deg, var(--bg-card) 0%, rgba(99, 102, 241, 0.05) 100%);
-  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: var(--spacing-xl);
   margin-bottom: var(--spacing-xl);
@@ -412,20 +410,18 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--accent);
-  background: rgba(99, 102, 241, 0.1);
+  background: var(--accent-glow);
   padding: 0.25rem 0.75rem;
   border-radius: 12px;
   margin-bottom: var(--spacing-md);
+  border: 1px solid var(--border);
 }
 
 .hero-title {
   font-size: 3rem;
   font-weight: 800;
   margin: 0 0 var(--spacing-md) 0;
-  background: linear-gradient(135deg, var(--accent) 0%, #a78bfa 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--accent);
 }
 
 .hero-description {
@@ -487,7 +483,7 @@
 
 .hero-cta:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgba(99, 102, 241, 0.3);
+  box-shadow: 0 8px 16px var(--accent-glow);
 }
 
 /* Featured Section */
@@ -750,7 +746,7 @@
   align-items: center;
   gap: var(--spacing-sm);
   padding: var(--spacing-sm);
-  background: rgba(99, 102, 241, 0.1);
+  background: var(--accent-glow);
   border-radius: var(--radius-sm);
 }
 
@@ -804,7 +800,7 @@
 
 .version-btn.selected {
   border-color: var(--accent);
-  background: rgba(99, 102, 241, 0.1);
+  background: var(--accent-glow);
 }
 
 .version-badge {
@@ -860,7 +856,7 @@
 
 .fee-tier-btn.selected {
   border-color: var(--accent);
-  background: rgba(99, 102, 241, 0.1);
+  background: var(--accent-glow);
 }
 
 .fee-label {
@@ -951,7 +947,7 @@
   justify-content: space-between;
   align-items: center;
   padding: var(--spacing-md);
-  background: rgba(99, 102, 241, 0.1);
+  background: var(--accent-glow);
   border-radius: var(--radius-md);
   margin-top: var(--spacing-sm);
 }
@@ -1010,20 +1006,22 @@
  */
 
 :root {
-  /* Colors */
-  --bg-primary: #0a0a0f;
-  --bg-secondary: #0f0f18;
-  --bg-card: #12121c;
-  --border: #1f1f2f;
-  --border-active: #2a2a3f;
-  --text-primary: #e8e8f2;
-  --text-secondary: #7a7a8f;
-  --text-muted: #5a5a6f;
-  --accent: #10b981;
-  --accent-dim: #0d9668;
-  --positive: #22c55e;
-  --negative: #ef4444;
-  --warning: #f59e0b;
+  /* Matrix Green & Black Color Scheme */
+  --bg-primary: #000000;
+  --bg-secondary: #0a0a0a;
+  --bg-card: rgba(0, 20, 0, 0.3);
+  --bg-card-solid: #0d0d0d;
+  --border: #003b00;
+  --border-active: #00ff41;
+  --text-primary: #00ff41;
+  --text-secondary: #00cc33;
+  --text-muted: #008f11;
+  --accent: #00ff41;
+  --accent-dim: #00cc33;
+  --accent-glow: rgba(0, 255, 65, 0.3);
+  --positive: #00ff41;
+  --negative: #ff0000;
+  --warning: #ffff00;
 
   /* Spacing */
   --spacing-xs: 0.25rem;
@@ -1161,20 +1159,21 @@ button:disabled {
 /* ArbMe - Dark Theme Styles */
 
 :root {
-  --bg-primary: #0a0a0f;
-  --bg-secondary: #0f0f18;
-  --bg-card: #12121c;
-  --border: #1f1f2f;
-  --border-active: #2a2a3f;
-  --text-primary: #e8e8f2;
-  --text-secondary: #7a7a8f;
-  --text-muted: #5a5a6f;
-  --accent: #10b981;
-  --accent-dim: #0d9668;
-  --accent-glow: rgba(16, 185, 129, 0.15);
-  --warning: #f59e0b;
-  --positive: #22c55e;
-  --negative: #ef4444;
+  --bg-primary: #000000;
+  --bg-secondary: #0a0a0a;
+  --bg-card: rgba(0, 20, 0, 0.3);
+  --bg-card-solid: #0d0d0d;
+  --border: #003b00;
+  --border-active: #00ff41;
+  --text-primary: #00ff41;
+  --text-secondary: #00cc33;
+  --text-muted: #008f11;
+  --accent: #00ff41;
+  --accent-dim: #00cc33;
+  --accent-glow: rgba(0, 255, 65, 0.3);
+  --warning: #ffff00;
+  --positive: #00ff41;
+  --negative: #ff0000;
   --purple: #8b5cf6;
 }
 
@@ -1238,10 +1237,8 @@ body {
   font-family: ui-monospace, 'SF Mono', Monaco, monospace;
   font-size: 1.375rem;
   font-weight: 700;
-  background: linear-gradient(135deg, var(--accent) 0%, var(--warning) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--accent);
+  text-shadow: 0 0 10px var(--accent-glow);
 }
 
 .wallet-btn {
@@ -2237,7 +2234,7 @@ body {
 
 .miniapp-prompt-button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgba(99, 102, 241, 0.3);
+  box-shadow: 0 8px 16px var(--accent-glow);
 }
 
 .miniapp-prompt-button:active {
@@ -2542,7 +2539,7 @@ body {
 }
 
 .detail-row.highlight {
-  background: rgba(99, 102, 241, 0.05);
+  background: rgba(0, 255, 65, 0.05);
   padding: var(--spacing-sm);
   border-radius: var(--radius-sm);
   margin: var(--spacing-xs) calc(-1 * var(--spacing-xs));
@@ -2673,6 +2670,169 @@ body {
   margin-top: var(--spacing-sm);
   margin-bottom: var(--spacing-xl);
   font-size: 1rem;
+}
+
+/* Matrix Green Enhancements */
+
+/* Animated Matrix Background */
+body {
+  background:
+    radial-gradient(ellipse at top, rgba(0, 255, 65, 0.05) 0%, transparent 50%),
+    radial-gradient(ellipse at bottom, rgba(0, 255, 65, 0.03) 0%, transparent 50%),
+    #000000;
+  background-attachment: fixed;
+}
+
+/* Glassmorphism Cards */
+.app-header,
+.stats-banner,
+.hero-section,
+.pool-card,
+.contract-address-section,
+.arbme-price-display {
+  background: rgba(0, 30, 0, 0.2);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--border);
+  box-shadow:
+    0 8px 32px 0 rgba(0, 255, 65, 0.05),
+    inset 0 1px 0 0 rgba(0, 255, 65, 0.1);
+}
+
+/* Glow Effects */
+.hero-title {
+  text-shadow:
+    0 0 10px var(--accent-glow),
+    0 0 20px var(--accent-glow),
+    0 0 30px var(--accent-glow);
+  animation: pulseGlow 3s ease-in-out infinite;
+}
+
+.hero-stat-value,
+.stat-value,
+.price-value {
+  text-shadow: 0 0 10px var(--accent-glow);
+}
+
+.hero-cta,
+.copy-button,
+.buy-arbme-btn,
+button.button-primary {
+  background: var(--accent);
+  color: #000;
+  font-weight: 700;
+  box-shadow:
+    0 0 20px var(--accent-glow),
+    0 4px 12px rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--accent);
+  transition: all 0.3s ease;
+}
+
+.hero-cta:hover,
+.copy-button:hover,
+.buy-arbme-btn:hover,
+button.button-primary:hover {
+  box-shadow:
+    0 0 30px var(--accent-glow),
+    0 0 40px var(--accent-glow),
+    0 6px 16px rgba(0, 0, 0, 0.6);
+  transform: translateY(-2px);
+  background: #00cc33;
+}
+
+/* Pulsing Glow Animation */
+@keyframes pulseGlow {
+  0%, 100% {
+    text-shadow:
+      0 0 10px var(--accent-glow),
+      0 0 20px var(--accent-glow),
+      0 0 30px var(--accent-glow);
+  }
+  50% {
+    text-shadow:
+      0 0 20px var(--accent-glow),
+      0 0 30px var(--accent-glow),
+      0 0 40px var(--accent-glow),
+      0 0 50px var(--accent-glow);
+  }
+}
+
+/* Fade In Animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hero-section,
+.stats-banner,
+.pools-grid {
+  animation: fadeIn 0.6s ease-out;
+}
+
+.pool-card {
+  animation: fadeIn 0.6s ease-out;
+  animation-fill-mode: both;
+}
+
+.pool-card:nth-child(1) { animation-delay: 0.1s; }
+.pool-card:nth-child(2) { animation-delay: 0.2s; }
+.pool-card:nth-child(3) { animation-delay: 0.3s; }
+.pool-card:nth-child(4) { animation-delay: 0.4s; }
+
+/* Shimmer Loading Effect */
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.pool-card.loading {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 20, 0, 0.2) 0%,
+    rgba(0, 255, 65, 0.1) 50%,
+    rgba(0, 20, 0, 0.2) 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* Hover Glow for Cards */
+.pool-card:hover {
+  border-color: var(--accent);
+  box-shadow:
+    0 8px 32px 0 rgba(0, 255, 65, 0.15),
+    inset 0 1px 0 0 rgba(0, 255, 65, 0.2);
+  transform: translateY(-4px);
+}
+
+/* Contract Address Special Styling */
+.contract-address code {
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid var(--border);
+  box-shadow: inset 0 0 10px rgba(0, 255, 65, 0.1);
+  font-weight: 600;
+}
+
+/* Matrix Rain Effect for Logo */
+.logo-image {
+  box-shadow: 0 0 20px var(--accent-glow);
+  border: 2px solid var(--accent);
+}
+
+/* Accent Text Glow */
+.text-accent {
+  color: var(--accent) !important;
+  text-shadow: 0 0 5px var(--accent-glow);
 }
 
 /* Mobile-First Responsive Design */
