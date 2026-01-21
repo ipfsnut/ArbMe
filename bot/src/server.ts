@@ -26,15 +26,20 @@ import {
   checkV2PoolExists,
   checkV3PoolExists,
   checkV4PoolExists,
+  checkAeroPoolExists,
   buildApproveTransaction,
   buildV2CreatePoolTransaction,
   buildV3InitializePoolTransaction,
   buildV3MintPositionTransaction,
   buildV4InitializePoolTransaction,
   buildV4MintPositionTransaction,
+  buildAeroInitializePoolTransaction,
+  buildAeroMintPositionTransaction,
   calculateSqrtPriceX96,
   sortTokens,
   FEE_TO_TICK_SPACING,
+  UNISWAP_FEE_TO_AERO_TICK_SPACING,
+  AERO_SLIPSTREAM_POSITION_MANAGER,
 } from '@arbme/core-lib';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -373,8 +378,18 @@ const checkPoolExistsHandler = async (req: any, res: any) => {
       }
       result = await checkV4PoolExists(sortedToken0, sortedToken1, fee, tickSpacing);
       res.json({ exists: result.exists, initialized: result.initialized });
+    } else if (version === 'aerodrome') {
+      if (!fee) {
+        return res.status(400).json({ error: 'fee required for Aerodrome pools' });
+      }
+      const tickSpacing = UNISWAP_FEE_TO_AERO_TICK_SPACING[fee];
+      if (!tickSpacing) {
+        return res.status(400).json({ error: 'Invalid fee tier for Aerodrome' });
+      }
+      result = await checkAeroPoolExists(sortedToken0, sortedToken1, tickSpacing);
+      res.json({ exists: result.exists, poolAddress: result.pool });
     } else {
-      return res.status(400).json({ error: 'Invalid version. Use v2, v3, or v4' });
+      return res.status(400).json({ error: 'Invalid version. Use v2, v3, v4, or aerodrome' });
     }
   } catch (error) {
     console.error('[Server] Failed to check pool exists:', error);
@@ -465,8 +480,8 @@ const buildCreatePoolHandler = async (req: any, res: any) => {
       });
     }
 
-    if ((version === 'v3' || version === 'v4') && !fee) {
-      return res.status(400).json({ error: 'fee required for V3/V4 pools' });
+    if ((version === 'v3' || version === 'v4' || version === 'aerodrome') && !fee) {
+      return res.status(400).json({ error: 'fee required for V3/V4/Aerodrome pools' });
     }
 
     console.log(`[Server] Building ${version} pool creation: ${token0}/${token1}`);
@@ -554,8 +569,32 @@ const buildCreatePoolHandler = async (req: any, res: any) => {
       });
 
       transactions.push(initTx, mintTx);
+    } else if (version === 'aerodrome') {
+      const initTx = buildAeroInitializePoolTransaction({
+        token0: sortedToken0 as any,
+        token1: sortedToken1 as any,
+        fee,
+        sqrtPriceX96,
+        amount0: amount0Wei.toString(),
+        amount1: amount1Wei.toString(),
+        recipient: recipient as any,
+        slippageTolerance,
+      });
+
+      const mintTx = buildAeroMintPositionTransaction({
+        token0: sortedToken0 as any,
+        token1: sortedToken1 as any,
+        fee,
+        sqrtPriceX96,
+        amount0: amount0Wei.toString(),
+        amount1: amount1Wei.toString(),
+        recipient: recipient as any,
+        slippageTolerance,
+      });
+
+      transactions.push(initTx, mintTx);
     } else {
-      return res.status(400).json({ error: 'Invalid version. Use v2, v3, or v4' });
+      return res.status(400).json({ error: 'Invalid version. Use v2, v3, v4, or aerodrome' });
     }
 
     res.json({ transactions });

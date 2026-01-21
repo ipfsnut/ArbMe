@@ -48,6 +48,17 @@ export interface V2CreatePoolParams {
   slippageTolerance?: number;
 }
 
+export interface AerodromeCreatePoolParams {
+  token0: Address;
+  token1: Address;
+  fee: number; // Fee in basis points (will map to tick spacing)
+  sqrtPriceX96: bigint;
+  amount0: string;
+  amount1: string;
+  recipient: Address;
+  slippageTolerance?: number;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // Contract Constants
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -64,6 +75,26 @@ export const V3_POSITION_MANAGER: Address = '0x03a520b32C04BF3bEEf7BEb72E919cf82
 export const V4_POOL_MANAGER: Address = '0x498581ff718922c3f8e6a244956af099b2652b2b';
 export const V4_POSITION_MANAGER: Address = '0x7c5f5a4bbd8fd63184577525326123b519429bdc';
 export const V4_STATE_VIEW: Address = '0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6';
+
+// Aerodrome Slipstream (Concentrated Liquidity)
+export const AERO_SLIPSTREAM_FACTORY: Address = '0xeC8E5342B19977B4eF8892e02D8DAEcfa1315831';
+export const AERO_SLIPSTREAM_ROUTER: Address = '0xbe6d8f0d05cc4be24d5167a3ef062215be6d18a5';
+export const AERO_SLIPSTREAM_POSITION_MANAGER: Address = '0x827922686190790b37229fd06084350E74485b72';
+
+// Map Uniswap fee tiers to Aerodrome tick spacing
+export const UNISWAP_FEE_TO_AERO_TICK_SPACING: Record<number, number> = {
+  100: 1,       // 0.01% → CL1 (stablecoins)
+  500: 50,      // 0.05% → CL50 (correlated)
+  3000: 100,    // 0.30% → CL100 (standard volatile)
+  10000: 200,   // 1.00% → CL200 (exotic)
+  30000: 200,   // 3.00% → CL200
+  50000: 200,   // 5.00% → CL200
+  100000: 2000, // 10.00% → CL2000
+  150000: 2000, // 15.00% → CL2000
+  200000: 2000, // 20.00% → CL2000
+  250000: 2000, // 25.00% → CL2000
+  500000: 2000, // 50.00% → CL2000
+};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Mathematical Utilities
@@ -504,6 +535,119 @@ export function buildV2CreatePoolTransaction(params: V2CreatePoolParams): Transa
 
   return {
     to: V2_ROUTER,
+    data,
+    value: '0',
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Aerodrome Slipstream Pool Creation
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Check if Aerodrome Slipstream pool exists
+ */
+export async function checkAeroPoolExists(
+  token0: Address,
+  token1: Address,
+  tickSpacing: number
+): Promise<{ exists: boolean; pool?: Address }> {
+  try {
+    // getPool(address,address,int24) selector: 0x1698ee82
+    const data = '0x1698ee82' +
+      token0.slice(2).padStart(64, '0') +
+      token1.slice(2).padStart(64, '0') +
+      BigInt(tickSpacing).toString(16).padStart(64, '0');
+
+    const result = await rpcCall('eth_call', [
+      { to: AERO_SLIPSTREAM_FACTORY, data },
+      'latest'
+    ]);
+
+    const poolAddress = ('0x' + result.slice(-40)) as Address;
+    const exists = poolAddress !== '0x0000000000000000000000000000000000000000';
+
+    return { exists, pool: exists ? poolAddress : undefined };
+  } catch (err) {
+    console.error('[checkAeroPoolExists] Error:', err);
+    return { exists: false };
+  }
+}
+
+/**
+ * Build Aerodrome Slipstream pool initialization transaction
+ * Note: Aerodrome may auto-create pools, so this may not be needed
+ */
+export function buildAeroInitializePoolTransaction(
+  params: AerodromeCreatePoolParams
+): Transaction {
+  const tickSpacing = UNISWAP_FEE_TO_AERO_TICK_SPACING[params.fee] || 100;
+
+  // createPool(address,address,int24,uint160) selector: 0x13af4035
+  const data = '0x13af4035' +
+    params.token0.slice(2).padStart(64, '0') +
+    params.token1.slice(2).padStart(64, '0') +
+    BigInt(tickSpacing).toString(16).padStart(64, '0') +
+    params.sqrtPriceX96.toString(16).padStart(64, '0');
+
+  return {
+    to: AERO_SLIPSTREAM_FACTORY,
+    data,
+    value: '0',
+  };
+}
+
+/**
+ * Build Aerodrome Slipstream mint position transaction
+ */
+export function buildAeroMintPositionTransaction(
+  params: AerodromeCreatePoolParams
+): Transaction {
+  const tickSpacing = UNISWAP_FEE_TO_AERO_TICK_SPACING[params.fee] || 100;
+
+  // Full range ticks based on tick spacing
+  const tickLower = Math.ceil(-887272 / tickSpacing) * tickSpacing;
+  const tickUpper = Math.floor(887272 / tickSpacing) * tickSpacing;
+
+  // Calculate min amounts with slippage
+  const slippageMultiplier = 1 - (params.slippageTolerance || 0.5) / 100;
+  const amount0Min = BigInt(Math.floor(Number(params.amount0) * slippageMultiplier));
+  const amount1Min = BigInt(Math.floor(Number(params.amount1) * slippageMultiplier));
+  const deadline = Math.floor(Date.now() / 1000) + 1200;
+
+  // mint(MintParams) - similar to Uniswap V3
+  // struct MintParams {
+  //   address token0;
+  //   address token1;
+  //   int24 tickSpacing;
+  //   int24 tickLower;
+  //   int24 tickUpper;
+  //   uint256 amount0Desired;
+  //   uint256 amount1Desired;
+  //   uint256 amount0Min;
+  //   uint256 amount1Min;
+  //   address recipient;
+  //   uint256 deadline;
+  //   uint160 sqrtPriceX96;
+  // }
+  // selector: 0x11ed56c9
+  const data = '0x11ed56c9' +
+    '0000000000000000000000000000000000000000000000000000000000000020' + // offset
+    params.token0.slice(2).padStart(64, '0') +
+    params.token1.slice(2).padStart(64, '0') +
+    BigInt(tickSpacing).toString(16).padStart(64, '0') +
+    (tickLower < 0 ? 'f'.repeat(64 - tickLower.toString(16).length) + tickLower.toString(16).slice(1) : BigInt(tickLower).toString(16).padStart(64, '0')) +
+    (tickUpper < 0 ? 'f'.repeat(64 - tickUpper.toString(16).length) + tickUpper.toString(16).slice(1) : BigInt(tickUpper).toString(16).padStart(64, '0')) +
+    BigInt(params.amount0).toString(16).padStart(64, '0') +
+    BigInt(params.amount1).toString(16).padStart(64, '0') +
+    amount0Min.toString(16).padStart(64, '0') +
+    amount1Min.toString(16).padStart(64, '0') +
+    params.recipient.slice(2).padStart(64, '0') +
+    deadline.toString(16).padStart(64, '0') +
+    params.sqrtPriceX96.toString(16).padStart(64, '0');
+
+  return {
+    to: AERO_SLIPSTREAM_POSITION_MANAGER,
     data,
     value: '0',
   };
