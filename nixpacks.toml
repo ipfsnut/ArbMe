@@ -8,11 +8,20 @@ cmds = [
 
 [phases.build]
 cmds = [
+  "echo '🔨 Building core-lib...'",
   "npm run build --workspace=@arbme/core-lib",
+  "echo '✅ core-lib built'",
+  "echo '🔨 Building Next.js app...'",
   "npm run build --workspace=@arbme/nextjs",
-  "ls -la packages/nextjs/.next/ || echo 'No .next directory'",
-  "ls -la packages/nextjs/.next/standalone/ || echo 'No standalone directory'",
-  "cp -r packages/nextjs/.next/static packages/nextjs/.next/standalone/packages/nextjs/.next/static || echo 'Failed to copy static files'"
+  "echo '✅ Next.js built'",
+  "echo '📁 Checking build output...'",
+  "ls -la packages/nextjs/.next/ || (echo '❌ ERROR: No .next directory created!' && exit 1)",
+  "ls -la packages/nextjs/.next/standalone/ || (echo '❌ ERROR: No standalone directory!' && exit 1)",
+  "test -f packages/nextjs/.next/standalone/packages/nextjs/server.js || (echo '❌ ERROR: server.js not created!' && exit 1)",
+  "echo '✅ server.js exists'",
+  "echo '📦 Copying static files...'",
+  "cp -r packages/nextjs/.next/static packages/nextjs/.next/standalone/packages/nextjs/.next/static",
+  "echo '✅ Build complete!'"
 ]
 
 [start]
