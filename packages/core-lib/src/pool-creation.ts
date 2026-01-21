@@ -75,9 +75,22 @@ export const V4_STATE_VIEW: Address = '0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe
  * @returns sqrtPriceX96 as bigint
  */
 export function calculateSqrtPriceX96(price: number): bigint {
-  const sqrtPrice = Math.sqrt(price);
+  // To avoid precision loss, scale price before sqrt, then adjust Q96
+  // sqrt(price) * 2^96 = sqrt(price * 2^192) = sqrt(price) * 2^96
+  // But we can do: sqrt(price * 2^64) * 2^64 to keep precision
+
   const Q96 = 2n ** 96n;
-  return BigInt(Math.floor(sqrtPrice * Number(Q96)));
+  const Q64 = 2n ** 64n;
+
+  // Scale price by 2^64 before sqrt to maintain precision
+  const scaledPrice = price * Number(Q64);
+  const sqrtScaledPrice = Math.sqrt(scaledPrice);
+
+  // Convert to BigInt and multiply by remaining 2^32
+  const sqrtScaledPriceBigInt = BigInt(Math.floor(sqrtScaledPrice));
+  const Q32 = 2n ** 32n;
+
+  return sqrtScaledPriceBigInt * Q32;
 }
 
 /**
