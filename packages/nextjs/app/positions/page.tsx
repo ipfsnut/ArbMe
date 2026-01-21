@@ -10,7 +10,7 @@ import { AppHeader } from '@/components/AppHeader'
 import { Footer } from '@/components/Footer'
 import PositionCard from '@/components/PositionCard'
 import Link from 'next/link'
-import sdk from '@farcaster/frame-sdk'
+import sdk from '@farcaster/miniapp-sdk'
 
 const POSITIONS_PER_PAGE = 10
 

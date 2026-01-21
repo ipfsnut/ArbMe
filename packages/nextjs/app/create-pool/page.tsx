@@ -16,7 +16,7 @@ import {
   fetchPoolPrice,
   calculateLiquidityRatio,
 } from '@/services/api'
-import sdk from '@farcaster/frame-sdk'
+import sdk from '@farcaster/miniapp-sdk'
 import { QuickSelectButtons } from '@/components/QuickSelectButtons'
 import { SlippageControl } from '@/components/SlippageControl'
 import { Footer } from '@/components/Footer'

@@ -17,7 +17,7 @@ import type { Position } from '@/utils/types'
 import { AppHeader } from '@/components/AppHeader'
 import { Footer } from '@/components/Footer'
 import Link from 'next/link'
-import sdk from '@farcaster/frame-sdk'
+import sdk from '@farcaster/miniapp-sdk'
 import { QuickSelectButtons } from '@/components/QuickSelectButtons'
 
 type ActionMode = 'view' | 'add' | 'remove' | 'close'
