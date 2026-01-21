@@ -2,6 +2,11 @@
   "name": "arbme-monorepo",
   "version": "1.0.0",
   "private": true,
+  "packageManager": "pnpm@10.0.0",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=10"
+  },
   "workspaces": [
     "packages/*"
   ],
