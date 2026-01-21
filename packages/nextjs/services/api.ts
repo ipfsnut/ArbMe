@@ -221,18 +221,22 @@ export async function checkApprovals(params: {
  */
 export async function buildApprovalTransaction(
   token: string,
-  spender: string
+  spender: string,
+  amount?: string,
+  unlimited?: boolean
 ): Promise<{
   to: string;
   data: string;
   value: string;
+  approvalAmount: string;
+  isUnlimited: boolean;
 }> {
   const res = await fetch(`${API_BASE}/build-approval`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ token, spender }),
+    body: JSON.stringify({ token, spender, amount, unlimited }),
   });
 
   if (!res.ok) {
@@ -272,6 +276,95 @@ export async function buildCreatePoolTransaction(params: {
 
   if (!res.ok) {
     throw new Error(`Failed to build create pool transaction: ${res.statusText}`);
+  }
+
+  return res.json();
+}
+
+/**
+ * Fetch token balance for wallet
+ */
+export async function fetchTokenBalance(
+  tokenAddress: string,
+  walletAddress: string
+): Promise<{
+  balanceWei: string;
+  balanceFormatted: string;
+  decimals: number;
+}> {
+  const res = await fetch(`${API_BASE}/token-balance`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ tokenAddress, walletAddress }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch token balance: ${res.statusText}`);
+  }
+
+  return res.json();
+}
+
+/**
+ * Fetch pool price
+ */
+export async function fetchPoolPrice(params: {
+  version: string;
+  token0: string;
+  token1: string;
+  fee?: number;
+}): Promise<{
+  exists: boolean;
+  price?: number;
+  priceDisplay?: string;
+  token0Symbol?: string;
+  token1Symbol?: string;
+}> {
+  const res = await fetch(`${API_BASE}/pool-price`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(params),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch pool price: ${res.statusText}`);
+  }
+
+  return res.json();
+}
+
+/**
+ * Calculate liquidity ratio
+ */
+export async function calculateLiquidityRatio(params: {
+  version: string;
+  token0: string;
+  token1: string;
+  fee?: number;
+  amount0?: string;
+  amount1?: string;
+  decimals0: number;
+  decimals1: number;
+}): Promise<{
+  amount0: string;
+  amount1: string;
+  price: number;
+  priceDisplay: string;
+}> {
+  const res = await fetch(`${API_BASE}/calculate-ratio`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(params),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to calculate ratio: ${res.statusText}`);
   }
 
   return res.json();

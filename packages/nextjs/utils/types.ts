@@ -41,7 +41,7 @@ export interface GlobalStats {
 
 export interface Position {
   id: string;
-  version: 'V2' | 'V3' | 'V4';
+  version: 'V2' | 'V3' | 'V4' | 'Aerodrome';
   pair: string;
   poolAddress?: string;
   token0: {
