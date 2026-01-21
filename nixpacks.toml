@@ -10,7 +10,9 @@ cmds = [
 cmds = [
   "npm run build --workspace=@arbme/core-lib",
   "npm run build --workspace=@arbme/nextjs",
-  "cp -r packages/nextjs/.next/static packages/nextjs/.next/standalone/packages/nextjs/.next/static"
+  "ls -la packages/nextjs/.next/ || echo 'No .next directory'",
+  "ls -la packages/nextjs/.next/standalone/ || echo 'No standalone directory'",
+  "cp -r packages/nextjs/.next/static packages/nextjs/.next/standalone/packages/nextjs/.next/static || echo 'Failed to copy static files'"
 ]
 
 [start]
