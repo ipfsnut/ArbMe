@@ -6,6 +6,14 @@ import { getWalletAddress } from '@/lib/wallet'
 import { ARBME_ADDRESS } from '@/utils/constants'
 import { AppHeader } from '@/components/AppHeader'
 import Link from 'next/link'
+import {
+  fetchTokenInfo,
+  checkPoolExists,
+  checkApprovals,
+  buildApprovalTransaction,
+  buildCreatePoolTransaction,
+} from '@/services/api'
+import sdk from '@farcaster/frame-sdk'
 
 interface Token {
   address: string
@@ -51,6 +59,9 @@ export default function CreatePoolPage() {
   const [showCustomB, setShowCustomB] = useState(false)
   const [customAddressA, setCustomAddressA] = useState('')
   const [customAddressB, setCustomAddressB] = useState('')
+  const [poolExists, setPoolExists] = useState(false)
+  const [currentStep, setCurrentStep] = useState<string>('')
+  const [poolAddress, setPoolAddress] = useState<string>('')
 
   useEffect(() => {
     loadWallet()
@@ -119,8 +130,62 @@ export default function CreatePoolPage() {
     }
   }
 
+  // Fetch token decimals for custom token A
+  useEffect(() => {
+    if (tokenA && tokenA.symbol === 'CUSTOM') {
+      fetchTokenInfo(tokenA.address)
+        .then(info => {
+          setTokenA({ ...tokenA, symbol: info.symbol, decimals: info.decimals })
+        })
+        .catch(err => {
+          console.error('[CreatePool] Failed to fetch token A info:', err)
+          setState({ error: 'Failed to fetch token info. Please check the address.' })
+        })
+    }
+  }, [tokenA?.address])
+
+  // Fetch token decimals for custom token B
+  useEffect(() => {
+    if (tokenB && tokenB.symbol === 'CUSTOM') {
+      fetchTokenInfo(tokenB.address)
+        .then(info => {
+          setTokenB({ ...tokenB, symbol: info.symbol, decimals: info.decimals })
+        })
+        .catch(err => {
+          console.error('[CreatePool] Failed to fetch token B info:', err)
+          setState({ error: 'Failed to fetch token info. Please check the address.' })
+        })
+    }
+  }, [tokenB?.address])
+
+  // Check pool existence
+  useEffect(() => {
+    if (tokenA && tokenB && tokenA.address && tokenB.address) {
+      checkPoolExists({
+        version,
+        token0: tokenA.address,
+        token1: tokenB.address,
+        fee: version !== 'v2' ? feeTier : undefined,
+      })
+        .then(result => {
+          setPoolExists(result.exists)
+          setPoolAddress(result.poolAddress || '')
+          if (result.exists) {
+            setState({
+              error: `Pool already exists at ${result.poolAddress}. You can add liquidity to it instead.`,
+            })
+          } else {
+            setState({ error: null })
+          }
+        })
+        .catch(err => {
+          console.error('[CreatePool] Failed to check pool exists:', err)
+        })
+    }
+  }, [tokenA?.address, tokenB?.address, version, feeTier])
+
   async function handleCreatePool() {
-    if (!wallet || !tokenA || !tokenB) {
+    if (!wallet || !tokenA || !tokenB || !amountA || !amountB) {
       setState({ error: 'Missing required information' })
       return
     }
@@ -129,7 +194,12 @@ export default function CreatePoolPage() {
     setState({ error: null })
 
     try {
-      console.log('[CreatePool] Creating pool:', {
+      const provider = await sdk.wallet.getEthereumProvider()
+      if (!provider) {
+        throw new Error('No Ethereum provider available')
+      }
+
+      console.log('[CreatePool] Starting pool creation:', {
         tokenA,
         tokenB,
         version,
@@ -138,13 +208,134 @@ export default function CreatePoolPage() {
         amountB,
       })
 
-      // Pool creation not yet implemented
-      setState({ error: 'Pool creation not yet implemented' })
-    } catch (err) {
-      console.error('[CreatePool] Failed to create pool:', err)
-      setState({ error: 'Failed to create pool. Please try again.' })
+      // Determine spender based on version
+      const V2_ROUTER = '0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24'
+      const V3_POSITION_MANAGER = '0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1'
+      const V4_POSITION_MANAGER = '0x7c5f5a4bbd8fd63184577525326123b519429bdc'
+
+      const spender = version === 'v2' ? V2_ROUTER
+                    : version === 'v3' ? V3_POSITION_MANAGER
+                    : V4_POSITION_MANAGER
+
+      // Convert amounts to wei for approval checking
+      const decimals0 = tokenA.decimals
+      const decimals1 = tokenB.decimals
+      const amount0Wei = (parseFloat(amountA) * 10 ** decimals0).toString()
+      const amount1Wei = (parseFloat(amountB) * 10 ** decimals1).toString()
+
+      // Check approvals
+      setCurrentStep('Checking token approvals...')
+      const approvalStatus = await checkApprovals({
+        token0: tokenA.address,
+        token1: tokenB.address,
+        owner: wallet,
+        spender,
+        amount0Required: amount0Wei,
+        amount1Required: amount1Wei,
+      })
+
+      console.log('[CreatePool] Approval status:', approvalStatus)
+
+      // Send approval transactions if needed
+      const needsApproval = approvalStatus.token0NeedsApproval || approvalStatus.token1NeedsApproval
+      if (needsApproval) {
+        const approvalTxs: any[] = []
+
+        if (approvalStatus.token0NeedsApproval) {
+          approvalTxs.push({
+            ...(await buildApprovalTransaction(tokenA.address, spender)),
+            tokenSymbol: tokenA.symbol,
+          })
+        }
+        if (approvalStatus.token1NeedsApproval) {
+          approvalTxs.push({
+            ...(await buildApprovalTransaction(tokenB.address, spender)),
+            tokenSymbol: tokenB.symbol,
+          })
+        }
+
+        for (let i = 0; i < approvalTxs.length; i++) {
+          const tx = approvalTxs[i]
+          setCurrentStep(`Approving ${tx.tokenSymbol} (${i + 1} of ${approvalTxs.length})...`)
+
+          console.log(`[CreatePool] Sending approval for ${tx.tokenSymbol}`)
+          await provider.request({
+            method: 'eth_sendTransaction',
+            params: [{
+              from: wallet as any,
+              to: tx.to as any,
+              data: tx.data as any,
+              value: tx.value as any,
+            }],
+          })
+
+          // Wait between approvals
+          await new Promise(resolve => setTimeout(resolve, 3000))
+        }
+      }
+
+      // Build pool creation transactions
+      setCurrentStep('Building pool creation transaction...')
+      const price = parseFloat(amountB) / parseFloat(amountA)
+      const { transactions } = await buildCreatePoolTransaction({
+        version,
+        token0: tokenA.address,
+        token1: tokenB.address,
+        amount0: amountA,
+        amount1: amountB,
+        fee: version !== 'v2' ? feeTier : undefined,
+        price,
+        recipient: wallet,
+        slippageTolerance: 0.5,
+      })
+
+      console.log(`[CreatePool] Built ${transactions.length} transaction(s)`)
+
+      // Send transactions
+      for (let i = 0; i < transactions.length; i++) {
+        const stepName = transactions.length > 1
+          ? (i === 0 ? 'Initializing pool...' : 'Adding liquidity...')
+          : 'Creating pool...'
+        setCurrentStep(stepName)
+
+        const tx = transactions[i]
+        console.log(`[CreatePool] Sending ${stepName}`)
+        const txHash = await provider.request({
+          method: 'eth_sendTransaction',
+          params: [{
+            from: wallet as any,
+            to: tx.to as any,
+            data: tx.data as any,
+            value: tx.value as any,
+          }],
+        })
+
+        console.log(`[CreatePool] ${stepName} txHash:`, txHash)
+
+        // Wait between transactions
+        if (i < transactions.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 5000))
+        }
+      }
+
+      alert('Pool created successfully!')
+      window.location.href = '/positions'
+    } catch (err: any) {
+      console.error('[CreatePool] Failed:', err)
+      let errorMessage = 'Failed to create pool. Please try again.'
+
+      if (err.message?.includes('User rejected')) {
+        errorMessage = 'Transaction rejected by user'
+      } else if (err.message?.includes('insufficient')) {
+        errorMessage = 'Insufficient balance for this transaction'
+      } else if (err.message) {
+        errorMessage = err.message
+      }
+
+      setState({ error: errorMessage })
     } finally {
       setIsCreating(false)
+      setCurrentStep('')
     }
   }
 
@@ -162,7 +353,7 @@ export default function CreatePoolPage() {
       <div className="create-pool-page">
         <AppHeader />
         <div className="page-subheader">
-          <Link href="/app" className="back-button">← Back</Link>
+          <Link href="/" className="back-button">← Back</Link>
           <h2>Create New Pool</h2>
         </div>
         <div className="empty-state">
@@ -178,11 +369,24 @@ export default function CreatePoolPage() {
       <AppHeader />
 
       <div className="page-subheader">
-        <Link href="/app" className="back-button">← Back</Link>
+        <Link href="/" className="back-button">← Back</Link>
         <h2>Create New Pool</h2>
       </div>
 
       {error && <div className="error-banner">{error}</div>}
+
+      {currentStep && (
+        <div className="creating-status">
+          <div className="spinner"></div>
+          <p>{currentStep}</p>
+        </div>
+      )}
+
+      {poolExists && poolAddress && (
+        <div className="warning-banner">
+          Pool already exists at {poolAddress.slice(0, 6)}...{poolAddress.slice(-4)}. You can add liquidity to the existing pool instead.
+        </div>
+      )}
 
       <div className="create-pool-card">
         <div className="create-section">
@@ -369,9 +573,9 @@ export default function CreatePoolPage() {
           <button
             className="button-primary"
             onClick={handleCreatePool}
-            disabled={!canCreate || isCreating}
+            disabled={!canCreate || isCreating || poolExists}
           >
-            {isCreating ? 'Creating Pool...' : 'Create Pool & Add Liquidity'}
+            {isCreating ? (currentStep || 'Creating Pool...') : 'Create Pool & Add Liquidity'}
           </button>
         </div>
 

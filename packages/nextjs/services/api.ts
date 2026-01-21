@@ -140,3 +140,139 @@ export async function buildBurnPositionTransaction(positionId: string): Promise<
 
   return res.json();
 }
+
+/**
+ * Fetch token info (symbol, name, decimals)
+ */
+export async function fetchTokenInfo(address: string): Promise<{
+  address: string;
+  symbol: string;
+  name: string;
+  decimals: number;
+}> {
+  const res = await fetch(`${API_BASE}/token-info?address=${address}`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch token info: ${res.statusText}`);
+  }
+  return res.json();
+}
+
+/**
+ * Check if a pool exists
+ */
+export async function checkPoolExists(params: {
+  version: string;
+  token0: string;
+  token1: string;
+  fee?: number;
+}): Promise<{
+  exists: boolean;
+  poolAddress?: string;
+  initialized?: boolean;
+}> {
+  const res = await fetch(`${API_BASE}/check-pool-exists`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(params),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to check pool exists: ${res.statusText}`);
+  }
+
+  return res.json();
+}
+
+/**
+ * Check token approvals
+ */
+export async function checkApprovals(params: {
+  token0: string;
+  token1: string;
+  owner: string;
+  spender: string;
+  amount0Required: string;
+  amount1Required: string;
+}): Promise<{
+  token0NeedsApproval: boolean;
+  token1NeedsApproval: boolean;
+  token0Allowance: string;
+  token1Allowance: string;
+}> {
+  const res = await fetch(`${API_BASE}/check-approvals`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(params),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to check approvals: ${res.statusText}`);
+  }
+
+  return res.json();
+}
+
+/**
+ * Build approval transaction
+ */
+export async function buildApprovalTransaction(
+  token: string,
+  spender: string
+): Promise<{
+  to: string;
+  data: string;
+  value: string;
+}> {
+  const res = await fetch(`${API_BASE}/build-approval`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ token, spender }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to build approval: ${res.statusText}`);
+  }
+
+  return res.json();
+}
+
+/**
+ * Build create pool transaction(s)
+ */
+export async function buildCreatePoolTransaction(params: {
+  version: string;
+  token0: string;
+  token1: string;
+  amount0: string;
+  amount1: string;
+  fee?: number;
+  price: number;
+  recipient: string;
+  slippageTolerance?: number;
+}): Promise<{
+  transactions: Array<{
+    to: string;
+    data: string;
+    value: string;
+  }>;
+}> {
+  const res = await fetch(`${API_BASE}/build-create-pool`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(params),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to build create pool transaction: ${res.statusText}`);
+  }
+
+  return res.json();
+}

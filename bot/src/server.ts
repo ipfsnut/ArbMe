@@ -19,6 +19,22 @@ import {
   buildIncreaseLiquidityTransaction,
   buildDecreaseLiquidityTransaction,
   buildBurnPositionTransaction,
+  getTokenDecimals,
+  getTokenSymbol,
+  getTokenName,
+  getTokenAllowance,
+  checkV2PoolExists,
+  checkV3PoolExists,
+  checkV4PoolExists,
+  buildApproveTransaction,
+  buildV2CreatePoolTransaction,
+  buildV3InitializePoolTransaction,
+  buildV3MintPositionTransaction,
+  buildV4InitializePoolTransaction,
+  buildV4MintPositionTransaction,
+  calculateSqrtPriceX96,
+  sortTokens,
+  FEE_TO_TICK_SPACING,
 } from '@arbme/core-lib';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -270,6 +286,286 @@ const burnPositionHandler = async (req: any, res: any) => {
 };
 app.post('/api/burn-position', burnPositionHandler);
 app.post('/app/api/burn-position', burnPositionHandler);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// POOL CREATION API
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Token cache for 5 minutes
+const tokenCache = new Map<string, { info: any; timestamp: number }>();
+const TOKEN_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// Token Info API - Get token details (symbol, name, decimals)
+const tokenInfoHandler = async (req: any, res: any) => {
+  try {
+    const address = (req.query.address || req.body.address) as string;
+
+    if (!address || typeof address !== 'string') {
+      return res.status(400).json({ error: 'Token address required' });
+    }
+
+    if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+      return res.status(400).json({ error: 'Invalid address format' });
+    }
+
+    // Check cache
+    const cached = tokenCache.get(address.toLowerCase());
+    if (cached && Date.now() - cached.timestamp < TOKEN_CACHE_TTL) {
+      return res.json(cached.info);
+    }
+
+    console.log(`[Server] Fetching token info for: ${address}`);
+
+    // Fetch in parallel
+    const [decimals, symbol, name] = await Promise.all([
+      getTokenDecimals(address as any),
+      getTokenSymbol(address as any).catch(() => 'UNKNOWN'),
+      getTokenName(address as any).catch(() => 'Unknown Token'),
+    ]);
+
+    const info = { address, symbol, name, decimals };
+
+    // Cache result
+    tokenCache.set(address.toLowerCase(), { info, timestamp: Date.now() });
+
+    res.json(info);
+  } catch (error) {
+    console.error('[Server] Failed to fetch token info:', error);
+    res.status(500).json({ error: 'Failed to fetch token info' });
+  }
+};
+app.get('/api/token-info', tokenInfoHandler);
+app.get('/app/api/token-info', tokenInfoHandler);
+app.post('/api/token-info', tokenInfoHandler);
+app.post('/app/api/token-info', tokenInfoHandler);
+
+// Check Pool Exists API
+const checkPoolExistsHandler = async (req: any, res: any) => {
+  try {
+    const { version, token0, token1, fee } = req.body;
+
+    if (!version || !token0 || !token1) {
+      return res.status(400).json({ error: 'version, token0, and token1 required' });
+    }
+
+    // Sort tokens
+    const [sortedToken0, sortedToken1] = sortTokens(token0, token1);
+
+    console.log(`[Server] Checking ${version} pool: ${sortedToken0}/${sortedToken1} (fee: ${fee})`);
+
+    let result;
+    if (version === 'v2') {
+      result = await checkV2PoolExists(sortedToken0, sortedToken1);
+      res.json({ exists: result.exists, poolAddress: result.pair });
+    } else if (version === 'v3') {
+      if (!fee) {
+        return res.status(400).json({ error: 'fee required for V3 pools' });
+      }
+      result = await checkV3PoolExists(sortedToken0, sortedToken1, fee);
+      res.json({ exists: result.exists, poolAddress: result.pool });
+    } else if (version === 'v4') {
+      if (!fee) {
+        return res.status(400).json({ error: 'fee required for V4 pools' });
+      }
+      const tickSpacing = FEE_TO_TICK_SPACING[fee];
+      if (!tickSpacing) {
+        return res.status(400).json({ error: 'Invalid fee tier for V4' });
+      }
+      result = await checkV4PoolExists(sortedToken0, sortedToken1, fee, tickSpacing);
+      res.json({ exists: result.exists, initialized: result.initialized });
+    } else {
+      return res.status(400).json({ error: 'Invalid version. Use v2, v3, or v4' });
+    }
+  } catch (error) {
+    console.error('[Server] Failed to check pool exists:', error);
+    res.status(500).json({ error: 'Failed to check pool' });
+  }
+};
+app.post('/api/check-pool-exists', checkPoolExistsHandler);
+app.post('/app/api/check-pool-exists', checkPoolExistsHandler);
+
+// Check Approvals API
+const checkApprovalsHandler = async (req: any, res: any) => {
+  try {
+    const { token0, token1, owner, spender, amount0Required, amount1Required } = req.body;
+
+    if (!token0 || !token1 || !owner || !spender || !amount0Required || !amount1Required) {
+      return res.status(400).json({ error: 'All parameters required' });
+    }
+
+    console.log(`[Server] Checking approvals for ${owner}`);
+
+    // Check both tokens in parallel
+    const [allowance0, allowance1] = await Promise.all([
+      getTokenAllowance(token0, owner, spender),
+      getTokenAllowance(token1, owner, spender),
+    ]);
+
+    const token0NeedsApproval = allowance0 < BigInt(amount0Required);
+    const token1NeedsApproval = allowance1 < BigInt(amount1Required);
+
+    res.json({
+      token0NeedsApproval,
+      token1NeedsApproval,
+      token0Allowance: allowance0.toString(),
+      token1Allowance: allowance1.toString(),
+    });
+  } catch (error) {
+    console.error('[Server] Failed to check approvals:', error);
+    res.status(500).json({ error: 'Failed to check approvals' });
+  }
+};
+app.post('/api/check-approvals', checkApprovalsHandler);
+app.post('/app/api/check-approvals', checkApprovalsHandler);
+
+// Build Approval Transaction API
+const buildApprovalHandler = async (req: any, res: any) => {
+  try {
+    const { token, spender } = req.body;
+
+    if (!token || !spender) {
+      return res.status(400).json({ error: 'token and spender required' });
+    }
+
+    if (!/^0x[a-fA-F0-9]{40}$/.test(token) || !/^0x[a-fA-F0-9]{40}$/.test(spender)) {
+      return res.status(400).json({ error: 'Invalid address format' });
+    }
+
+    console.log(`[Server] Building approval: ${token} -> ${spender}`);
+    const transaction = buildApproveTransaction(token as any, spender as any);
+
+    res.json(transaction);
+  } catch (error) {
+    console.error('[Server] Failed to build approval:', error);
+    res.status(500).json({ error: 'Failed to build approval transaction' });
+  }
+};
+app.post('/api/build-approval', buildApprovalHandler);
+app.post('/app/api/build-approval', buildApprovalHandler);
+
+// Build Create Pool Transaction API
+const buildCreatePoolHandler = async (req: any, res: any) => {
+  try {
+    const {
+      version,
+      token0,
+      token1,
+      amount0,
+      amount1,
+      fee,
+      price,
+      recipient,
+      slippageTolerance,
+    } = req.body;
+
+    // Validate required params
+    if (!version || !token0 || !token1 || !amount0 || !amount1 || !price || !recipient) {
+      return res.status(400).json({
+        error: 'version, token0, token1, amount0, amount1, price, and recipient required',
+      });
+    }
+
+    if ((version === 'v3' || version === 'v4') && !fee) {
+      return res.status(400).json({ error: 'fee required for V3/V4 pools' });
+    }
+
+    console.log(`[Server] Building ${version} pool creation: ${token0}/${token1}`);
+
+    // Fetch decimals
+    const [decimals0, decimals1] = await Promise.all([
+      getTokenDecimals(token0),
+      getTokenDecimals(token1),
+    ]);
+
+    // Convert amounts to wei
+    let amount0Wei = BigInt(Math.floor(parseFloat(amount0) * 10 ** decimals0));
+    let amount1Wei = BigInt(Math.floor(parseFloat(amount1) * 10 ** decimals1));
+
+    // Sort tokens
+    const [sortedToken0, sortedToken1] = sortTokens(token0, token1);
+
+    // If tokens were swapped, swap amounts and invert price
+    let finalPrice = price;
+    if (sortedToken0 !== token0) {
+      [amount0Wei, amount1Wei] = [amount1Wei, amount0Wei];
+      finalPrice = 1 / price;
+    }
+
+    // Calculate sqrtPriceX96
+    const sqrtPriceX96 = calculateSqrtPriceX96(finalPrice);
+
+    const transactions: any[] = [];
+
+    if (version === 'v2') {
+      const tx = buildV2CreatePoolTransaction({
+        tokenA: sortedToken0 as any,
+        tokenB: sortedToken1 as any,
+        amountA: amount0Wei.toString(),
+        amountB: amount1Wei.toString(),
+        recipient: recipient as any,
+        slippageTolerance,
+      });
+      transactions.push(tx);
+    } else if (version === 'v3') {
+      const initTx = buildV3InitializePoolTransaction({
+        token0: sortedToken0 as any,
+        token1: sortedToken1 as any,
+        fee,
+        sqrtPriceX96,
+        amount0: amount0Wei.toString(),
+        amount1: amount1Wei.toString(),
+        recipient: recipient as any,
+        slippageTolerance,
+      });
+
+      const mintTx = buildV3MintPositionTransaction({
+        token0: sortedToken0 as any,
+        token1: sortedToken1 as any,
+        fee,
+        sqrtPriceX96,
+        amount0: amount0Wei.toString(),
+        amount1: amount1Wei.toString(),
+        recipient: recipient as any,
+        slippageTolerance,
+      });
+
+      transactions.push(initTx, mintTx);
+    } else if (version === 'v4') {
+      const initTx = buildV4InitializePoolTransaction({
+        token0: sortedToken0 as any,
+        token1: sortedToken1 as any,
+        fee,
+        sqrtPriceX96,
+        amount0: amount0Wei.toString(),
+        amount1: amount1Wei.toString(),
+        recipient: recipient as any,
+        slippageTolerance,
+      });
+
+      const mintTx = buildV4MintPositionTransaction({
+        token0: sortedToken0 as any,
+        token1: sortedToken1 as any,
+        fee,
+        sqrtPriceX96,
+        amount0: amount0Wei.toString(),
+        amount1: amount1Wei.toString(),
+        recipient: recipient as any,
+        slippageTolerance,
+      });
+
+      transactions.push(initTx, mintTx);
+    } else {
+      return res.status(400).json({ error: 'Invalid version. Use v2, v3, or v4' });
+    }
+
+    res.json({ transactions });
+  } catch (error) {
+    console.error('[Server] Failed to build create pool transaction:', error);
+    res.status(500).json({ error: 'Failed to build transaction' });
+  }
+};
+app.post('/api/build-create-pool', buildCreatePoolHandler);
+app.post('/app/api/build-create-pool', buildCreatePoolHandler);
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // FARCASTER MINIAPP
