@@ -19,11 +19,11 @@ export async function POST(request: NextRequest) {
     // Determine approval amount
     const isUnlimited = unlimited === true && !amount
     const approvalAmount = isUnlimited
-      ? ethers.MaxUint256
-      : ethers.toBigInt(amount || '0') // amount should already be in wei
+      ? ethers.constants.MaxUint256
+      : ethers.BigNumber.from(amount || '0') // amount should already be in wei
 
     // Create contract interface
-    const iface = new ethers.Interface(ERC20_ABI)
+    const iface = new ethers.utils.Interface(ERC20_ABI)
 
     // Encode the approve function call
     const data = iface.encodeFunctionData('approve', [spender, approvalAmount])

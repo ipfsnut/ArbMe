@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const provider = new ethers.JsonRpcProvider(PROVIDER_URL)
+    const provider = new ethers.providers.JsonRpcProvider(PROVIDER_URL)
     const contract = new ethers.Contract(tokenAddress, ERC20_ABI, provider)
 
     // Fetch balance and decimals in parallel
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     ])
 
     // Format balance
-    const balanceFormatted = ethers.formatUnits(balanceWei, decimals)
+    const balanceFormatted = ethers.utils.formatUnits(balanceWei, decimals)
 
     return NextResponse.json({
       balanceWei: balanceWei.toString(),

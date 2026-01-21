@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const provider = new ethers.JsonRpcProvider(PROVIDER_URL)
+    const provider = new ethers.providers.JsonRpcProvider(PROVIDER_URL)
 
     // Get token symbols
     const token0Contract = new ethers.Contract(token0, ERC20_ABI, provider)
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
       const factory = new ethers.Contract(factoryAddress, V2_FACTORY_ABI, provider)
       const pairAddress = await factory.getPair(token0, token1)
 
-      if (pairAddress === ethers.ZeroAddress) {
+      if (pairAddress === ethers.constants.AddressZero) {
         return NextResponse.json({
           exists: false,
           price: null,
@@ -77,8 +77,8 @@ export async function POST(request: NextRequest) {
       const reserves = await pair.getReserves()
 
       // Calculate price (reserve1 / reserve0)
-      const reserve0 = Number(ethers.formatUnits(reserves.reserve0, 18))
-      const reserve1 = Number(ethers.formatUnits(reserves.reserve1, 18))
+      const reserve0 = Number(ethers.utils.formatUnits(reserves.reserve0, 18))
+      const reserve1 = Number(ethers.utils.formatUnits(reserves.reserve1, 18))
       const price = reserve1 / reserve0
 
       const priceDisplay = `1 ${symbol0} = ${price.toFixed(6)} ${symbol1}`
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
     const factory = new ethers.Contract(factoryAddress, V3_FACTORY_ABI, provider)
     const poolAddress = await factory.getPool(token0, token1, fee)
 
-    if (poolAddress === ethers.ZeroAddress) {
+    if (poolAddress === ethers.constants.AddressZero) {
       return NextResponse.json({
         exists: false,
         price: null,
@@ -121,8 +121,8 @@ export async function POST(request: NextRequest) {
 
     // Calculate price from sqrtPriceX96
     // price = (sqrtPriceX96 / 2^96) ^ 2
-    const Q96 = ethers.toBigInt(2) ** ethers.toBigInt(96)
-    const sqrtPrice = Number(sqrtPriceX96) / Number(Q96)
+    const Q96 = ethers.BigNumber.from(2).pow(96)
+    const sqrtPrice = Number(sqrtPriceX96.toString()) / Number(Q96.toString())
     const price = sqrtPrice ** 2
 
     const priceDisplay = `1 ${symbol0} = ${price.toFixed(6)} ${symbol1}`
