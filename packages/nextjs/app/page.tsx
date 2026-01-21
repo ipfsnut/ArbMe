@@ -18,6 +18,15 @@ export default function HomePage() {
   const wallet = useWallet()
 
   useEffect(() => {
+    // Redirect desktop users to Uniswap
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    const isSmallScreen = window.innerWidth < 768
+
+    if (!isMobile && !isSmallScreen) {
+      window.location.href = 'https://app.uniswap.org/swap?outputCurrency=0xC647421C5Dc78D1c3960faA7A33f9aEFDF4B7B07&chain=base'
+      return
+    }
+
     if (!loading && pools.length === 0) {
       loadPools()
     }

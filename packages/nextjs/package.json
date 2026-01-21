@@ -11,6 +11,7 @@
   "dependencies": {
     "@arbme/core-lib": "*",
     "@farcaster/miniapp-sdk": "^0.2.1",
+    "ethers": "^5.8.0",
     "next": "^15.1.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
