@@ -160,11 +160,13 @@ export async function getTokenSymbol(address: Address): Promise<string> {
   const hex = result.slice(2);
   if (hex.length === 64) {
     // bytes32 format
-    return Buffer.from(hex, 'hex').toString('utf8').replace(/\0/g, '');
+    return Buffer.from(hex, 'hex').toString('utf8').replace(/\0/g, '').trim();
   } else {
-    // dynamic string format - skip offset + length
-    const strHex = hex.slice(128);
-    return Buffer.from(strHex, 'hex').toString('utf8').replace(/\0/g, '');
+    // dynamic string format: offset(32) + length(32) + data
+    const lengthHex = hex.slice(64, 128); // bytes 32-63
+    const length = parseInt(lengthHex, 16);
+    const dataHex = hex.slice(128, 128 + length * 2); // actual string data
+    return Buffer.from(dataHex, 'hex').toString('utf8');
   }
 }
 
@@ -175,10 +177,17 @@ export async function getTokenName(address: Address): Promise<string> {
   const data = '0x06fdde03'; // name()
   const result = await rpcCall('eth_call', [{ to: address, data }, 'latest']);
 
-  // Decode dynamic string
+  // Decode dynamic string: offset(32) + length(32) + data
   const hex = result.slice(2);
-  const strHex = hex.slice(128);
-  return Buffer.from(strHex, 'hex').toString('utf8').replace(/\0/g, '');
+  if (hex.length === 64) {
+    // bytes32 format (rare for name)
+    return Buffer.from(hex, 'hex').toString('utf8').replace(/\0/g, '').trim();
+  } else {
+    const lengthHex = hex.slice(64, 128);
+    const length = parseInt(lengthHex, 16);
+    const dataHex = hex.slice(128, 128 + length * 2);
+    return Buffer.from(dataHex, 'hex').toString('utf8');
+  }
 }
 
 /**
