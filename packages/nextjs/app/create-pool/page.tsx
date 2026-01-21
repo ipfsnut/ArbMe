@@ -61,8 +61,9 @@ export default function CreatePoolPage() {
     symbol: 'ARBME',
     decimals: 18,
   })
-  const [version, setVersion] = useState<'v2' | 'v3' | 'v4'>('v4')
+  const [version, setVersion] = useState<'v2' | 'v3' | 'v4' | 'aerodrome'>('v4')
   const [feeTier, setFeeTier] = useState(3000)
+  const [isUsdcPair, setIsUsdcPair] = useState(false)
   const [amountA, setAmountA] = useState('')
   const [amountB, setAmountB] = useState('')
   const [isCreating, setIsCreating] = useState(false)
@@ -177,6 +178,20 @@ export default function CreatePoolPage() {
     }
   }, [tokenB?.address])
 
+  // Detect USDC pairs and switch to Aerodrome
+  useEffect(() => {
+    const isUsdcA = tokenA?.address?.toLowerCase() === USDC_ADDRESS.toLowerCase()
+    const isUsdcB = tokenB?.address?.toLowerCase() === USDC_ADDRESS.toLowerCase()
+    const hasUsdc = isUsdcA || isUsdcB
+
+    setIsUsdcPair(hasUsdc)
+
+    if (hasUsdc && version !== 'aerodrome') {
+      setVersion('aerodrome')
+      console.log('[CreatePool] USDC detected, switching to Aerodrome')
+    }
+  }, [tokenA?.address, tokenB?.address, version])
+
   // Check pool existence
   useEffect(() => {
     if (tokenA && tokenB && tokenA.address && tokenB.address) {
@@ -231,10 +246,12 @@ export default function CreatePoolPage() {
       const V2_ROUTER = '0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24'
       const V3_POSITION_MANAGER = '0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1'
       const V4_POSITION_MANAGER = '0x7c5f5a4bbd8fd63184577525326123b519429bdc'
+      const AERO_POSITION_MANAGER = '0x827922686190790b37229fd06084350E74485b72'
 
       const spender = version === 'v2' ? V2_ROUTER
                     : version === 'v3' ? V3_POSITION_MANAGER
-                    : V4_POSITION_MANAGER
+                    : version === 'v4' ? V4_POSITION_MANAGER
+                    : AERO_POSITION_MANAGER
 
       // Convert amounts to wei for approval checking
       const decimals0 = tokenA.decimals
@@ -487,29 +504,41 @@ export default function CreatePoolPage() {
         <div className="create-section">
           <div className="selector-group">
             <div className="selector-label">Pool Version</div>
-            <div className="version-selector">
-              <button
-                className={`version-btn ${version === 'v2' ? 'selected' : ''}`}
-                onClick={() => setVersion('v2')}
-              >
-                <span className="version-badge v2">V2</span>
-                <span className="version-desc">Simple AMM</span>
-              </button>
-              <button
-                className={`version-btn ${version === 'v3' ? 'selected' : ''}`}
-                onClick={() => setVersion('v3')}
-              >
-                <span className="version-badge v3">V3</span>
-                <span className="version-desc">Concentrated</span>
-              </button>
-              <button
-                className={`version-btn ${version === 'v4' ? 'selected' : ''}`}
-                onClick={() => setVersion('v4')}
-              >
-                <span className="version-badge v4">V4</span>
-                <span className="version-desc">Hooks</span>
-              </button>
-            </div>
+            {isUsdcPair ? (
+              <div className="aerodrome-notice">
+                <div className="aerodrome-badge">
+                  <span className="version-badge aerodrome">Aerodrome</span>
+                  <span className="version-desc">Slipstream CL</span>
+                </div>
+                <p className="text-secondary" style={{ fontSize: '0.875rem', marginTop: '0.5rem' }}>
+                  USDC pairs automatically use Aerodrome for optimal liquidity
+                </p>
+              </div>
+            ) : (
+              <div className="version-selector">
+                <button
+                  className={`version-btn ${version === 'v2' ? 'selected' : ''}`}
+                  onClick={() => setVersion('v2')}
+                >
+                  <span className="version-badge v2">V2</span>
+                  <span className="version-desc">Simple AMM</span>
+                </button>
+                <button
+                  className={`version-btn ${version === 'v3' ? 'selected' : ''}`}
+                  onClick={() => setVersion('v3')}
+                >
+                  <span className="version-badge v3">V3</span>
+                  <span className="version-desc">Concentrated</span>
+                </button>
+                <button
+                  className={`version-btn ${version === 'v4' ? 'selected' : ''}`}
+                  onClick={() => setVersion('v4')}
+                >
+                  <span className="version-badge v4">V4</span>
+                  <span className="version-desc">Hooks</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
