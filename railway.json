@@ -2,7 +2,7 @@
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "rm -rf packages/nextjs/.next && npm run build --workspace=@arbme/core-lib && npm run build --workspace=@arbme/nextjs && test -f packages/nextjs/.next/standalone/packages/nextjs/server.js && cp -r packages/nextjs/.next/static packages/nextjs/.next/standalone/packages/nextjs/.next/static"
+    "buildCommand": "npm run build --workspace=@arbme/core-lib && npm run build --workspace=@arbme/nextjs && test -f packages/nextjs/.next/standalone/packages/nextjs/server.js && cp -r packages/nextjs/.next/static packages/nextjs/.next/standalone/packages/nextjs/.next/static"
   },
   "deploy": {
     "startCommand": "npm run server --workspace=arbme-market-maker-bot",
