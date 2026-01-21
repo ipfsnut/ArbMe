@@ -33,7 +33,7 @@ interface Token {
 // USDC address for blocking from Uniswap
 const USDC_ADDRESS = '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913'
 
-// Common tokens on Base (USDC not supported)
+// Common tokens on Base (USDC excluded - use Aerodrome for USDC pairs)
 const COMMON_TOKENS = [
   { address: ARBME_ADDRESS, symbol: 'ARBME', decimals: 18 },
   { address: '0x4200000000000000000000000000000000000006', symbol: 'WETH', decimals: 18 },
@@ -69,8 +69,9 @@ export default function CreatePoolPage() {
     symbol: 'ARBME',
     decimals: 18,
   })
-  const [version, setVersion] = useState<'v2' | 'v3' | 'v4'>('v4')
+  const [version, setVersion] = useState<'v2' | 'v3' | 'v4' | 'aerodrome'>('v4')
   const [feeTier, setFeeTier] = useState(3000)
+  const [isUsdcPair, setIsUsdcPair] = useState(false)
   const [amountA, setAmountA] = useState('')
   const [amountB, setAmountB] = useState('')
   const [isCreating, setIsCreating] = useState(false)
@@ -140,7 +141,7 @@ export default function CreatePoolPage() {
     const address = customAddressA.trim()
     if (address && address.startsWith('0x')) {
       if (address.toLowerCase() === USDC_ADDRESS.toLowerCase()) {
-        setState({ error: 'USDC pairs are not supported. Please use a different token.' })
+        setState({ error: 'USDC pairs are not supported on Uniswap. Use Aerodrome for USDC pools.' })
         return
       }
       setTokenA({
@@ -155,7 +156,7 @@ export default function CreatePoolPage() {
     const address = customAddressB.trim()
     if (address && address.startsWith('0x')) {
       if (address.toLowerCase() === USDC_ADDRESS.toLowerCase()) {
-        setState({ error: 'USDC pairs are not supported. Please use a different token.' })
+        setState({ error: 'USDC pairs are not supported on Uniswap. Use Aerodrome for USDC pools.' })
         return
       }
       setTokenB({
@@ -196,7 +197,7 @@ export default function CreatePoolPage() {
 
   // Fetch balance for token A
   useEffect(() => {
-    if (!wallet || !tokenA?.address) {
+    if (!wallet || !tokenA?.address || version === 'aerodrome') {
       setBalanceA('')
       return
     }
@@ -216,7 +217,7 @@ export default function CreatePoolPage() {
 
   // Fetch balance for token B
   useEffect(() => {
-    if (!wallet || !tokenB?.address) {
+    if (!wallet || !tokenB?.address || version === 'aerodrome') {
       setBalanceB('')
       return
     }
@@ -236,7 +237,7 @@ export default function CreatePoolPage() {
 
   // Fetch pool price when tokens or fee tier changes
   useEffect(() => {
-    if (!tokenA?.address || !tokenB?.address) {
+    if (!tokenA?.address || !tokenB?.address || version === 'aerodrome') {
       setCurrentPrice(null)
       setPriceDisplay('')
       return
@@ -264,7 +265,7 @@ export default function CreatePoolPage() {
 
   // Auto-calculate amount B when amount A changes
   useEffect(() => {
-    if (!amountA || !tokenA || !tokenB || parseFloat(amountA) === 0 || autoCalculating) {
+    if (!amountA || !tokenA || !tokenB || parseFloat(amountA) === 0 || autoCalculating || version === 'aerodrome') {
       return
     }
 
@@ -296,7 +297,7 @@ export default function CreatePoolPage() {
 
   // Auto-calculate amount A when amount B changes
   useEffect(() => {
-    if (!amountB || !tokenA || !tokenB || parseFloat(amountB) === 0 || autoCalculating) {
+    if (!amountB || !tokenA || !tokenB || parseFloat(amountB) === 0 || autoCalculating || version === 'aerodrome') {
       return
     }
 
@@ -325,6 +326,20 @@ export default function CreatePoolPage() {
       })
   }, [amountB, tokenA, tokenB, version, feeTier, currentPrice])
 
+  // Detect USDC pairs and switch to Aerodrome
+  useEffect(() => {
+    const isUsdcA = tokenA?.address?.toLowerCase() === USDC_ADDRESS.toLowerCase()
+    const isUsdcB = tokenB?.address?.toLowerCase() === USDC_ADDRESS.toLowerCase()
+    const hasUsdc = isUsdcA || isUsdcB
+
+    setIsUsdcPair(hasUsdc)
+
+    if (hasUsdc && version !== 'aerodrome') {
+      setVersion('aerodrome')
+      console.log('[CreatePool] USDC detected, switching to Aerodrome')
+    }
+  }, [tokenA?.address, tokenB?.address, version])
+
   // Check pool existence
   useEffect(() => {
     if (tokenA && tokenB && tokenA.address && tokenB.address) {
@@ -351,21 +366,12 @@ export default function CreatePoolPage() {
     }
   }, [tokenA?.address, tokenB?.address, version, feeTier])
 
-  function handleInitiatePoolCreation() {
-    if (!tokenA || !tokenB || !amountA || !amountB) {
-      setState({ error: 'Missing required information' })
-      return
-    }
-    setShowConfirmModal(true)
-  }
-
   async function handleCreatePool() {
     if (!wallet || !tokenA || !tokenB || !amountA || !amountB) {
       setState({ error: 'Missing required information' })
       return
     }
 
-    setShowConfirmModal(false)
     setIsCreating(true)
     setState({ error: null })
 
@@ -388,10 +394,12 @@ export default function CreatePoolPage() {
       const V2_ROUTER = '0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24'
       const V3_POSITION_MANAGER = '0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1'
       const V4_POSITION_MANAGER = '0x7c5f5a4bbd8fd63184577525326123b519429bdc'
+      const AERO_POSITION_MANAGER = '0x827922686190790b37229fd06084350E74485b72'
 
       const spender = version === 'v2' ? V2_ROUTER
                     : version === 'v3' ? V3_POSITION_MANAGER
-                    : V4_POSITION_MANAGER
+                    : version === 'v4' ? V4_POSITION_MANAGER
+                    : AERO_POSITION_MANAGER
 
       // Convert amounts to wei for approval checking
       const decimals0 = tokenA.decimals
@@ -662,29 +670,41 @@ export default function CreatePoolPage() {
         <div className="create-section">
           <div className="selector-group">
             <div className="selector-label">Pool Version</div>
-            <div className="version-selector">
-              <button
-                className={`version-btn ${version === 'v2' ? 'selected' : ''}`}
-                onClick={() => setVersion('v2')}
-              >
-                <span className="version-badge v2">V2</span>
-                <span className="version-desc">Simple AMM</span>
-              </button>
-              <button
-                className={`version-btn ${version === 'v3' ? 'selected' : ''}`}
-                onClick={() => setVersion('v3')}
-              >
-                <span className="version-badge v3">V3</span>
-                <span className="version-desc">Concentrated</span>
-              </button>
-              <button
-                className={`version-btn ${version === 'v4' ? 'selected' : ''}`}
-                onClick={() => setVersion('v4')}
-              >
-                <span className="version-badge v4">V4</span>
-                <span className="version-desc">Hooks</span>
-              </button>
-            </div>
+            {isUsdcPair ? (
+              <div className="aerodrome-notice">
+                <div className="aerodrome-badge">
+                  <span className="version-badge aerodrome">Aerodrome</span>
+                  <span className="version-desc">Slipstream CL</span>
+                </div>
+                <p className="text-secondary" style={{ fontSize: '0.875rem', marginTop: '0.5rem' }}>
+                  USDC pairs automatically use Aerodrome for optimal liquidity
+                </p>
+              </div>
+            ) : (
+              <div className="version-selector">
+                <button
+                  className={`version-btn ${version === 'v2' ? 'selected' : ''}`}
+                  onClick={() => setVersion('v2')}
+                >
+                  <span className="version-badge v2">V2</span>
+                  <span className="version-desc">Simple AMM</span>
+                </button>
+                <button
+                  className={`version-btn ${version === 'v3' ? 'selected' : ''}`}
+                  onClick={() => setVersion('v3')}
+                >
+                  <span className="version-badge v3">V3</span>
+                  <span className="version-desc">Concentrated</span>
+                </button>
+                <button
+                  className={`version-btn ${version === 'v4' ? 'selected' : ''}`}
+                  onClick={() => setVersion('v4')}
+                >
+                  <span className="version-badge v4">V4</span>
+                  <span className="version-desc">Hooks</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -713,11 +733,13 @@ export default function CreatePoolPage() {
           </div>
         )}
 
-        <SlippageControl
-          value={slippageTolerance}
-          onChange={setSlippageTolerance}
-          pairType="standard"
-        />
+        {version !== 'aerodrome' && (
+          <SlippageControl
+            value={slippageTolerance}
+            onChange={setSlippageTolerance}
+            pairType="standard"
+          />
+        )}
 
         <div className="create-section">
           <h3 className="section-title">Initial Liquidity</h3>
@@ -755,7 +777,7 @@ export default function CreatePoolPage() {
                   />
                   <span className="input-token-label">{tokenA.symbol}</span>
                 </div>
-                {balanceA && tokenA && (
+                {balanceA && tokenA && version !== 'aerodrome' && (
                   <QuickSelectButtons
                     balance={balanceA}
                     decimals={tokenA.decimals}
@@ -794,7 +816,7 @@ export default function CreatePoolPage() {
                   />
                   <span className="input-token-label">{tokenB.symbol}</span>
                 </div>
-                {balanceB && tokenB && (
+                {balanceB && tokenB && version !== 'aerodrome' && (
                   <QuickSelectButtons
                     balance={balanceB}
                     decimals={tokenB.decimals}
@@ -819,7 +841,7 @@ export default function CreatePoolPage() {
         <div className="create-actions">
           <button
             className="button-primary"
-            onClick={handleInitiatePoolCreation}
+            onClick={handleCreatePool}
             disabled={!canCreate || isCreating || poolExists}
           >
             {isCreating ? (currentStep || 'Creating Pool...') : 'Create Pool & Add Liquidity'}
@@ -832,20 +854,6 @@ export default function CreatePoolPage() {
           </p>
         </div>
       </div>
-
-      <TransactionConfirmModal
-        isOpen={showConfirmModal}
-        onClose={() => setShowConfirmModal(false)}
-        onConfirm={handleCreatePool}
-        title="Confirm Pool Creation"
-        details={[
-          { label: `${tokenA?.symbol} Amount`, value: amountA },
-          { label: `${tokenB?.symbol} Amount`, value: amountB },
-          { label: 'Fee Tier', value: FEE_TIERS.find(t => t.value === feeTier)?.label || '' },
-          { label: 'Initial Price', value: initialPrice ? `1 ${tokenA?.symbol} = ${initialPrice} ${tokenB?.symbol}` : '' },
-          { label: 'Slippage', value: `${slippageTolerance}%` },
-        ]}
-      />
 
       <Footer />
     </div>

@@ -351,21 +351,12 @@ export default function CreatePoolPage() {
     }
   }, [tokenA?.address, tokenB?.address, version, feeTier])
 
-  function handleInitiatePoolCreation() {
-    if (!tokenA || !tokenB || !amountA || !amountB) {
-      setState({ error: 'Missing required information' })
-      return
-    }
-    setShowConfirmModal(true)
-  }
-
   async function handleCreatePool() {
     if (!wallet || !tokenA || !tokenB || !amountA || !amountB) {
       setState({ error: 'Missing required information' })
       return
     }
 
-    setShowConfirmModal(false)
     setIsCreating(true)
     setState({ error: null })
 
@@ -713,11 +704,13 @@ export default function CreatePoolPage() {
           </div>
         )}
 
-        <SlippageControl
-          value={slippageTolerance}
-          onChange={setSlippageTolerance}
-          pairType="standard"
-        />
+        {version !== 'aerodrome' && (
+          <SlippageControl
+            value={slippageTolerance}
+            onChange={setSlippageTolerance}
+            pairType="standard"
+          />
+        )}
 
         <div className="create-section">
           <h3 className="section-title">Initial Liquidity</h3>
@@ -755,7 +748,7 @@ export default function CreatePoolPage() {
                   />
                   <span className="input-token-label">{tokenA.symbol}</span>
                 </div>
-                {balanceA && tokenA && (
+                {balanceA && tokenA && version !== 'aerodrome' && (
                   <QuickSelectButtons
                     balance={balanceA}
                     decimals={tokenA.decimals}
@@ -794,7 +787,7 @@ export default function CreatePoolPage() {
                   />
                   <span className="input-token-label">{tokenB.symbol}</span>
                 </div>
-                {balanceB && tokenB && (
+                {balanceB && tokenB && version !== 'aerodrome' && (
                   <QuickSelectButtons
                     balance={balanceB}
                     decimals={tokenB.decimals}
@@ -819,7 +812,7 @@ export default function CreatePoolPage() {
         <div className="create-actions">
           <button
             className="button-primary"
-            onClick={handleInitiatePoolCreation}
+            onClick={handleCreatePool}
             disabled={!canCreate || isCreating || poolExists}
           >
             {isCreating ? (currentStep || 'Creating Pool...') : 'Create Pool & Add Liquidity'}
@@ -832,20 +825,6 @@ export default function CreatePoolPage() {
           </p>
         </div>
       </div>
-
-      <TransactionConfirmModal
-        isOpen={showConfirmModal}
-        onClose={() => setShowConfirmModal(false)}
-        onConfirm={handleCreatePool}
-        title="Confirm Pool Creation"
-        details={[
-          { label: `${tokenA?.symbol} Amount`, value: amountA },
-          { label: `${tokenB?.symbol} Amount`, value: amountB },
-          { label: 'Fee Tier', value: FEE_TIERS.find(t => t.value === feeTier)?.label || '' },
-          { label: 'Initial Price', value: initialPrice ? `1 ${tokenA?.symbol} = ${initialPrice} ${tokenB?.symbol}` : '' },
-          { label: 'Slippage', value: `${slippageTolerance}%` },
-        ]}
-      />
 
       <Footer />
     </div>

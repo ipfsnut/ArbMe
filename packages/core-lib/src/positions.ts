@@ -11,7 +11,6 @@ import { getTokenPricesOnChain } from './pricing.js';
 const V2_ROUTER = '0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24';
 const V3_POSITION_MANAGER = '0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1';
 const V4_POSITION_MANAGER = '0x7c5f5a4bbd8fd63184577525326123b519429bdc';
-const AERO_SLIPSTREAM_POSITION_MANAGER = '0x827922686190790b37229fd06084350E74485b72';
 
 // Known ARBME pools
 const KNOWN_POOLS = {
@@ -161,49 +160,9 @@ const V4_NFT_ABI = [
   },
 ] as const;
 
-const AERO_NFT_ABI = [
-  {
-    name: 'balanceOf',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [{ name: 'owner', type: 'address' }],
-    outputs: [{ name: '', type: 'uint256' }],
-  },
-  {
-    name: 'tokenOfOwnerByIndex',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [
-      { name: 'owner', type: 'address' },
-      { name: 'index', type: 'uint256' },
-    ],
-    outputs: [{ name: '', type: 'uint256' }],
-  },
-  {
-    name: 'positions',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [{ name: 'tokenId', type: 'uint256' }],
-    outputs: [
-      { name: 'nonce', type: 'uint96' },
-      { name: 'operator', type: 'address' },
-      { name: 'token0', type: 'address' },
-      { name: 'token1', type: 'address' },
-      { name: 'tickSpacing', type: 'int24' },
-      { name: 'tickLower', type: 'int24' },
-      { name: 'tickUpper', type: 'int24' },
-      { name: 'liquidity', type: 'uint128' },
-      { name: 'feeGrowthInside0LastX128', type: 'uint256' },
-      { name: 'feeGrowthInside1LastX128', type: 'uint256' },
-      { name: 'tokensOwed0', type: 'uint128' },
-      { name: 'tokensOwed1', type: 'uint128' },
-    ],
-  },
-] as const;
-
 export interface Position {
   id: string;
-  version: 'V2' | 'V3' | 'V4' | 'Aerodrome';
+  version: 'V2' | 'V3' | 'V4';
   pair: string; // e.g. "PAGE / ARBME"
   poolAddress: string;
   token0: string;
@@ -252,10 +211,6 @@ export async function fetchUserPositions(
     // Fetch V3 positions
     const v3Positions = await fetchV3Positions(client, walletAddress as Address);
     positions.push(...v3Positions);
-
-    // Fetch Aerodrome positions
-    const aeroPositions = await fetchAerodromePositions(client, walletAddress as Address);
-    positions.push(...aeroPositions);
 
     // Fetch V4 positions
     const v4Positions = await fetchV4Positions(client, walletAddress as Address, alchemyKey);
@@ -422,88 +377,6 @@ async function fetchV3Positions(client: any, wallet: Address): Promise<Position[
     }
   } catch (error) {
     console.error('[Positions] Error fetching V3 positions:', error);
-  }
-
-  return positions;
-}
-
-/**
- * Fetch Aerodrome Slipstream positions
- */
-async function fetchAerodromePositions(client: any, wallet: Address): Promise<Position[]> {
-  const positions: Position[] = [];
-
-  try {
-    // Get number of Aerodrome positions
-    const balance = await client.readContract({
-      address: AERO_SLIPSTREAM_POSITION_MANAGER as Address,
-      abi: AERO_NFT_ABI,
-      functionName: 'balanceOf',
-      args: [wallet],
-    });
-
-    const count = Number(balance);
-    console.log(`[Positions] User has ${count} Aerodrome Slipstream positions`);
-
-    // Enumerate positions
-    for (let i = 0; i < count; i++) {
-      try {
-        // Get token ID
-        const tokenId = await client.readContract({
-          address: AERO_SLIPSTREAM_POSITION_MANAGER as Address,
-          abi: AERO_NFT_ABI,
-          functionName: 'tokenOfOwnerByIndex',
-          args: [wallet, BigInt(i)],
-        });
-
-        // Get position details
-        const position = await client.readContract({
-          address: AERO_SLIPSTREAM_POSITION_MANAGER as Address,
-          abi: AERO_NFT_ABI,
-          functionName: 'positions',
-          args: [tokenId],
-        });
-
-        const [
-          nonce,
-          operator,
-          token0,
-          token1,
-          tickSpacing,
-          tickLower,
-          tickUpper,
-          liquidity,
-          feeGrowthInside0LastX128,
-          feeGrowthInside1LastX128,
-          tokensOwed0,
-          tokensOwed1,
-        ] = position;
-
-        if (liquidity > 0n) {
-          positions.push({
-            id: `aerodrome-${tokenId}`,
-            version: 'Aerodrome',
-            pair: `Token Pair`, // Will be enriched with actual symbols
-            poolAddress: AERO_SLIPSTREAM_POSITION_MANAGER,
-            token0: token0 as string,
-            token1: token1 as string,
-            liquidity: `${formatUnits(liquidity, 0)} liquidity`,
-            liquidityUsd: 0, // Will be calculated in enrichment
-            feesEarned: `${formatUnits(tokensOwed0, 18)} / ${formatUnits(tokensOwed1, 18)}`,
-            feesEarnedUsd: 0, // Will be calculated in enrichment
-            priceRangeLow: `Tick ${tickLower}`,
-            priceRangeHigh: `Tick ${tickUpper}`,
-            inRange: undefined, // TODO: Check current tick vs range
-            tokenId: tokenId.toString(),
-            tickSpacing: Number(tickSpacing),
-          });
-        }
-      } catch (error) {
-        console.error(`[Positions] Error fetching Aerodrome position ${i}:`, error);
-      }
-    }
-  } catch (error) {
-    console.error('[Positions] Error fetching Aerodrome positions:', error);
   }
 
   return positions;
