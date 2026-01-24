@@ -23,6 +23,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/js/pools-widget.css">
   <style>
     :root {
       --bg: #0a0a0f;
@@ -948,13 +949,39 @@
 
       <!-- Statement -->
       <div class="statement">
-        <div class="speech-bubble">u
+        <div class="speech-bubble">
           <p>
             Most tokens hate getting arbed. <strong>$ARBME embraces it.</strong><br>
             More LPers → more pools → more routes → more fees. No gatekeepers.
           </p>
         </div>
       </div>
+
+      <!-- Live Pools - Featured at top -->
+      <section id="pools" class="pools-section">
+        <div class="pools-header">
+          <div>
+            <div class="section-label">Live Pools</div>
+            <h2 class="section-title">The Mesh</h2>
+          </div>
+          <div class="pools-stats">
+            <div class="pools-stat">
+              <div class="pools-stat-value" id="pool-count">-</div>
+              <div class="pools-stat-label">Pools</div>
+            </div>
+            <div class="pools-stat">
+              <div class="pools-stat-value" id="total-tvl">-</div>
+              <div class="pools-stat-label">Total TVL</div>
+            </div>
+          </div>
+        </div>
+
+        <div id="pools-container">
+          <div class="pools-loading">Loading pools...</div>
+        </div>
+
+        <div class="pools-refresh" id="pools-refresh"></div>
+      </section>
 
       <!-- How it works -->
       <section id="how">
@@ -1214,32 +1241,6 @@
         </div>
       </section>
 
-      <!-- Live Pools -->
-      <section id="pools" class="pools-section">
-        <div class="pools-header">
-          <div>
-            <div class="section-label">Live Pools</div>
-            <h2 class="section-title">The Mesh</h2>
-          </div>
-          <div class="pools-stats">
-            <div class="pools-stat">
-              <div class="pools-stat-value" id="pool-count">-</div>
-              <div class="pools-stat-label">Pools</div>
-            </div>
-            <div class="pools-stat">
-              <div class="pools-stat-value" id="total-tvl">-</div>
-              <div class="pools-stat-label">Total TVL</div>
-            </div>
-          </div>
-        </div>
-
-        <div id="pools-container">
-          <div class="pools-loading">Loading pools...</div>
-        </div>
-
-        <div class="pools-refresh" id="pools-refresh"></div>
-      </section>
-
       <!-- CTA -->
       <section class="cta-section">
         <img class="cta-mascot" src="arbie.png" alt="Arbie">
@@ -1278,99 +1279,25 @@
 
   </div>
 
+  <script src="/js/pools-widget.js"></script>
   <script>
-    const API_URL = '/pools';
-
-    function formatUsd(value) {
-      if (value >= 1000000) return '$' + (value / 1000000).toFixed(2) + 'M';
-      if (value >= 1000) return '$' + (value / 1000).toFixed(2) + 'K';
-      if (value >= 1) return '$' + value.toFixed(2);
-      return '$' + value.toFixed(4);
-    }
-
-    function formatDex(dexId) {
-      const dexNames = {
-        'uniswap': 'Uniswap',
-        'uniswap_v2': 'Uniswap V2',
-        'uniswap_v3': 'Uniswap V3',
-        'uniswap_v4': 'Uniswap V4',
-        'aerodrome': 'Aerodrome',
-      };
-      return dexNames[dexId] || dexId;
-    }
-
-    async function fetchPools() {
-      const container = document.getElementById('pools-container');
-      const poolCount = document.getElementById('pool-count');
-      const totalTvl = document.getElementById('total-tvl');
-      const refreshEl = document.getElementById('pools-refresh');
-
-      try {
-        console.log('[ArbMe] Fetching pools from:', API_URL);
-        const response = await fetch(API_URL);
-        if (!response.ok) throw new Error('API error: ' + response.status);
-        const data = await response.json();
-
-        console.log('[ArbMe] API Response:', data);
-        console.log('[ArbMe] Pool count:', data.poolCount, 'Total TVL:', data.totalTvl);
-        if (data.pools) {
-          data.pools.forEach((p, i) => console.log(`[ArbMe] Pool ${i}:`, p.pair, 'TVL:', p.tvl));
-        }
-
-        if (!data.pools || data.pools.length === 0) {
-          container.innerHTML = '<div class="pools-loading">No pools found yet. Be the first to LP!</div>';
-          return;
-        }
-
-        // Update stats
-        poolCount.textContent = data.poolCount;
-        totalTvl.textContent = formatUsd(data.totalTvl);
-
-        // Build table
-        let html = `
-          <table class="pools-table">
-            <thead>
-              <tr>
-                <th>Pair</th>
-                <th>DEX</th>
-                <th>TVL</th>
-                <th>24h Volume</th>
-                <th>Link</th>
-              </tr>
-            </thead>
-            <tbody>
-        `;
-
-        for (const pool of data.pools) {
-          html += `
-            <tr>
-              <td class="pool-pair">${pool.pair}</td>
-              <td class="pool-dex">${formatDex(pool.dex)}</td>
-              <td class="pool-tvl">${formatUsd(pool.tvl)}</td>
-              <td class="pool-volume">${formatUsd(pool.volume24h)}</td>
-              <td><a href="${pool.url}" target="_blank" class="pool-link">View</a></td>
-            </tr>
-          `;
-        }
-
-        html += '</tbody></table>';
-        container.innerHTML = html;
-
-        // Show refresh time
-        const cacheHit = response.headers.get('X-Cache') === 'HIT';
-        refreshEl.textContent = `Last updated: ${new Date(data.lastUpdated).toLocaleTimeString()} ${cacheHit ? '(cached)' : ''}`;
-
-      } catch (error) {
-        container.innerHTML = '<div class="pools-error">Failed to load pools. Please refresh the page.</div>';
-        console.error('Failed to fetch pools:', error);
+    // Initialize pools widget
+    const poolsWidget = new PoolsWidget({
+      container: '#pools-container',
+      apiUrl: '/pools',
+      limit: 5,
+      showPrices: true,
+      autoRefresh: true,
+      refreshInterval: 60000,
+      onDataLoaded: function(data) {
+        // Update stats in header
+        const poolCount = document.getElementById('pool-count');
+        const totalTvl = document.getElementById('total-tvl');
+        if (poolCount) poolCount.textContent = data.poolCount;
+        if (totalTvl) totalTvl.textContent = poolsWidget.formatUsd(data.totalTvl);
       }
-    }
-
-    // Fetch on load
-    fetchPools();
-
-    // Refresh every 60 seconds
-    setInterval(fetchPools, 60000);
+    });
+    poolsWidget.init();
   </script>
 
   <!-- Farcaster SDK for Add to Farcaster button -->

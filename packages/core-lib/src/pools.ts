@@ -340,24 +340,27 @@ async function fetchTokenPrices(): Promise<Record<string, number>> {
     PAGE: TOKENS.PAGE.toLowerCase(),
     OINC: TOKENS.OINC.toLowerCase(),
     CLANKER: TOKENS.CLANKER.toLowerCase(),
+    WETH: '0x4200000000000000000000000000000000000006',
     USDC: '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913',
     cbBTC: '0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf',
   };
 
-  const [pagePrice, oincPrice, clankerPrice, usdcPrice, cbbtcPrice] = await Promise.all([
+  const [pagePrice, oincPrice, clankerPrice, wethPrice, usdcPrice, cbbtcPrice] = await Promise.all([
     fetchTokenPrice(tokens.PAGE),
     fetchTokenPrice(tokens.OINC),
     fetchTokenPrice(tokens.CLANKER),
+    fetchTokenPrice(tokens.WETH),
     fetchTokenPrice(tokens.USDC),
     fetchTokenPrice(tokens.cbBTC),
   ]);
 
-  console.log(`[Pools] Prices - PAGE: $${pagePrice}, OINC: $${oincPrice}, CLANKER: $${clankerPrice}, USDC: $${usdcPrice}, cbBTC: $${cbbtcPrice}`);
+  console.log(`[Pools] Prices - PAGE: $${pagePrice}, OINC: $${oincPrice}, CLANKER: $${clankerPrice}, WETH: $${wethPrice}, USDC: $${usdcPrice}, cbBTC: $${cbbtcPrice}`);
 
   return {
     [tokens.PAGE]: pagePrice,
     [tokens.OINC]: oincPrice,
     [tokens.CLANKER]: clankerPrice,
+    [tokens.WETH]: wethPrice,
     [tokens.USDC]: usdcPrice,
     [tokens.cbBTC]: cbbtcPrice,
   };
@@ -609,6 +612,8 @@ export async function fetchPools(alchemyKey?: string): Promise<{
     const totalTvl = allPools.reduce((sum, p) => sum + p.tvl, 0);
     const arbmePrice = allPools.find(p => p.tvl > 0)?.priceUsd || '0';
 
+    const wethPrice = tokenPrices['0x4200000000000000000000000000000000000006'] || 0;
+
     const responseData = {
       token: ARBME.address,
       poolCount: allPools.length,
@@ -618,6 +623,7 @@ export async function fetchPools(alchemyKey?: string): Promise<{
         PAGE: pagePrice,
         OINC: oincPrice,
         CLANKER: clankerPrice,
+        WETH: wethPrice,
       },
       pools: allPools,
       lastUpdated: new Date().toISOString(),

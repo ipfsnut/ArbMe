@@ -29,6 +29,7 @@ export interface PoolsResponse {
     PAGE: number;
     OINC: number;
     CLANKER: number;
+    WETH: number;
   };
   pools: Pool[];
   lastUpdated: string;

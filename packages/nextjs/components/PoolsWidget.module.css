@@ -1,0 +1,147 @@
+/**
+ * PoolsWidget CSS Module
+ * Matches the ArbMe design system
+ */
+
+.widget {
+  width: 100%;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.table th,
+.table td {
+  padding: 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.table th {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--surface-2);
+}
+
+.table td {
+  font-size: 0.9rem;
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+.table tbody tr:hover {
+  background: var(--surface-2);
+}
+
+.pair {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.change {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.positive {
+  color: var(--accent);
+}
+
+.negative {
+  color: #ef4444;
+}
+
+.dex {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.pricesHeader {
+  min-width: 180px;
+}
+
+.prices {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.tokenPrice {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.tvl {
+  font-family: var(--font-mono);
+  color: var(--accent);
+}
+
+.volume {
+  font-family: var(--font-mono);
+  color: var(--muted);
+}
+
+.link {
+  color: var(--accent);
+  text-decoration: none;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.loading,
+.error,
+.empty {
+  text-align: center;
+  padding: 3rem;
+  color: var(--muted);
+  font-family: var(--font-mono);
+}
+
+.error {
+  color: #ef4444;
+}
+
+.updated {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-align: right;
+  padding: 0.75rem 1rem;
+  font-family: var(--font-mono);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .table th,
+  .table td {
+    padding: 0.75rem 0.5rem;
+  }
+
+  .prices,
+  .pricesHeader {
+    display: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .table th:nth-child(5),
+  .table td:nth-child(5) {
+    display: none;
+  }
+}

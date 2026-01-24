@@ -1,79 +1,17 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useState } from 'react'
 import { useAppState } from '@/store/AppContext'
-import { useWallet } from '@/hooks/useWallet'
-import { fetchPools } from '@/services/api'
-import { FEATURED_POOLS, type FeaturedPoolConfig } from '@/utils/constants'
-import type { Pool } from '@/utils/types'
 import { AppHeader } from '@/components/AppHeader'
 import { Footer } from '@/components/Footer'
-import PoolCard from '@/components/PoolCard'
+import PoolsWidget from '@/components/PoolsWidget'
 import { formatPrice } from '@/utils/format'
-import Link from 'next/link'
+import type { PoolsResponse } from '@/utils/types'
 
 export default function HomePage() {
   const { state, setState } = useAppState()
-  const { pools, loading, error } = state
-  const wallet = useWallet()
+  const [statsLoaded, setStatsLoaded] = useState(false)
 
-  useEffect(() => {
-    if (!loading && pools.length === 0) {
-      loadPools()
-    }
-  }, [])
-
-  async function loadPools() {
-    setState({ loading: true, error: null })
-
-    try {
-      const data = await fetchPools()
-      setState({
-        pools: data.pools,
-        globalStats: {
-          arbmePrice: data.arbmePrice,
-          totalTvl: data.totalTvl,
-        },
-        loading: false
-      })
-    } catch (err) {
-      console.error('[Home] Failed to load pools:', err)
-      setState({
-        error: 'Failed to load pools. Please try again.',
-        loading: false,
-      })
-    }
-  }
-
-  function matchesTokenPair(pool: Pool, config: FeaturedPoolConfig): boolean {
-    if (!pool.token0 || !pool.token1) return false
-
-    const p0 = pool.token0.toLowerCase()
-    const p1 = pool.token1.toLowerCase()
-    const c0 = config.token0Address.toLowerCase()
-    const c1 = config.token1Address.toLowerCase()
-
-    return (p0 === c0 && p1 === c1) || (p0 === c1 && p1 === c0)
-  }
-
-  function getFeaturedPools(): Pool[] {
-    const featuredPools: Pool[] = []
-
-    for (const config of FEATURED_POOLS) {
-      const match = pools.find(p => matchesTokenPair(p, config))
-      if (match) {
-        featuredPools.push(match)
-      }
-    }
-
-    return featuredPools.sort((a, b) => {
-      const aConfig = FEATURED_POOLS.find(c => matchesTokenPair(a, c))
-      const bConfig = FEATURED_POOLS.find(c => matchesTokenPair(b, c))
-      return (aConfig?.priority || 999) - (bConfig?.priority || 999)
-    })
-  }
-
-  const featuredPools = getFeaturedPools()
   const arbmePrice = typeof state.globalStats?.arbmePrice === 'number'
     ? state.globalStats.arbmePrice
     : parseFloat(state.globalStats?.arbmePrice || '0') || 0
@@ -81,11 +19,23 @@ export default function HomePage() {
     ? state.globalStats.totalTvl
     : parseFloat(state.globalStats?.totalTvl || '0') || 0
 
+  const handleDataLoaded = (data: PoolsResponse) => {
+    setState({
+      pools: data.pools,
+      globalStats: {
+        arbmePrice: data.arbmePrice,
+        totalTvl: data.totalTvl,
+      },
+      loading: false
+    })
+    setStatsLoaded(true)
+  }
+
+  const loading = !statsLoaded
+
   return (
     <div className="home-page">
       <AppHeader />
-
-      {error && <div className="error-banner">{error}</div>}
 
       {/* Hero Section */}
       <div className="hero-section">
@@ -140,16 +90,15 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Featured Pools Section */}
+      {/* Top Pools Section */}
       <div className="featured-section">
         <h2 className="section-title">$ARBME Pools</h2>
-        <p className="section-subtitle">Trade on Uniswap or Aerodrome</p>
-        <div className="pools-grid">
-          {loading || featuredPools.length === 0
-            ? FEATURED_POOLS.map((_, i) => <PoolCard key={i} pool={null} />)
-            : featuredPools.map(pool => <PoolCard key={pool.id} pool={pool} />)
-          }
-        </div>
+        <p className="section-subtitle">Top pools by TVL</p>
+        <PoolsWidget
+          limit={5}
+          showPrices={true}
+          onDataLoaded={handleDataLoaded}
+        />
       </div>
 
       <Footer />

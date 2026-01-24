@@ -39,6 +39,21 @@ export const FEATURED_POOLS: FeaturedPoolConfig[] = [
 export const ROUTES = {
   HOME: '/',
   MY_POOLS: '/positions',
-  POSITION_DETAIL: '/position',
-  CREATE_POOL: '/create-pool',
+  POSITION_DETAIL: '/positions',
+  ADD_LIQUIDITY: '/add-liquidity',
 } as const;
+
+// Position Managers
+export const V4_POSITION_MANAGER = '0x7c5f5a4bbd8fd63184577525326123b519429bdc';
+export const V3_POSITION_MANAGER = '0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1';
+export const V2_ROUTER = '0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24';
+
+// Fee tiers for UI
+export const FEE_TIERS = [
+  { value: 500, label: '0.05%', description: 'Best for stable pairs' },
+  { value: 3000, label: '0.3%', description: 'Best for most pairs' },
+  { value: 10000, label: '1%', description: 'Best for exotic pairs' },
+  { value: 30000, label: '3%', description: 'High volatility' },
+  { value: 50000, label: '5%', description: 'Very high volatility' },
+  { value: 100000, label: '10%', description: 'Extreme volatility' },
+] as const;

@@ -1,11 +1,14 @@
 'use client'
 
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { useAppState } from '@/store/AppContext'
 import { formatArbmeMarketCap, formatUsd, formatPrice } from '@/utils/format'
 import { buyArbme, sendTip } from '@/lib/actions'
-import Image from 'next/image'
+import { ROUTES } from '@/utils/constants'
 
 export function AppHeader() {
+  const pathname = usePathname()
   const { state } = useAppState()
   const { globalStats } = state
 
@@ -20,6 +23,12 @@ export function AppHeader() {
   const priceDisplay = globalStats
     ? formatPrice(globalStats.arbmePrice)
     : '...'
+
+  const navLinks = [
+    { href: ROUTES.HOME, label: 'Pools' },
+    { href: ROUTES.MY_POOLS, label: 'Positions' },
+    { href: ROUTES.ADD_LIQUIDITY, label: '+ Add' },
+  ]
 
   return (
     <header className="app-header">
@@ -39,6 +48,18 @@ export function AppHeader() {
           💝
         </button>
       </div>
+
+      <nav className="app-nav">
+        {navLinks.map((link) => (
+          <Link
+            key={link.href}
+            href={link.href}
+            className={`nav-link ${pathname === link.href || (link.href !== '/' && pathname?.startsWith(link.href)) ? 'active' : ''}`}
+          >
+            {link.label}
+          </Link>
+        ))}
+      </nav>
 
       <div className="stats-banner">
         <div className="stat-item">
