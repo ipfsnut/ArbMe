@@ -115,15 +115,34 @@ export function getTickRange(tickSpacing: number): { minTick: number; maxTick: n
 // RPC Helper Functions
 // ═══════════════════════════════════════════════════════════════════════════════
 
-let rpcUrl = BASE_RPCS_FALLBACK[0];
-let rpcIndex = 0;
+// Module-level Alchemy key for RPC calls
+let _alchemyKey: string | undefined;
+
+/**
+ * Set the Alchemy API key for RPC calls
+ * Call this before using pool creation functions
+ */
+export function setAlchemyKey(key: string | undefined): void {
+  _alchemyKey = key;
+}
+
+function getRpcUrl(): string {
+  if (_alchemyKey) {
+    return `https://base-mainnet.g.alchemy.com/v2/${_alchemyKey}`;
+  }
+  return BASE_RPCS_FALLBACK[0];
+}
+
+let fallbackRpcIndex = 0;
 
 async function rpcCall(method: string, params: any[]): Promise<any> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), RPC_TIMEOUT);
 
+  const url = getRpcUrl();
+
   try {
-    const response = await fetch(rpcUrl, {
+    const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
@@ -144,9 +163,10 @@ async function rpcCall(method: string, params: any[]): Promise<any> {
     return data.result;
   } catch (err) {
     clearTimeout(timeout);
-    // Fallback to next RPC
-    rpcIndex = (rpcIndex + 1) % BASE_RPCS_FALLBACK.length;
-    rpcUrl = BASE_RPCS_FALLBACK[rpcIndex];
+    // If using Alchemy and it fails, fallback to public RPCs
+    if (!_alchemyKey) {
+      fallbackRpcIndex = (fallbackRpcIndex + 1) % BASE_RPCS_FALLBACK.length;
+    }
     throw err;
   }
 }

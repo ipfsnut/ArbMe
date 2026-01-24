@@ -62,6 +62,11 @@ export declare function getTickRange(tickSpacing: number): {
     maxTick: number;
 };
 /**
+ * Set the Alchemy API key for RPC calls
+ * Call this before using pool creation functions
+ */
+export declare function setAlchemyKey(key: string | undefined): void;
+/**
  * Get token decimals via eth_call
  */
 export declare function getTokenDecimals(address: Address): Promise<number>;

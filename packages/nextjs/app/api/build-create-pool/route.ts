@@ -10,10 +10,16 @@ import {
   checkV3PoolExists,
   checkV4PoolExists,
   FEE_TO_TICK_SPACING,
+  setAlchemyKey,
 } from '@arbme/core-lib'
+
+const ALCHEMY_KEY = process.env.ALCHEMY_API_KEY
 
 export async function POST(request: NextRequest) {
   try {
+    // Set Alchemy key for RPC calls
+    setAlchemyKey(ALCHEMY_KEY)
+
     const {
       version,
       token0,
