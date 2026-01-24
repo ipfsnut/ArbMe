@@ -36,11 +36,12 @@ export const FEATURED_POOLS: FeaturedPoolConfig[] = [
   },
 ];
 
+// Routes with /app prefix for production (Express serves miniapp at /app/*)
 export const ROUTES = {
-  HOME: '/',
-  MY_POOLS: '/positions',
-  POSITION_DETAIL: '/positions',
-  ADD_LIQUIDITY: '/add-liquidity',
+  HOME: '/app',
+  MY_POOLS: '/app/positions',
+  POSITION_DETAIL: '/app/positions',
+  ADD_LIQUIDITY: '/app/add-liquidity',
 } as const;
 
 // Position Managers

@@ -54,7 +54,7 @@ export function AppHeader() {
           <Link
             key={link.href}
             href={link.href}
-            className={`nav-link ${pathname === link.href || (link.href !== '/' && pathname?.startsWith(link.href)) ? 'active' : ''}`}
+            className={`nav-link ${pathname === link.href || (link.href !== ROUTES.HOME && pathname?.startsWith(link.href)) ? 'active' : ''}`}
           >
             {link.label}
           </Link>
