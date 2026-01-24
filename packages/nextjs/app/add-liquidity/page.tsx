@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useWallet } from '@/hooks/useWallet'
 import { AppHeader } from '@/components/AppHeader'
 import { Footer } from '@/components/Footer'
+import { BackButton } from '@/components/BackButton'
 import { TokenInput } from '@/components/TokenInput'
 import { FeeTierSelector } from '@/components/FeeTierSelector'
 import { TransactionButton } from '@/components/TransactionButton'
@@ -210,6 +211,8 @@ export default function AddLiquidityPage() {
       <AppHeader />
 
       <div className="main-content">
+        <BackButton href={ROUTES.HOME} label="Back to Home" />
+
         <div className="section-header">
           <h2>Add Liquidity</h2>
         </div>

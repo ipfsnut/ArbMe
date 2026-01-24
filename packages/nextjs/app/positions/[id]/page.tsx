@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useWallet } from '@/hooks/useWallet'
 import { AppHeader } from '@/components/AppHeader'
 import { Footer } from '@/components/Footer'
+import { BackButton } from '@/components/BackButton'
 import { ROUTES } from '@/utils/constants'
 import type { Position } from '@/utils/types'
 import sdk from '@farcaster/miniapp-sdk'
@@ -194,9 +195,7 @@ export default function PositionDetailPage() {
       <AppHeader />
 
       <div className="main-content">
-        <Link href={ROUTES.MY_POOLS} className="back-button">
-          ← Back to Positions
-        </Link>
+        <BackButton href={ROUTES.MY_POOLS} label="Back to Positions" />
 
         {!wallet ? (
           <div className="empty-state">

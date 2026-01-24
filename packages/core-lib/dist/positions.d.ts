@@ -6,25 +6,29 @@ export interface Position {
     version: 'V2' | 'V3' | 'V4';
     pair: string;
     poolAddress: string;
-    token0: string;
-    token1: string;
+    token0: {
+        symbol: string;
+        address: string;
+        amount: number;
+    };
+    token1: {
+        symbol: string;
+        address: string;
+        amount: number;
+    };
     liquidity: string;
     liquidityUsd: number;
     feesEarned: string;
     feesEarnedUsd: number;
-    priceRangeLow?: string;
-    priceRangeHigh?: string;
+    priceRange?: {
+        min: number;
+        max: number;
+    };
     inRange?: boolean;
     tokenId?: string;
     fee?: number;
     tickSpacing?: number;
     hooks?: string;
-    v2Balance?: bigint;
-    v2TotalSupply?: bigint;
-    v2Reserve0?: bigint;
-    v2Reserve1?: bigint;
-    v3TokensOwed0?: bigint;
-    v3TokensOwed1?: bigint;
 }
 /**
  * Fetch all positions for a wallet address

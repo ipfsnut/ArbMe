@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useWallet } from '@/hooks/useWallet'
 import { AppHeader } from '@/components/AppHeader'
 import { Footer } from '@/components/Footer'
+import { BackButton } from '@/components/BackButton'
 import { PositionCard } from '@/components/PositionCard'
 import { ROUTES } from '@/utils/constants'
 import type { Position } from '@/utils/types'
@@ -59,6 +60,8 @@ export default function PositionsPage() {
       <AppHeader />
 
       <div className="main-content">
+        <BackButton href={ROUTES.HOME} label="Back to Home" />
+
         <div className="section-header">
           <h2>
             My Positions
