@@ -184,7 +184,7 @@ export default function PositionDetailPage() {
     return amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: decimals })
   }
 
-  const isClosed = position && (!position.liquidity || BigInt(position.liquidity) === 0n)
+  const isClosed = position && (!position.liquidityUsd || position.liquidityUsd === 0)
   const hasFees = position && position.feesEarnedUsd && position.feesEarnedUsd > 0
 
   return (

@@ -46,10 +46,10 @@ export default function PositionsPage() {
   }, [wallet])
 
   const activePositions = positions.filter(p =>
-    p.liquidity && BigInt(p.liquidity) > 0n
+    p.liquidityUsd && p.liquidityUsd > 0
   )
   const closedPositions = positions.filter(p =>
-    !p.liquidity || BigInt(p.liquidity) === 0n
+    !p.liquidityUsd || p.liquidityUsd === 0
   )
 
   const displayedPositions = showClosed ? positions : activePositions
