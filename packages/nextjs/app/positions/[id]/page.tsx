@@ -174,12 +174,14 @@ export default function PositionDetailPage() {
     }
   }
 
-  const formatUsd = (value: number) => {
+  const formatUsd = (value: number | undefined) => {
+    if (value === undefined || value === null) return '$0.00'
     if (value < 0.01) return '<$0.01'
     return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   }
 
-  const formatAmount = (amount: number, decimals: number = 6) => {
+  const formatAmount = (amount: number | undefined, decimals: number = 6) => {
+    if (amount === undefined || amount === null) return '0'
     if (amount < 0.000001) return '<0.000001'
     return amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: decimals })
   }
@@ -244,12 +246,12 @@ export default function PositionDetailPage() {
               <h3>Token Amounts</h3>
               <div className="detail-stats">
                 <div className="stat-large">
-                  <span className="stat-label">{position.token0.symbol}</span>
-                  <span className="stat-value">{formatAmount(position.token0.amount)}</span>
+                  <span className="stat-label">{position.token0?.symbol || '???'}</span>
+                  <span className="stat-value">{formatAmount(position.token0?.amount)}</span>
                 </div>
                 <div className="stat-large">
-                  <span className="stat-label">{position.token1.symbol}</span>
-                  <span className="stat-value">{formatAmount(position.token1.amount)}</span>
+                  <span className="stat-label">{position.token1?.symbol || '???'}</span>
+                  <span className="stat-value">{formatAmount(position.token1?.amount)}</span>
                 </div>
               </div>
             </div>
@@ -261,11 +263,11 @@ export default function PositionDetailPage() {
                 <div className="detail-stats">
                   <div className="stat-large">
                     <span className="stat-label">Min Price</span>
-                    <span className="stat-value">{formatAmount(position.priceRange.min, 8)}</span>
+                    <span className="stat-value">{formatAmount(position.priceRange?.min, 8)}</span>
                   </div>
                   <div className="stat-large">
                     <span className="stat-label">Max Price</span>
-                    <span className="stat-value">{formatAmount(position.priceRange.max, 8)}</span>
+                    <span className="stat-value">{formatAmount(position.priceRange?.max, 8)}</span>
                   </div>
                 </div>
               </div>
@@ -388,15 +390,15 @@ export default function PositionDetailPage() {
                   <div className="preview-header">You will receive</div>
                   <div className="preview-amounts">
                     <div className="preview-row">
-                      <span className="token-symbol">{position.token0.symbol}</span>
+                      <span className="token-symbol">{position.token0?.symbol || '???'}</span>
                       <span className="amount">
-                        {formatAmount(position.token0.amount * (removePercentage / 100))}
+                        {formatAmount((position.token0?.amount || 0) * (removePercentage / 100))}
                       </span>
                     </div>
                     <div className="preview-row">
-                      <span className="token-symbol">{position.token1.symbol}</span>
+                      <span className="token-symbol">{position.token1?.symbol || '???'}</span>
                       <span className="amount">
-                        {formatAmount(position.token1.amount * (removePercentage / 100))}
+                        {formatAmount((position.token1?.amount || 0) * (removePercentage / 100))}
                       </span>
                     </div>
                   </div>
