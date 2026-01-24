@@ -9,7 +9,7 @@ interface PositionCardProps {
 }
 
 export function PositionCard({ position }: PositionCardProps) {
-  const isClosed = !position.liquidity || BigInt(position.liquidity) === 0n
+  const isClosed = !position.liquidityUsd || position.liquidityUsd === 0
   const hasFees = position.feesEarnedUsd && position.feesEarnedUsd > 0
 
   const formatUsd = (value: number) => {
