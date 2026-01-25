@@ -2,7 +2,7 @@
  * On-chain pricing service
  * Calculates token prices from pool reserves/sqrtPriceX96 instead of external APIs
  */
-import { createPublicClient, http } from 'viem';
+import { createPublicClient, http, keccak256 } from 'viem';
 import { base } from 'viem/chains';
 // Registry of pools we can use for pricing (lowercase addresses)
 // We'll discover WETH pairs dynamically from GeckoTerminal and cache them
@@ -74,17 +74,7 @@ const V4_STATE_VIEW_ABI = [
         type: 'function',
         stateMutability: 'view',
         inputs: [
-            {
-                name: 'poolKey',
-                type: 'tuple',
-                components: [
-                    { name: 'currency0', type: 'address' },
-                    { name: 'currency1', type: 'address' },
-                    { name: 'fee', type: 'uint24' },
-                    { name: 'tickSpacing', type: 'int24' },
-                    { name: 'hooks', type: 'address' },
-                ],
-            },
+            { name: 'poolId', type: 'bytes32' },
         ],
         outputs: [
             { name: 'sqrtPriceX96', type: 'uint160' },
@@ -94,8 +84,17 @@ const V4_STATE_VIEW_ABI = [
         ],
     },
 ];
-const V4_STATE_VIEW = '0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6'; // Uniswap V4 StateView on Base
+const V4_STATE_VIEW = '0xa3c0c9b65bad0b08107aa264b0f3db444b867a71'; // Uniswap V4 StateView on Base
 const WETH_ADDRESS = '0x4200000000000000000000000000000000000006';
+// Helper to calculate V4 pool ID from pool key
+function calculateV4PoolId(currency0, currency1, fee, tickSpacing, hooks) {
+    const poolKeyEncoded = currency0.slice(2).toLowerCase().padStart(64, '0') +
+        currency1.slice(2).toLowerCase().padStart(64, '0') +
+        fee.toString(16).padStart(64, '0') +
+        tickSpacing.toString(16).padStart(64, '0') +
+        hooks.slice(2).toLowerCase().padStart(64, '0');
+    return keccak256(`0x${poolKeyEncoded}`);
+}
 /**
  * Get WETH USD price from GeckoTerminal (used as anchor)
  */
@@ -178,18 +177,12 @@ async function fetchPoolPrice(pool, decimals0, decimals1, alchemyKey) {
                 console.warn(`[Pricing] V4 pool ${pool.address} missing fee/tickSpacing/hooks`);
                 return 0;
             }
-            const poolKey = {
-                currency0: pool.token0,
-                currency1: pool.token1,
-                fee: pool.fee,
-                tickSpacing: pool.tickSpacing,
-                hooks: pool.hooks,
-            };
+            const poolId = calculateV4PoolId(pool.token0, pool.token1, pool.fee, pool.tickSpacing, pool.hooks);
             const slot0 = await client.readContract({
                 address: V4_STATE_VIEW,
                 abi: V4_STATE_VIEW_ABI,
                 functionName: 'getSlot0',
-                args: [poolKey],
+                args: [poolId],
             });
             const sqrtPriceX96 = slot0[0];
             return calculatePriceFromSqrtPriceX96(sqrtPriceX96, decimals0, decimals1);

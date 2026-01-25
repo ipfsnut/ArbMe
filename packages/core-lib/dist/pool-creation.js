@@ -15,7 +15,7 @@ export const V3_POSITION_MANAGER = '0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1';
 // Uniswap V4
 export const V4_POOL_MANAGER = '0x498581ff718922c3f8e6a244956af099b2652b2b';
 export const V4_POSITION_MANAGER = '0x7c5f5a4bbd8fd63184577525326123b519429bdc';
-export const V4_STATE_VIEW = '0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6';
+export const V4_STATE_VIEW = '0xa3c0c9b65bad0b08107aa264b0f3db444b867a71';
 // ═══════════════════════════════════════════════════════════════════════════════
 // Mathematical Utilities
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -203,19 +203,20 @@ export async function checkV3PoolExists(token0, token1, fee) {
  * Check if V4 pool exists (via StateView getSlot0)
  */
 export async function checkV4PoolExists(token0, token1, fee, tickSpacing) {
-    // Encode PoolKey struct
-    const poolKey = token0.slice(2).padStart(64, '0') +
-        token1.slice(2).padStart(64, '0') +
+    // Calculate poolId = keccak256(abi.encode(poolKey))
+    const poolKeyEncoded = token0.slice(2).toLowerCase().padStart(64, '0') +
+        token1.slice(2).toLowerCase().padStart(64, '0') +
         fee.toString(16).padStart(64, '0') +
         tickSpacing.toString(16).padStart(64, '0') +
         '0000000000000000000000000000000000000000000000000000000000000000'; // hooks = 0x0
-    // getSlot0(PoolKey) selector: 0x3850c7bd
-    const data = '0x3850c7bd' +
-        '0000000000000000000000000000000000000000000000000000000000000020' + // offset
-        poolKey;
+    // Manual keccak256 using Web Crypto API is not available, so we use viem
+    const { keccak256 } = await import('viem');
+    const poolId = keccak256(`0x${poolKeyEncoded}`);
+    // getSlot0(bytes32) selector: 0x98e5b12a
+    const data = '0x98e5b12a' + poolId.slice(2);
     try {
         const result = await rpcCall('eth_call', [{ to: V4_STATE_VIEW, data }, 'latest']);
-        // Decode sqrtPriceX96 (first 32 bytes after offset)
+        // Decode sqrtPriceX96 (first 32 bytes)
         const sqrtPriceX96Hex = result.slice(2, 66);
         const sqrtPriceX96 = BigInt('0x' + sqrtPriceX96Hex);
         const initialized = sqrtPriceX96 > 0n;

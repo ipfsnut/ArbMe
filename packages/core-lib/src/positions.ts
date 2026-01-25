@@ -463,20 +463,18 @@ async function fetchV4Positions(client: any, wallet: Address, alchemyKey?: strin
 
     // Helper function to extract tick values from bit-packed PositionInfo
     const extractTicks = (packedInfo: bigint): { tickLower: number; tickUpper: number } => {
-      // PositionInfo layout: poolId (200 bits) | tickUpper (24 bits) | tickLower (24 bits) | hasSubscriber (8 bits)
-      // Extract from right to left: hasSubscriber (first 8 bits), tickLower (next 24), tickUpper (next 24)
-      const lowerMask = BigInt(0xFFFFFF); // 24 bits
-      const upperMask = BigInt(0xFFFFFF) << BigInt(24);
+      // PositionInfo layout (from LSB): hasSubscriber (8 bits) | tickLower (24 bits) | tickUpper (24 bits) | poolId (200 bits)
+      // Must skip the first 8 bits (hasSubscriber) before extracting ticks
+      const shifted = packedInfo >> BigInt(8);
 
-      const tickLowerRaw = Number((packedInfo & lowerMask));
-      const tickUpperRaw = Number(((packedInfo & upperMask) >> BigInt(24)));
+      const tickLowerRaw = Number(shifted & BigInt(0xFFFFFF));
+      const tickUpperRaw = Number((shifted >> BigInt(24)) & BigInt(0xFFFFFF));
 
       // Convert from unsigned to signed (int24 range: -8388608 to 8388607)
       const tickLower = tickLowerRaw > 0x7FFFFF ? tickLowerRaw - 0x1000000 : tickLowerRaw;
       const tickUpper = tickUpperRaw > 0x7FFFFF ? tickUpperRaw - 0x1000000 : tickUpperRaw;
 
-      // IMPORTANT: Return them swapped because the layout is tickUpper-then-tickLower
-      return { tickLower: tickUpper, tickUpper: tickLower };
+      return { tickLower, tickUpper };
     };
 
     // Fetch details for each owned position
@@ -1162,17 +1160,7 @@ const V4_STATE_VIEW_ABI = [
     type: 'function',
     stateMutability: 'view',
     inputs: [
-      {
-        name: 'poolKey',
-        type: 'tuple',
-        components: [
-          { name: 'currency0', type: 'address' },
-          { name: 'currency1', type: 'address' },
-          { name: 'fee', type: 'uint24' },
-          { name: 'tickSpacing', type: 'int24' },
-          { name: 'hooks', type: 'address' },
-        ],
-      },
+      { name: 'poolId', type: 'bytes32' },
     ],
     outputs: [
       { name: 'sqrtPriceX96', type: 'uint160' },
@@ -1212,7 +1200,7 @@ const V4_STATE_VIEW_ABI = [
 ] as const;
 
 const V3_FACTORY = '0x33128a8fC17869897dcE68Ed026d694621f6FDfD';
-const V4_STATE_VIEW = '0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6'; // Uniswap V4 StateView on Base
+const V4_STATE_VIEW = '0xa3c0c9b65bad0b08107aa264b0f3db444b867a71'; // Uniswap V4 StateView on Base
 
 // Helper to calculate V4 pool ID
 function calculateV4PoolId(
@@ -1300,20 +1288,20 @@ async function fetchPoolSqrtPriceForRaw(
       console.warn(`[Positions] V3 pool not found for ${raw.token0Address}/${raw.token1Address} fee=${raw.fee}`);
       return null;
     } else if (raw.version === 'V4' && raw.fee !== undefined && raw.tickSpacing !== undefined && raw.hooks) {
-      // V4 - use StateView to get slot0
-      const poolKey = {
-        currency0: raw.token0Address as Address,
-        currency1: raw.token1Address as Address,
-        fee: raw.fee,
-        tickSpacing: raw.tickSpacing,
-        hooks: raw.hooks as Address,
-      };
+      // V4 - use StateView to get slot0 (requires poolId, not poolKey)
+      const poolId = calculateV4PoolId(
+        raw.token0Address,
+        raw.token1Address,
+        raw.fee,
+        raw.tickSpacing,
+        raw.hooks
+      );
 
       const slot0 = await client.readContract({
         address: V4_STATE_VIEW as Address,
         abi: V4_STATE_VIEW_ABI,
         functionName: 'getSlot0',
-        args: [poolKey],
+        args: [poolId],
       });
 
       return {
