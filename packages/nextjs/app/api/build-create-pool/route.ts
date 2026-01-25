@@ -11,7 +11,9 @@ import {
   checkV4PoolExists,
   FEE_TO_TICK_SPACING,
   setAlchemyKey,
+  getTokenMetadata,
 } from '@arbme/core-lib'
+import { parseUnits } from 'viem'
 
 const ALCHEMY_KEY = process.env.ALCHEMY_API_KEY
 
@@ -53,13 +55,23 @@ export async function POST(request: NextRequest) {
     const versionLower = version.toLowerCase()
     const transactions: Array<{ to: string; data: string; value: string; description: string }> = []
 
+    // Fetch token decimals and convert amounts to wei
+    const [token0Metadata, token1Metadata] = await Promise.all([
+      getTokenMetadata(token0, ALCHEMY_KEY),
+      getTokenMetadata(token1, ALCHEMY_KEY),
+    ])
+
+    // Convert decimal amounts to wei strings
+    const amount0Wei = parseUnits(String(amount0), token0Metadata.decimals).toString()
+    const amount1Wei = parseUnits(String(amount1), token1Metadata.decimals).toString()
+
     if (versionLower === 'v2') {
       // V2: Single transaction to add liquidity (creates pool if doesn't exist)
       const tx = buildV2CreatePoolTransaction({
         tokenA: token0,
         tokenB: token1,
-        amountA: amount0,
-        amountB: amount1,
+        amountA: amount0Wei,
+        amountB: amount1Wei,
         recipient,
         slippageTolerance: slippageTolerance || 0.5,
       })
@@ -99,8 +111,8 @@ export async function POST(request: NextRequest) {
 
       // Adjust amounts based on token order
       const isSwapped = sortedToken0.toLowerCase() !== token0.toLowerCase()
-      const sortedAmount0 = isSwapped ? amount1 : amount0
-      const sortedAmount1 = isSwapped ? amount0 : amount1
+      const sortedAmount0 = isSwapped ? amount1Wei : amount0Wei
+      const sortedAmount1 = isSwapped ? amount0Wei : amount1Wei
 
       const params = {
         token0: sortedToken0,
@@ -170,16 +182,16 @@ export async function POST(request: NextRequest) {
 
       // Adjust amounts based on token order
       const isSwapped = sortedToken0.toLowerCase() !== token0.toLowerCase()
-      const sortedAmount0 = isSwapped ? amount1 : amount0
-      const sortedAmount1 = isSwapped ? amount0 : amount1
+      const sortedAmount0V4 = isSwapped ? amount1Wei : amount0Wei
+      const sortedAmount1V4 = isSwapped ? amount0Wei : amount1Wei
 
       const params = {
         token0: sortedToken0,
         token1: sortedToken1,
         fee,
         sqrtPriceX96,
-        amount0: sortedAmount0,
-        amount1: sortedAmount1,
+        amount0: sortedAmount0V4,
+        amount1: sortedAmount1V4,
         recipient,
         slippageTolerance: slippageTolerance || 0.5,
       }

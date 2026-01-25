@@ -3117,3 +3117,432 @@ button.button-primary:hover {
     display: none;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   STEP INDICATOR STYLES
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.step-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--spacing-xl);
+  padding: var(--spacing-md) 0;
+}
+
+.step-item-wrapper {
+  display: flex;
+  align-items: center;
+}
+
+.step-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.step-circle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  border: 2px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  transition: all 0.3s ease;
+}
+
+.step-item.active .step-circle {
+  background: var(--accent-glow);
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 15px var(--accent-glow);
+}
+
+.step-item.completed .step-circle {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #000;
+}
+
+.step-number {
+  font-family: var(--font-mono);
+}
+
+.step-check {
+  font-size: 1rem;
+}
+
+.step-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-align: center;
+  max-width: 70px;
+  transition: color 0.3s ease;
+}
+
+.step-item.active .step-label {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.step-item.completed .step-label {
+  color: var(--text-secondary);
+}
+
+.step-connector {
+  width: 40px;
+  height: 2px;
+  background: var(--border);
+  margin: 0 var(--spacing-sm);
+  margin-bottom: 20px;
+  transition: background 0.3s ease;
+}
+
+.step-connector.completed {
+  background: var(--accent);
+}
+
+@media (max-width: 480px) {
+  .step-connector {
+    width: 24px;
+  }
+
+  .step-circle {
+    width: 32px;
+    height: 32px;
+    font-size: 0.8125rem;
+  }
+
+  .step-label {
+    font-size: 0.6875rem;
+    max-width: 60px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   MULTI-STEP FORM STYLES
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.step-content {
+  animation: stepFadeIn 0.3s ease-out;
+}
+
+@keyframes stepFadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.step-navigation {
+  display: flex;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-xl);
+  padding-top: var(--spacing-lg);
+  border-top: 1px solid var(--border);
+}
+
+.step-navigation button {
+  flex: 1;
+}
+
+.btn-back {
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.btn-back:hover:not(:disabled) {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-color: var(--border-active);
+}
+
+.btn-next {
+  background: var(--accent);
+  color: #000;
+  font-weight: 600;
+}
+
+.btn-next:hover:not(:disabled) {
+  background: var(--accent-dim);
+}
+
+.btn-next:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Summary Card Styles */
+.summary-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
+}
+
+.summary-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--spacing-md);
+  padding-bottom: var(--spacing-sm);
+  border-bottom: 1px solid var(--border);
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-sm) 0;
+}
+
+.summary-row:not(:last-child) {
+  border-bottom: 1px solid rgba(0, 59, 0, 0.5);
+}
+
+.summary-label {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.summary-value {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+.summary-value.accent {
+  color: var(--accent);
+}
+
+/* Approval Section Styles */
+.approval-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
+}
+
+.approval-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--spacing-md);
+}
+
+.approval-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-md);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--spacing-sm);
+}
+
+.approval-item:last-child {
+  margin-bottom: 0;
+}
+
+.approval-token {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.approval-token-symbol {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.approval-status {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.approval-check {
+  color: var(--positive);
+  font-size: 1.25rem;
+}
+
+.approval-text {
+  font-size: 0.875rem;
+  color: var(--positive);
+}
+
+.approval-btn {
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--accent);
+  color: #000;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.approval-btn:hover:not(:disabled) {
+  background: var(--accent-dim);
+}
+
+.approval-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.approval-btn.pending {
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+/* Pool Info Banner */
+.pool-info-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.pool-info-icon {
+  font-size: 1.5rem;
+}
+
+.pool-info-content {
+  flex: 1;
+}
+
+.pool-info-pair {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.pool-info-status {
+  font-size: 0.875rem;
+  margin-top: var(--spacing-xs);
+}
+
+.pool-info-status.exists {
+  color: var(--positive);
+}
+
+.pool-info-status.new {
+  color: var(--warning);
+}
+
+.pool-info-price {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-top: var(--spacing-xs);
+}
+
+/* Success State */
+.success-state {
+  text-align: center;
+  padding: var(--spacing-xl);
+}
+
+.success-icon {
+  font-size: 4rem;
+  margin-bottom: var(--spacing-lg);
+  animation: successPop 0.5s ease-out;
+}
+
+@keyframes successPop {
+  0% {
+    transform: scale(0);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.success-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: var(--spacing-md);
+}
+
+.success-message {
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-xl);
+}
+
+.success-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+/* Current Price Display */
+.current-price-display {
+  padding: var(--spacing-md);
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.current-price-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: var(--spacing-xs);
+}
+
+.current-price-value {
+  font-size: 1rem;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--positive);
+}
+
+/* Input Prefix (for $ symbol) */
+.input-prefix {
+  position: absolute;
+  left: var(--spacing-md);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  font-size: 1.125rem;
+  font-family: var(--font-mono);
+  pointer-events: none;
+}
+
+.input-wrapper:has(.input-prefix) .amount-input {
+  padding-left: 2rem;
+}
+
+.input-hint {
+  font-size: 0.75rem;
+  font-weight: normal;
+}

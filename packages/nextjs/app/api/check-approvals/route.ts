@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getTokenAllowance } from '@arbme/core-lib'
+import { getTokenAllowance, setAlchemyKey } from '@arbme/core-lib'
 
 export async function POST(request: NextRequest) {
   try {
+    // Initialize Alchemy key for RPC calls
+    setAlchemyKey(process.env.ALCHEMY_API_KEY)
+
     const { token0, token1, owner, spender, amount0Required, amount1Required } = await request.json()
 
     if (!token0 || !token1 || !owner || !spender) {
@@ -29,8 +32,17 @@ export async function POST(request: NextRequest) {
       getTokenAllowance(token1, owner, spender),
     ])
 
-    const amount0Needed = BigInt(amount0Required || '0')
-    const amount1Needed = BigInt(amount1Required || '0')
+    // Safely parse amounts - handle strings, numbers, and potential decimals
+    const parseAmount = (val: any): bigint => {
+      if (!val) return 0n
+      const str = String(val)
+      // Remove any decimal portion (truncate to integer)
+      const intPart = str.split('.')[0]
+      return BigInt(intPart)
+    }
+
+    const amount0Needed = parseAmount(amount0Required)
+    const amount1Needed = parseAmount(amount1Required)
 
     const token0NeedsApproval = allowance0 < amount0Needed
     const token1NeedsApproval = allowance1 < amount1Needed

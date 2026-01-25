@@ -1,68 +1,33 @@
 /**
  * Wallet connection hook
- * Integrates with Farcaster SDK for wallet access
+ * Works with both Farcaster SDK and browser wallets (wagmi)
  */
 
 'use client';
 
-import { useEffect } from 'react';
-import { useAppState } from '../store/AppContext';
-import sdk from '@farcaster/miniapp-sdk';
+import { useWalletContext } from '@/components/WalletProvider';
 
-export function useWallet() {
-  const { state, setState } = useAppState();
+/**
+ * Get the connected wallet address
+ * Returns null if not connected
+ */
+export function useWallet(): string | null {
+  const { address } = useWalletContext();
+  return address;
+}
 
-  useEffect(() => {
-    async function loadWallet() {
-      try {
-        console.log('[useWallet] Getting Ethereum provider...');
+/**
+ * Check if wallet is connected
+ */
+export function useIsConnected(): boolean {
+  const { isConnected } = useWalletContext();
+  return isConnected;
+}
 
-        const provider = await sdk.wallet.getEthereumProvider();
-        if (!provider) {
-          console.log('[useWallet] No Ethereum provider available');
-          return;
-        }
-
-        console.log('[useWallet] Provider available, requesting accounts...');
-
-        // Try eth_accounts first (Farcaster miniapps have pre-authorized access)
-        let accounts: string[] = [];
-        try {
-          accounts = await provider.request({
-            method: 'eth_accounts'
-          }) as string[];
-
-          if (accounts && accounts.length > 0) {
-            console.log('[useWallet] Connected:', accounts[0]);
-            setState({ wallet: accounts[0] });
-            return;
-          }
-        } catch (err) {
-          console.log('[useWallet] eth_accounts failed:', err);
-        }
-
-        // Fallback: try eth_requestAccounts (for browser wallet connect)
-        try {
-          accounts = await provider.request({
-            method: 'eth_requestAccounts'
-          }) as string[];
-
-          if (accounts && accounts.length > 0) {
-            console.log('[useWallet] Connected via eth_requestAccounts:', accounts[0]);
-            setState({ wallet: accounts[0] });
-          }
-        } catch (err) {
-          console.log('[useWallet] eth_requestAccounts failed:', err);
-        }
-      } catch (error) {
-        console.error('[useWallet] Error getting wallet:', error);
-      }
-    }
-
-    if (!state.wallet) {
-      loadWallet();
-    }
-  }, [state.wallet, setState]);
-
-  return state.wallet;
+/**
+ * Check if running in Farcaster
+ */
+export function useIsFarcaster(): boolean {
+  const { isFarcaster } = useWalletContext();
+  return isFarcaster;
 }
