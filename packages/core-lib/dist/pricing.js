@@ -23,7 +23,18 @@ const PRICING_POOLS = [
 ];
 // Cache for discovered WETH pairs
 const wethPairCache = new Map();
+// Cache for token decimals
+const decimalsCache = new Map();
 // ABIs
+const ERC20_DECIMALS_ABI = [
+    {
+        name: 'decimals',
+        type: 'function',
+        stateMutability: 'view',
+        inputs: [],
+        outputs: [{ name: '', type: 'uint8' }],
+    },
+];
 const V2_PAIR_ABI = [
     {
         name: 'getReserves',
@@ -86,6 +97,42 @@ const V4_STATE_VIEW_ABI = [
 ];
 const V4_STATE_VIEW = '0xa3c0c9b65bad0b08107aa264b0f3db444b867a71'; // Uniswap V4 StateView on Base
 const WETH_ADDRESS = '0x4200000000000000000000000000000000000006';
+/**
+ * Get token decimals with caching
+ */
+async function getTokenDecimals(tokenAddress, alchemyKey) {
+    const normalized = tokenAddress.toLowerCase();
+    // WETH/ETH is always 18
+    if (normalized === WETH_ADDRESS.toLowerCase() || normalized === '0x0000000000000000000000000000000000000000') {
+        return 18;
+    }
+    // Check cache
+    if (decimalsCache.has(normalized)) {
+        return decimalsCache.get(normalized);
+    }
+    const rpcUrl = alchemyKey
+        ? `https://base-mainnet.g.alchemy.com/v2/${alchemyKey}`
+        : 'https://mainnet.base.org';
+    const client = createPublicClient({
+        chain: base,
+        transport: http(rpcUrl),
+    });
+    try {
+        const decimals = await client.readContract({
+            address: tokenAddress,
+            abi: ERC20_DECIMALS_ABI,
+            functionName: 'decimals',
+        });
+        const result = Number(decimals);
+        decimalsCache.set(normalized, result);
+        return result;
+    }
+    catch (error) {
+        console.warn(`[Pricing] Failed to get decimals for ${tokenAddress}, defaulting to 18`);
+        decimalsCache.set(normalized, 18);
+        return 18;
+    }
+}
 // Helper to calculate V4 pool ID from pool key
 function calculateV4PoolId(currency0, currency1, fee, tickSpacing, hooks) {
     const poolKeyEncoded = currency0.slice(2).toLowerCase().padStart(64, '0') +
@@ -319,7 +366,9 @@ export async function getTokenPriceOnChain(tokenAddress, decimals, wethPrice, al
     }
     const isToken0 = pool.token0.toLowerCase() === normalizedToken;
     const pairedToken = isToken0 ? pool.token1 : pool.token0;
-    const pairedTokenDecimals = 18; // Assume 18 for now, we'd need to fetch this properly
+    // Fetch actual decimals for the paired token (critical for correct price calculation)
+    const pairedTokenDecimals = await getTokenDecimals(pairedToken, alchemyKey);
+    console.log(`[Pricing] Token ${tokenAddress} paired with ${pairedToken} (${pairedTokenDecimals} decimals)`);
     // Fetch pool price
     const poolPrice = await fetchPoolPrice(pool, isToken0 ? decimals : pairedTokenDecimals, isToken0 ? pairedTokenDecimals : decimals, alchemyKey);
     if (poolPrice === 0) {
