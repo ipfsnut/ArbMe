@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { WagmiProvider, useAccount, useDisconnect } from 'wagmi'
+import { WagmiProvider, useAccount } from 'wagmi'
 import { RainbowKitProvider, ConnectButton, darkTheme } from '@rainbow-me/rainbowkit'
 import '@rainbow-me/rainbowkit/styles.css'
 import sdk from '@farcaster/miniapp-sdk'
@@ -33,15 +33,21 @@ export function useWalletContext() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Farcaster Wallet Provider
+// Inner Wallet Logic (runs inside WagmiProvider)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function FarcasterWalletProvider({ children }: { children: ReactNode }) {
-  const [address, setAddress] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+function WalletInner({ children, isFarcaster }: { children: ReactNode; isFarcaster: boolean }) {
+  const [farcasterAddress, setFarcasterAddress] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(isFarcaster)
 
+  // Get wagmi account (used in browser mode)
+  const { address: wagmiAddress, isConnected: wagmiConnected } = useAccount()
+
+  // Load Farcaster wallet if in Farcaster mode
   useEffect(() => {
-    async function loadWallet() {
+    if (!isFarcaster) return
+
+    async function loadFarcasterWallet() {
       try {
         console.log('[Wallet] Loading Farcaster wallet...')
         sdk.actions.ready()
@@ -59,7 +65,7 @@ function FarcasterWalletProvider({ children }: { children: ReactNode }) {
 
         if (accounts && accounts.length > 0) {
           console.log('[Wallet] Farcaster wallet:', accounts[0])
-          setAddress(accounts[0])
+          setFarcasterAddress(accounts[0])
         }
       } catch (error) {
         console.error('[Wallet] Farcaster error:', error)
@@ -68,14 +74,18 @@ function FarcasterWalletProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    loadWallet()
-  }, [])
+    loadFarcasterWallet()
+  }, [isFarcaster])
+
+  // Determine which address to use
+  const address = isFarcaster ? farcasterAddress : (wagmiAddress || null)
+  const isConnected = isFarcaster ? !!farcasterAddress : wagmiConnected
 
   return (
     <WalletContext.Provider value={{
       address,
-      isConnected: !!address,
-      isFarcaster: true,
+      isConnected,
+      isFarcaster,
       isLoading,
     }}>
       {children}
@@ -84,46 +94,8 @@ function FarcasterWalletProvider({ children }: { children: ReactNode }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Browser Wallet Provider (wagmi + RainbowKit)
-// ═══════════════════════════════════════════════════════════════════════════════
-
-function BrowserWalletInner({ children }: { children: ReactNode }) {
-  const { address, isConnected } = useAccount()
-
-  return (
-    <WalletContext.Provider value={{
-      address: address || null,
-      isConnected,
-      isFarcaster: false,
-      isLoading: false,
-    }}>
-      {children}
-    </WalletContext.Provider>
-  )
-}
-
-function BrowserWalletProvider({ children }: { children: ReactNode }) {
-  return (
-    <WagmiProvider config={wagmiConfig}>
-      <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider
-          theme={darkTheme({
-            accentColor: '#00d395',
-            accentColorForeground: 'black',
-            borderRadius: 'medium',
-          })}
-        >
-          <BrowserWalletInner>
-            {children}
-          </BrowserWalletInner>
-        </RainbowKitProvider>
-      </QueryClientProvider>
-    </WagmiProvider>
-  )
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
 // Main Wallet Provider
+// Always wraps in WagmiProvider so wagmi hooks work everywhere
 // ═══════════════════════════════════════════════════════════════════════════════
 
 interface WalletProviderProps {
@@ -160,7 +132,7 @@ export function WalletProvider({ children }: WalletProviderProps) {
     detectEnvironment()
   }, [])
 
-  // Still detecting
+  // Still detecting environment
   if (isFarcaster === null) {
     return (
       <div style={{
@@ -179,11 +151,24 @@ export function WalletProvider({ children }: WalletProviderProps) {
     )
   }
 
-  if (isFarcaster) {
-    return <FarcasterWalletProvider>{children}</FarcasterWalletProvider>
-  }
-
-  return <BrowserWalletProvider>{children}</BrowserWalletProvider>
+  // Always wrap in WagmiProvider so wagmi hooks work in both environments
+  return (
+    <WagmiProvider config={wagmiConfig}>
+      <QueryClientProvider client={queryClient}>
+        <RainbowKitProvider
+          theme={darkTheme({
+            accentColor: '#00d395',
+            accentColorForeground: 'black',
+            borderRadius: 'medium',
+          })}
+        >
+          <WalletInner isFarcaster={isFarcaster}>
+            {children}
+          </WalletInner>
+        </RainbowKitProvider>
+      </QueryClientProvider>
+    </WagmiProvider>
+  )
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
