@@ -14,9 +14,10 @@ interface RacePool {
   token1: { symbol: string; address: string }
   fee: number
   volume24h: number
-  tvlUsd: number
-  poolAddress: string | null
+  swapCount24h: number
+  poolId: string
   rank: number
+  volumeSource: 'on-chain' | 'gecko' | 'unavailable'
 }
 
 interface RaceData {
@@ -24,6 +25,7 @@ interface RaceData {
   raceEndTime: number
   lastUpdated: number
   metric: string
+  source: string
 }
 
 function formatTimeRemaining(ms: number): { days: number; hours: number; minutes: number; seconds: number } {
@@ -223,9 +225,15 @@ export default function TheGreat20RacePage() {
                     </span>
                   </div>
 
-                  <div className="leaderboard-volume">
-                    <span className="volume-value">{formatUsd(pool.volume24h)}</span>
-                    <span className="volume-label">24h Vol</span>
+                  <div className="leaderboard-stats">
+                    <div className="leaderboard-volume">
+                      <span className="volume-value">{formatUsd(pool.volume24h)}</span>
+                      <span className="volume-label">24h Vol</span>
+                    </div>
+                    <div className="leaderboard-swaps">
+                      <span className="swaps-value">{pool.swapCount24h || 0}</span>
+                      <span className="swaps-label">swaps</span>
+                    </div>
                   </div>
 
                   <a
@@ -243,6 +251,9 @@ export default function TheGreat20RacePage() {
             {raceData.lastUpdated && (
               <div className="last-updated">
                 Last updated: {new Date(raceData.lastUpdated).toLocaleTimeString()}
+                {raceData.source === 'on-chain' && (
+                  <span className="data-source"> • On-chain V4 data</span>
+                )}
               </div>
             )}
           </div>
@@ -461,6 +472,12 @@ export default function TheGreat20RacePage() {
           color: var(--muted);
         }
 
+        .leaderboard-stats {
+          display: flex;
+          gap: 1rem;
+          align-items: center;
+        }
+
         .leaderboard-volume {
           display: flex;
           flex-direction: column;
@@ -476,6 +493,28 @@ export default function TheGreat20RacePage() {
 
         .volume-label {
           font-size: 0.625rem;
+          color: var(--muted);
+          text-transform: uppercase;
+        }
+
+        .leaderboard-swaps {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 0.125rem;
+          padding: 0.25rem 0.5rem;
+          background: rgba(99, 102, 241, 0.1);
+          border-radius: 0.5rem;
+        }
+
+        .swaps-value {
+          font-weight: 700;
+          font-size: 1rem;
+          color: var(--primary);
+        }
+
+        .swaps-label {
+          font-size: 0.5rem;
           color: var(--muted);
           text-transform: uppercase;
         }
@@ -496,6 +535,11 @@ export default function TheGreat20RacePage() {
           color: var(--muted);
           text-align: center;
           margin-top: 1rem;
+        }
+
+        .data-source {
+          color: var(--positive);
+          font-weight: 500;
         }
 
         .race-prize-info,

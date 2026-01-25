@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
-import { createPublicClient, http, Address } from 'viem'
+import { createPublicClient, http, Address, keccak256, parseAbiItem, formatUnits } from 'viem'
 import { base } from 'viem/chains'
 
 const ALCHEMY_KEY = process.env.ALCHEMY_API_KEY
 
-// V4 Position Manager on Base
+// V4 contracts on Base
 const V4_POSITION_MANAGER = '0x7c5f5a4bbd8fd63184577525326123b519429bdc'
+const V4_POOL_MANAGER = '0x498581ff718922c3f8e6a244956af099b2652b2b'
 
 // The 8 competing position IDs
 const RACE_POSITION_IDS = [
@@ -21,6 +22,12 @@ const RACE_POSITION_IDS = [
 
 // Race end time: Midnight UTC, Saturday Feb 1, 2026
 const RACE_END_TIME = new Date('2026-02-01T00:00:00Z').getTime()
+
+// 24 hours in milliseconds
+const DAY_MS = 24 * 60 * 60 * 1000
+
+// Base block time is ~2 seconds, so ~43200 blocks per day
+const BLOCKS_PER_DAY = 43200
 
 const V4_NFT_ABI = [
   {
@@ -53,27 +60,60 @@ const ERC20_ABI = [
     inputs: [],
     outputs: [{ name: '', type: 'string' }],
   },
+  {
+    name: 'decimals',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint8' }],
+  },
 ] as const
+
+// V4 Swap event: Swap(bytes32 indexed id, address indexed sender, int128 amount0, int128 amount1, uint160 sqrtPriceX96, uint128 liquidity, int24 tick, uint24 fee)
+const SWAP_EVENT = parseAbiItem(
+  'event Swap(bytes32 indexed id, address indexed sender, int128 amount0, int128 amount1, uint160 sqrtPriceX96, uint128 liquidity, int24 tick, uint24 fee)'
+)
+
+interface PoolKey {
+  currency0: string
+  currency1: string
+  fee: number
+  tickSpacing: number
+  hooks: string
+}
 
 interface RacePool {
   positionId: string
-  token0: { symbol: string; address: string }
-  token1: { symbol: string; address: string }
+  token0: { symbol: string; address: string; decimals: number }
+  token1: { symbol: string; address: string; decimals: number }
   fee: number
   volume24h: number
-  tvlUsd: number
-  poolAddress: string | null
+  swapCount24h: number
+  poolId: string
   rank: number
+  volumeSource: 'on-chain' | 'gecko' | 'unavailable'
 }
 
-interface GeckoPool {
-  address: string
-  name: string
-  volume24h: number
-  tvlUsd: number
-  fee: number
+// Token price cache
+const priceCache = new Map<string, number>()
+
+/**
+ * Calculate V4 pool ID from pool key
+ */
+function calculatePoolId(poolKey: PoolKey): `0x${string}` {
+  const encoded =
+    poolKey.currency0.slice(2).toLowerCase().padStart(64, '0') +
+    poolKey.currency1.slice(2).toLowerCase().padStart(64, '0') +
+    poolKey.fee.toString(16).padStart(64, '0') +
+    poolKey.tickSpacing.toString(16).padStart(64, '0') +
+    poolKey.hooks.slice(2).toLowerCase().padStart(64, '0')
+
+  return keccak256(`0x${encoded}` as `0x${string}`)
 }
 
+/**
+ * Get token symbol
+ */
 async function getTokenSymbol(client: any, address: string): Promise<string> {
   if (address === '0x0000000000000000000000000000000000000000') {
     return 'ETH'
@@ -91,100 +131,243 @@ async function getTokenSymbol(client: any, address: string): Promise<string> {
 }
 
 /**
- * Search GeckoTerminal for pools containing both tokens
- * Returns the best matching pool (by fee tier if possible)
+ * Get token decimals
  */
-async function findPoolOnGeckoTerminal(
-  token0: string,
-  token1: string,
-  targetFee: number
-): Promise<GeckoPool | null> {
+async function getTokenDecimals(client: any, address: string): Promise<number> {
+  if (address === '0x0000000000000000000000000000000000000000') {
+    return 18 // ETH
+  }
   try {
-    // Search by the first token to find all its pools
+    const decimals = await client.readContract({
+      address: address as Address,
+      abi: ERC20_ABI,
+      functionName: 'decimals',
+    })
+    return Number(decimals)
+  } catch {
+    return 18
+  }
+}
+
+/**
+ * Get token USD price from GeckoTerminal
+ */
+async function getTokenPrice(tokenAddress: string): Promise<number> {
+  const normalized = tokenAddress.toLowerCase()
+
+  // Use WETH for native ETH
+  const lookupAddress = normalized === '0x0000000000000000000000000000000000000000'
+    ? '0x4200000000000000000000000000000000000006'
+    : normalized
+
+  // Check cache
+  if (priceCache.has(lookupAddress)) {
+    return priceCache.get(lookupAddress)!
+  }
+
+  try {
+    const url = `https://api.geckoterminal.com/api/v2/simple/networks/base/token_price/${lookupAddress}`
+    const res = await fetch(url, { next: { revalidate: 60 } })
+
+    if (!res.ok) {
+      console.log(`[Price] Failed to fetch price for ${lookupAddress}: ${res.status}`)
+      return 0
+    }
+
+    const data = await res.json() as any
+    const price = parseFloat(data?.data?.attributes?.token_prices?.[lookupAddress] || '0')
+
+    priceCache.set(lookupAddress, price)
+    return price
+  } catch (error) {
+    console.error(`[Price] Error fetching price for ${tokenAddress}:`, error)
+    return 0
+  }
+}
+
+/**
+ * Fallback: Get volume from GeckoTerminal (returns V3 pool volume for the token pair)
+ */
+async function getGeckoTerminalVolume(
+  token0: string,
+  token1: string
+): Promise<{ volume: number; source: 'gecko' }> {
+  try {
     const searchToken = token0 === '0x0000000000000000000000000000000000000000'
-      ? '0x4200000000000000000000000000000000000006' // Use WETH for native ETH
+      ? '0x4200000000000000000000000000000000000006'
       : token0
 
     const url = `https://api.geckoterminal.com/api/v2/networks/base/tokens/${searchToken}/pools?page=1`
     const res = await fetch(url, { next: { revalidate: 60 } })
 
-    if (!res.ok) {
-      console.log(`[GeckoTerminal] Failed to fetch pools for ${searchToken}: ${res.status}`)
-      return null
-    }
+    if (!res.ok) return { volume: 0, source: 'gecko' }
 
     const data = await res.json() as any
     const pools = data?.data || []
 
-    // Normalize token1 for comparison (handle native ETH)
     const normalizedToken1 = token1 === '0x0000000000000000000000000000000000000000'
       ? '0x4200000000000000000000000000000000000006'.toLowerCase()
       : token1.toLowerCase()
 
-    // Find pools that contain both tokens
-    const matchingPools: GeckoPool[] = []
-
+    // Find pools with both tokens
     for (const pool of pools) {
-      const attrs = pool.attributes
       const relationships = pool.relationships
-
-      // Extract token addresses from relationships
       const baseTokenId = relationships?.base_token?.data?.id || ''
       const quoteTokenId = relationships?.quote_token?.data?.id || ''
-
-      // GeckoTerminal uses format "base_0xaddress"
       const baseToken = baseTokenId.split('_')[1]?.toLowerCase() || ''
       const quoteToken = quoteTokenId.split('_')[1]?.toLowerCase() || ''
 
-      // Check if this pool contains our second token
-      const hasToken1 = baseToken === normalizedToken1 || quoteToken === normalizedToken1
-
-      if (hasToken1) {
-        // Parse fee from pool name (e.g., "TOKEN0 / TOKEN1 0.3%")
-        const feeMatch = attrs.name?.match(/(\d+\.?\d*)%/)
-        const poolFee = feeMatch ? parseFloat(feeMatch[1]) * 10000 : 0 // Convert to basis points
-
-        matchingPools.push({
-          address: attrs.address,
-          name: attrs.name,
-          volume24h: parseFloat(attrs.volume_usd?.h24 || '0'),
-          tvlUsd: parseFloat(attrs.reserve_in_usd || '0'),
-          fee: poolFee,
-        })
+      if (baseToken === normalizedToken1 || quoteToken === normalizedToken1) {
+        const volume = parseFloat(pool.attributes?.volume_usd?.h24 || '0')
+        return { volume, source: 'gecko' }
       }
     }
 
-    if (matchingPools.length === 0) {
-      console.log(`[GeckoTerminal] No matching pools found for ${token0}/${token1}`)
-      return null
+    return { volume: 0, source: 'gecko' }
+  } catch {
+    return { volume: 0, source: 'gecko' }
+  }
+}
+
+// Alchemy free tier limits to 10 blocks per request, so we batch
+const BLOCKS_PER_BATCH = 2000 // Most RPCs allow 2000 blocks
+
+/**
+ * Fetch V4 swap events for a pool and calculate 24h volume in USD
+ * Uses batched requests to work around RPC limitations
+ */
+async function getPoolVolume24h(
+  client: any,
+  poolId: `0x${string}`,
+  token0: { address: string; decimals: number },
+  token1: { address: string; decimals: number }
+): Promise<{ volumeUsd: number; swapCount: number }> {
+  try {
+    const currentBlock = await client.getBlockNumber()
+    const targetFromBlock = currentBlock - BigInt(BLOCKS_PER_DAY)
+
+    console.log(`[Volume] Fetching swaps for pool ${poolId.slice(0, 10)}... from block ${targetFromBlock}`)
+
+    // Fetch swap events in batches
+    const allLogs: any[] = []
+    let fromBlock = targetFromBlock
+
+    while (fromBlock < currentBlock) {
+      const toBlock = fromBlock + BigInt(BLOCKS_PER_BATCH) > currentBlock
+        ? currentBlock
+        : fromBlock + BigInt(BLOCKS_PER_BATCH)
+
+      try {
+        const logs = await client.getLogs({
+          address: V4_POOL_MANAGER as Address,
+          event: SWAP_EVENT,
+          args: {
+            id: poolId,
+          },
+          fromBlock,
+          toBlock,
+        })
+        allLogs.push(...logs)
+      } catch (batchError: any) {
+        // If batch is too large, try smaller batches
+        if (batchError.details?.includes('block range')) {
+          console.log(`[Volume] Batch too large, trying smaller range...`)
+          // Try with 10 block range (Alchemy free tier)
+          const smallerBatchSize = 10n
+          let smallFrom = fromBlock
+          while (smallFrom < toBlock) {
+            const smallTo = smallFrom + smallerBatchSize > toBlock
+              ? toBlock
+              : smallFrom + smallerBatchSize
+            try {
+              const logs = await client.getLogs({
+                address: V4_POOL_MANAGER as Address,
+                event: SWAP_EVENT,
+                args: { id: poolId },
+                fromBlock: smallFrom,
+                toBlock: smallTo,
+              })
+              allLogs.push(...logs)
+            } catch {
+              // Skip failed batch
+            }
+            smallFrom = smallTo + 1n
+          }
+        }
+      }
+
+      fromBlock = toBlock + 1n
     }
 
-    // Try to find pool with matching fee tier
-    const exactFeeMatch = matchingPools.find(p => Math.abs(p.fee - targetFee) < 100)
-    if (exactFeeMatch) {
-      console.log(`[GeckoTerminal] Found exact fee match: ${exactFeeMatch.name}`)
-      return exactFeeMatch
+    console.log(`[Volume] Found ${allLogs.length} swaps for pool ${poolId.slice(0, 10)}...`)
+
+    if (allLogs.length === 0) {
+      return { volumeUsd: 0, swapCount: 0 }
     }
 
-    // Otherwise return the highest volume pool
-    matchingPools.sort((a, b) => b.volume24h - a.volume24h)
-    console.log(`[GeckoTerminal] Using highest volume pool: ${matchingPools[0].name}`)
-    return matchingPools[0]
+    // Get token prices
+    const [price0, price1] = await Promise.all([
+      getTokenPrice(token0.address),
+      getTokenPrice(token1.address),
+    ])
+
+    console.log(`[Volume] Prices: token0=$${price0}, token1=$${price1}`)
+
+    // Calculate total volume
+    let totalVolumeUsd = 0
+
+    for (const log of allLogs) {
+      const { amount0, amount1 } = log.args as { amount0: bigint; amount1: bigint }
+
+      // Use absolute values - swap amounts are signed (negative = out, positive = in)
+      const absAmount0 = amount0 < 0n ? -amount0 : amount0
+      const absAmount1 = amount1 < 0n ? -amount1 : amount1
+
+      // Convert to human-readable amounts
+      const humanAmount0 = parseFloat(formatUnits(absAmount0, token0.decimals))
+      const humanAmount1 = parseFloat(formatUnits(absAmount1, token1.decimals))
+
+      // Calculate USD volume (use the token with a valid price, or average if both have prices)
+      let swapVolumeUsd = 0
+      if (price0 > 0 && price1 > 0) {
+        // Use average of both sides
+        swapVolumeUsd = (humanAmount0 * price0 + humanAmount1 * price1) / 2
+      } else if (price0 > 0) {
+        swapVolumeUsd = humanAmount0 * price0
+      } else if (price1 > 0) {
+        swapVolumeUsd = humanAmount1 * price1
+      }
+
+      totalVolumeUsd += swapVolumeUsd
+    }
+
+    return { volumeUsd: totalVolumeUsd, swapCount: allLogs.length }
   } catch (error) {
-    console.error(`[GeckoTerminal] Error searching for pool:`, error)
-    return null
+    console.error(`[Volume] Error fetching volume for pool ${poolId}:`, error)
+    return { volumeUsd: 0, swapCount: 0 }
   }
 }
 
 export async function GET() {
   try {
-    const rpcUrl = ALCHEMY_KEY
+    // Use public Base RPC for getLogs (supports larger block ranges than Alchemy free tier)
+    // Alchemy is used for contract reads
+    const alchemyUrl = ALCHEMY_KEY
       ? `https://base-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`
       : 'https://mainnet.base.org'
 
+    // Public Base RPC for log queries
+    const publicRpcUrl = 'https://mainnet.base.org'
+
     const client = createPublicClient({
       chain: base,
-      transport: http(rpcUrl),
+      transport: http(alchemyUrl),
+    })
+
+    // Separate client for logs with public RPC
+    const logsClient = createPublicClient({
+      chain: base,
+      transport: http(publicRpcUrl),
     })
 
     const pools: RacePool[] = []
@@ -200,47 +383,83 @@ export async function GET() {
           args: [BigInt(positionId)],
         })
 
-        const { currency0, currency1, fee } = poolKey as any
+        const { currency0, currency1, fee, tickSpacing, hooks } = poolKey as any
 
-        // Get token symbols
-        const [symbol0, symbol1] = await Promise.all([
-          getTokenSymbol(client, currency0),
-          getTokenSymbol(client, currency1),
-        ])
-
-        // Search GeckoTerminal for this pool to get volume
-        const geckoPool = await findPoolOnGeckoTerminal(
+        // Calculate pool ID
+        const poolId = calculatePoolId({
           currency0,
           currency1,
-          Number(fee)
-        )
+          fee: Number(fee),
+          tickSpacing: Number(tickSpacing),
+          hooks,
+        })
+
+        // Get token info
+        const [symbol0, symbol1, decimals0, decimals1] = await Promise.all([
+          getTokenSymbol(client, currency0),
+          getTokenSymbol(client, currency1),
+          getTokenDecimals(client, currency0),
+          getTokenDecimals(client, currency1),
+        ])
+
+        // Try on-chain volume first, fall back to GeckoTerminal
+        let volumeUsd = 0
+        let swapCount = 0
+        let volumeSource: 'on-chain' | 'gecko' | 'unavailable' = 'unavailable'
+
+        try {
+          const onChainResult = await getPoolVolume24h(
+            logsClient,
+            poolId,
+            { address: currency0, decimals: decimals0 },
+            { address: currency1, decimals: decimals1 }
+          )
+          volumeUsd = onChainResult.volumeUsd
+          swapCount = onChainResult.swapCount
+          volumeSource = 'on-chain'
+          console.log(`[Race] ${symbol0}/${symbol1}: $${volumeUsd.toFixed(2)} (${swapCount} swaps) [on-chain]`)
+        } catch (onChainError) {
+          console.log(`[Race] On-chain failed for ${symbol0}/${symbol1}, trying GeckoTerminal...`)
+          // Fallback to GeckoTerminal
+          const geckoResult = await getGeckoTerminalVolume(currency0, currency1)
+          volumeUsd = geckoResult.volume
+          volumeSource = 'gecko'
+          console.log(`[Race] ${symbol0}/${symbol1}: $${volumeUsd.toFixed(2)} [gecko fallback]`)
+        }
 
         pools.push({
           positionId,
-          token0: { symbol: symbol0, address: currency0 },
-          token1: { symbol: symbol1, address: currency1 },
+          token0: { symbol: symbol0, address: currency0, decimals: decimals0 },
+          token1: { symbol: symbol1, address: currency1, decimals: decimals1 },
           fee: Number(fee),
-          volume24h: geckoPool?.volume24h || 0,
-          tvlUsd: geckoPool?.tvlUsd || 0,
-          poolAddress: geckoPool?.address || null,
+          volume24h: volumeUsd,
+          swapCount24h: swapCount,
+          poolId,
           rank: 0,
+          volumeSource,
         })
       } catch (err) {
         console.error(`Failed to fetch position ${positionId}:`, err)
       }
     }
 
-    // Sort by 24h volume (primary metric for the race!) and assign ranks
+    // Sort by 24h volume and assign ranks
     pools.sort((a, b) => b.volume24h - a.volume24h)
     pools.forEach((pool, index) => {
       pool.rank = index + 1
     })
 
+    // Determine overall source
+    const onChainCount = pools.filter(p => p.volumeSource === 'on-chain').length
+    const source = onChainCount === pools.length ? 'on-chain' :
+                   onChainCount > 0 ? 'mixed' : 'gecko'
+
     return NextResponse.json({
       pools,
       raceEndTime: RACE_END_TIME,
       lastUpdated: Date.now(),
-      metric: 'volume24h', // Indicate what we're ranking by
+      metric: 'volume24h',
+      source,
     })
   } catch (error: any) {
     console.error('[race-pools] Error:', error)
