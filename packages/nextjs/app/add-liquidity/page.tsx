@@ -633,7 +633,7 @@ export default function AddLiquidityPage() {
           <button
             className="btn-next"
             onClick={() => goToStep(2)}
-            disabled={!isStep1Valid || checkingPool}
+            disabled={!isStep1Valid}
           >
             Next
           </button>
