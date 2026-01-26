@@ -3,6 +3,7 @@
  * Handles Uniswap V2/V3/V4 pool creation and liquidity provision
  */
 import { FEE_TO_TICK_SPACING, BASE_RPCS_FALLBACK } from './constants.js';
+import { keccak256 } from 'viem';
 // ═══════════════════════════════════════════════════════════════════════════════
 // Contract Constants
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -252,8 +253,7 @@ export async function checkV4PoolExists(token0, token1, fee, tickSpacing) {
         fee.toString(16).padStart(64, '0') +
         tickSpacing.toString(16).padStart(64, '0') +
         '0000000000000000000000000000000000000000000000000000000000000000'; // hooks = 0x0
-    // Manual keccak256 using Web Crypto API is not available, so we use viem
-    const { keccak256 } = await import('viem');
+    // Calculate poolId hash
     const poolId = keccak256(`0x${poolKeyEncoded}`);
     // getSlot0(bytes32) selector: 0x98e5b12a
     const data = '0x98e5b12a' + poolId.slice(2);

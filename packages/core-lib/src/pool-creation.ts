@@ -4,6 +4,7 @@
  */
 
 import { FEE_TO_TICK_SPACING, BASE_RPCS_FALLBACK, RPC_TIMEOUT } from './constants.js';
+import { keccak256 } from 'viem';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types
@@ -357,8 +358,7 @@ export async function checkV4PoolExists(
     tickSpacing.toString(16).padStart(64, '0') +
     '0000000000000000000000000000000000000000000000000000000000000000'; // hooks = 0x0
 
-  // Manual keccak256 using Web Crypto API is not available, so we use viem
-  const { keccak256 } = await import('viem');
+  // Calculate poolId hash
   const poolId = keccak256(`0x${poolKeyEncoded}` as `0x${string}`);
 
   // getSlot0(bytes32) selector: 0x98e5b12a
