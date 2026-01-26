@@ -100,17 +100,45 @@ export async function POST(request: NextRequest) {
 
       // Sort tokens
       const [sortedToken0, sortedToken1] = sortTokens(token0, token1)
+      const isSwapped = sortedToken0.toLowerCase() !== token0.toLowerCase()
 
-      // Calculate sqrtPriceX96 from price
-      const sqrtPriceX96 = price
-        ? calculateSqrtPriceX96(Number(price))
-        : calculateSqrtPriceX96(Number(amount1) / Number(amount0))
+      // Calculate sqrtPriceX96 from price, adjusted for decimals
+      // sqrtPriceX96 expects: token1_raw / token0_raw (where token0 < token1 lexicographically)
+      // Frontend sends: price = token0UsdPrice / token1UsdPrice
+      // Formula: adjustedPrice = 10^(sorted_token1_dec - sorted_token0_dec) * sorted_token0_usd / sorted_token1_usd
+      let adjustedPrice: number
+      if (price) {
+        if (isSwapped) {
+          // sorted_token0 = original_token1, sorted_token1 = original_token0
+          adjustedPrice = Math.pow(10, token0Metadata.decimals - token1Metadata.decimals) / Number(price)
+        } else {
+          // sorted_token0 = original_token0, sorted_token1 = original_token1
+          adjustedPrice = Math.pow(10, token1Metadata.decimals - token0Metadata.decimals) * Number(price)
+        }
+      } else {
+        // Fallback: calculate from amounts (already in human-readable form)
+        const priceFromAmounts = Number(amount1) / Number(amount0)
+        if (isSwapped) {
+          adjustedPrice = Math.pow(10, token0Metadata.decimals - token1Metadata.decimals) / priceFromAmounts
+        } else {
+          adjustedPrice = Math.pow(10, token1Metadata.decimals - token0Metadata.decimals) * priceFromAmounts
+        }
+      }
+
+      console.log('[build-create-pool] V3 price calculation:', {
+        originalPrice: price,
+        isSwapped,
+        token0Decimals: token0Metadata.decimals,
+        token1Decimals: token1Metadata.decimals,
+        adjustedPrice,
+      })
+
+      const sqrtPriceX96 = calculateSqrtPriceX96(adjustedPrice)
 
       // Check if pool exists
       const poolCheck = await checkV3PoolExists(sortedToken0, sortedToken1, fee)
 
-      // Adjust amounts based on token order
-      const isSwapped = sortedToken0.toLowerCase() !== token0.toLowerCase()
+      // Adjust amounts based on token order (isSwapped already calculated above)
       const sortedAmount0 = isSwapped ? amount1Wei : amount0Wei
       const sortedAmount1 = isSwapped ? amount0Wei : amount1Wei
 
@@ -171,17 +199,44 @@ export async function POST(request: NextRequest) {
 
       // Sort tokens
       const [sortedToken0, sortedToken1] = sortTokens(token0, token1)
+      const isSwapped = sortedToken0.toLowerCase() !== token0.toLowerCase()
 
-      // Calculate sqrtPriceX96 from price
-      const sqrtPriceX96 = price
-        ? calculateSqrtPriceX96(Number(price))
-        : calculateSqrtPriceX96(Number(amount1) / Number(amount0))
+      // Calculate sqrtPriceX96 from price, adjusted for decimals
+      // sqrtPriceX96 expects: token1_raw / token0_raw (where token0 < token1 lexicographically)
+      // Frontend sends: price = token0UsdPrice / token1UsdPrice
+      let adjustedPriceV4: number
+      if (price) {
+        if (isSwapped) {
+          // sorted_token0 = original_token1, sorted_token1 = original_token0
+          adjustedPriceV4 = Math.pow(10, token0Metadata.decimals - token1Metadata.decimals) / Number(price)
+        } else {
+          // sorted_token0 = original_token0, sorted_token1 = original_token1
+          adjustedPriceV4 = Math.pow(10, token1Metadata.decimals - token0Metadata.decimals) * Number(price)
+        }
+      } else {
+        // Fallback: calculate from amounts (already in human-readable form)
+        const priceFromAmounts = Number(amount1) / Number(amount0)
+        if (isSwapped) {
+          adjustedPriceV4 = Math.pow(10, token0Metadata.decimals - token1Metadata.decimals) / priceFromAmounts
+        } else {
+          adjustedPriceV4 = Math.pow(10, token1Metadata.decimals - token0Metadata.decimals) * priceFromAmounts
+        }
+      }
+
+      console.log('[build-create-pool] V4 price calculation:', {
+        originalPrice: price,
+        isSwapped,
+        token0Decimals: token0Metadata.decimals,
+        token1Decimals: token1Metadata.decimals,
+        adjustedPrice: adjustedPriceV4,
+      })
+
+      const sqrtPriceX96 = calculateSqrtPriceX96(adjustedPriceV4)
 
       // Check if pool exists
       const poolCheck = await checkV4PoolExists(sortedToken0, sortedToken1, fee, tickSpacing)
 
       // Adjust amounts based on token order
-      const isSwapped = sortedToken0.toLowerCase() !== token0.toLowerCase()
       const sortedAmount0V4 = isSwapped ? amount1Wei : amount0Wei
       const sortedAmount1V4 = isSwapped ? amount0Wei : amount1Wei
 
