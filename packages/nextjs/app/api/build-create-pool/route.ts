@@ -407,7 +407,8 @@ export async function POST(request: NextRequest) {
             console.error('[build-create-pool] Initialize simulation failed:', simResult.error)
             // Try to decode common V4 errors
             const errMsg = simResult.error.message || simResult.error.data || ''
-            if (errMsg.includes('PoolAlreadyInitialized') || errMsg.includes('0x83b25734')) {
+            // PoolAlreadyInitialized can be 0x7983c051 or 0x83b25734 depending on V4 version
+            if (errMsg.includes('PoolAlreadyInitialized') || errMsg.includes('0x7983c051') || errMsg.includes('0x83b25734')) {
               return NextResponse.json(
                 { error: 'This pool already exists! Try adding liquidity instead of creating.' },
                 { status: 400 }
@@ -434,7 +435,8 @@ export async function POST(request: NextRequest) {
           if (simResult.result) {
             const r = simResult.result.toLowerCase()
             // Check for V4 custom error selectors
-            if (r.startsWith('0x83b25734')) {
+            // PoolAlreadyInitialized: 0x7983c051 or 0x83b25734
+            if (r.startsWith('0x7983c051') || r.startsWith('0x83b25734')) {
               // PoolAlreadyInitialized
               return NextResponse.json(
                 { error: 'This pool already exists! Try adding liquidity instead of creating.' },
