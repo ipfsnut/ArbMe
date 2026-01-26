@@ -65,6 +65,12 @@ interface FlowState {
   // Step 3: Deposit & Confirm
   amount0: string
   amount1: string
+  // Approval tracking - for V4 we track both ERC20->Permit2 and Permit2->PM approvals
+  approvalsChecked: boolean
+  token0NeedsErc20Approval: boolean
+  token0NeedsPermit2Approval: boolean
+  token1NeedsErc20Approval: boolean
+  token1NeedsPermit2Approval: boolean
   token0ApprovalStatus: ApprovalStatus
   token1ApprovalStatus: ApprovalStatus
   token0ApprovalError: string | null
@@ -115,6 +121,11 @@ export default function AddLiquidityPage() {
     token1FetchedUsdPrice: null,
     amount0: '',
     amount1: '',
+    approvalsChecked: false,
+    token0NeedsErc20Approval: true,
+    token0NeedsPermit2Approval: true,
+    token1NeedsErc20Approval: true,
+    token1NeedsPermit2Approval: true,
     token0ApprovalStatus: 'idle',
     token1ApprovalStatus: 'idle',
     token0ApprovalError: null,
@@ -280,7 +291,79 @@ export default function AddLiquidityPage() {
     }
   }, [wallet, state.token0Info?.address, state.token1Info?.address, state.step])
 
+  // Check approvals when entering step 3 - ONLY ONCE per token pair
+  useEffect(() => {
+    async function checkApprovals() {
+      if (state.step !== 3 || !wallet || !state.token0Info || !state.token1Info || !state.amount0 || !state.amount1) {
+        return
+      }
 
+      // Don't re-check if already checked for this combination
+      if (state.approvalsChecked) {
+        return
+      }
+
+      console.log('[Approvals] Checking on-chain approval status...')
+
+      try {
+        const spender = SPENDERS[state.version]
+        const amount0Wei = BigInt(Math.floor(parseFloat(state.amount0) * Math.pow(10, state.token0Info.decimals))).toString()
+        const amount1Wei = BigInt(Math.floor(parseFloat(state.amount1) * Math.pow(10, state.token1Info.decimals))).toString()
+
+        const res = await fetch(`${API_BASE}/check-approvals`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            token0: state.token0Info.address,
+            token1: state.token1Info.address,
+            owner: wallet,
+            spender,
+            amount0Required: amount0Wei,
+            amount1Required: amount1Wei,
+            version: state.version,
+          }),
+        })
+
+        if (res.ok) {
+          const data = await res.json()
+          console.log('[Approvals] Check result:', data)
+
+          if (state.version === 'V4') {
+            // V4 has two-step approval
+            const token0Done = !data.token0.needsErc20Approval && !data.token0.needsPermit2Approval
+            const token1Done = !data.token1.needsErc20Approval && !data.token1.needsPermit2Approval
+
+            updateState({
+              approvalsChecked: true,
+              token0NeedsErc20Approval: data.token0.needsErc20Approval,
+              token0NeedsPermit2Approval: data.token0.needsPermit2Approval,
+              token1NeedsErc20Approval: data.token1.needsErc20Approval,
+              token1NeedsPermit2Approval: data.token1.needsPermit2Approval,
+              token0ApprovalStatus: token0Done ? 'confirmed' : 'idle',
+              token1ApprovalStatus: token1Done ? 'confirmed' : 'idle',
+            })
+          } else {
+            // V2/V3 - simple single approval
+            updateState({
+              approvalsChecked: true,
+              token0NeedsErc20Approval: data.token0.needsApproval,
+              token0NeedsPermit2Approval: false,
+              token1NeedsErc20Approval: data.token1.needsApproval,
+              token1NeedsPermit2Approval: false,
+              token0ApprovalStatus: data.token0.needsApproval ? 'idle' : 'confirmed',
+              token1ApprovalStatus: data.token1.needsApproval ? 'idle' : 'confirmed',
+            })
+          }
+        }
+      } catch (err) {
+        console.error('[Approvals] Check failed:', err)
+        // On error, assume approvals needed
+        updateState({ approvalsChecked: true })
+      }
+    }
+
+    checkApprovals()
+  }, [state.step, wallet, state.token0Info?.address, state.token1Info?.address, state.amount0, state.amount1, state.version, state.approvalsChecked])
 
   const sendTransaction = async (tx: { to: string; data: string; value: string }) => {
     if (!wallet) throw new Error('No wallet connected')
@@ -371,102 +454,129 @@ export default function AddLiquidityPage() {
     const statusKey = token === 'token0' ? 'token0ApprovalStatus' : 'token1ApprovalStatus'
     const errorKey = token === 'token0' ? 'token0ApprovalError' : 'token1ApprovalError'
     const tokenInfo = token === 'token0' ? state.token0Info : state.token1Info
+    const needsErc20Key = token === 'token0' ? 'token0NeedsErc20Approval' : 'token1NeedsErc20Approval'
+    const needsPermit2Key = token === 'token0' ? 'token0NeedsPermit2Approval' : 'token1NeedsPermit2Approval'
+    const needsErc20 = token === 'token0' ? state.token0NeedsErc20Approval : state.token1NeedsErc20Approval
+    const needsPermit2 = token === 'token0' ? state.token0NeedsPermit2Approval : state.token1NeedsPermit2Approval
 
     // Set to signing state
     updateState({ [statusKey]: 'signing', [errorKey]: null })
 
     try {
       // V4 requires two-step approval: ERC20 -> Permit2, then Permit2 -> V4 PM
+      // But only do the steps that are actually needed!
       if (state.version === 'V4') {
-        // Step 1: ERC20 approve to Permit2
-        console.log('[V4 Approval] Step 1: Approving token to Permit2...')
-        const res1 = await fetch(`${API_BASE}/build-approval`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            token: tokenInfo.address,
-            version: 'V4',
-            approvalType: 'erc20',
-          }),
-        })
+        // Step 1: ERC20 approve to Permit2 (only if needed)
+        if (needsErc20) {
+          console.log('[V4 Approval] Step 1: Approving token to Permit2...')
+          const res1 = await fetch(`${API_BASE}/build-approval`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              token: tokenInfo.address,
+              version: 'V4',
+              approvalType: 'erc20',
+            }),
+          })
 
-        if (!res1.ok) {
-          const data = await res1.json().catch(() => ({}))
-          throw new Error(data?.error || 'Failed to build ERC20 approval')
-        }
+          if (!res1.ok) {
+            const data = await res1.json().catch(() => ({}))
+            throw new Error(data?.error || 'Failed to build ERC20 approval')
+          }
 
-        const data1 = await res1.json()
-        if (!data1.transaction) {
-          throw new Error('No ERC20 approval transaction returned')
-        }
+          const data1 = await res1.json()
+          if (!data1.transaction) {
+            throw new Error('No ERC20 approval transaction returned')
+          }
 
-        // Send ERC20 approval tx
-        let txHash1: string
-        try {
-          txHash1 = await sendTransaction(data1.transaction)
-        } catch (err: any) {
-          if (isUserRejection(err)) {
-            updateState({ [statusKey]: 'error', [errorKey]: 'Transaction cancelled' })
+          // Send ERC20 approval tx
+          let txHash1: string
+          try {
+            txHash1 = await sendTransaction(data1.transaction)
+          } catch (err: any) {
+            if (isUserRejection(err)) {
+              updateState({ [statusKey]: 'error', [errorKey]: 'Transaction cancelled' })
+              return
+            }
+            throw err
+          }
+
+          updateState({ [statusKey]: 'confirming' })
+          const success1 = await waitForReceipt(txHash1)
+          if (!success1) {
+            updateState({ [statusKey]: 'error', [errorKey]: 'ERC20 approval failed on-chain' })
             return
           }
-          throw err
-        }
 
-        updateState({ [statusKey]: 'confirming' })
-        const success1 = await waitForReceipt(txHash1)
-        if (!success1) {
-          updateState({ [statusKey]: 'error', [errorKey]: 'ERC20 approval failed on-chain' })
-          return
-        }
-
-        // Step 2: Permit2.approve to V4 Position Manager
-        console.log('[V4 Approval] Step 2: Granting Permit2 allowance to V4 PM...')
-        updateState({ [statusKey]: 'signing' })
-
-        const res2 = await fetch(`${API_BASE}/build-approval`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            token: tokenInfo.address,
-            version: 'V4',
-            approvalType: 'permit2',
-          }),
-        })
-
-        if (!res2.ok) {
-          const data = await res2.json().catch(() => ({}))
-          throw new Error(data?.error || 'Failed to build Permit2 approval')
-        }
-
-        const data2 = await res2.json()
-        if (!data2.transaction) {
-          throw new Error('No Permit2 approval transaction returned')
-        }
-
-        // Send Permit2 approval tx
-        let txHash2: string
-        try {
-          txHash2 = await sendTransaction(data2.transaction)
-        } catch (err: any) {
-          if (isUserRejection(err)) {
-            updateState({ [statusKey]: 'error', [errorKey]: 'Transaction cancelled' })
-            return
-          }
-          throw err
-        }
-
-        updateState({ [statusKey]: 'confirming' })
-        const success2 = await waitForReceipt(txHash2)
-
-        if (success2) {
-          updateState({ [statusKey]: 'confirmed', [errorKey]: null })
+          // Mark ERC20 approval as done
+          updateState({ [needsErc20Key]: false })
         } else {
-          updateState({ [statusKey]: 'error', [errorKey]: 'Permit2 approval failed on-chain' })
+          console.log('[V4 Approval] Step 1 skipped - ERC20 already approved to Permit2')
         }
+
+        // Step 2: Permit2.approve to V4 Position Manager (only if needed)
+        if (needsPermit2) {
+          console.log('[V4 Approval] Step 2: Granting Permit2 allowance to V4 PM...')
+          updateState({ [statusKey]: 'signing' })
+
+          const res2 = await fetch(`${API_BASE}/build-approval`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              token: tokenInfo.address,
+              version: 'V4',
+              approvalType: 'permit2',
+            }),
+          })
+
+          if (!res2.ok) {
+            const data = await res2.json().catch(() => ({}))
+            throw new Error(data?.error || 'Failed to build Permit2 approval')
+          }
+
+          const data2 = await res2.json()
+          if (!data2.transaction) {
+            throw new Error('No Permit2 approval transaction returned')
+          }
+
+          // Send Permit2 approval tx
+          let txHash2: string
+          try {
+            txHash2 = await sendTransaction(data2.transaction)
+          } catch (err: any) {
+            if (isUserRejection(err)) {
+              updateState({ [statusKey]: 'error', [errorKey]: 'Transaction cancelled' })
+              return
+            }
+            throw err
+          }
+
+          updateState({ [statusKey]: 'confirming' })
+          const success2 = await waitForReceipt(txHash2)
+
+          if (!success2) {
+            updateState({ [statusKey]: 'error', [errorKey]: 'Permit2 approval failed on-chain' })
+            return
+          }
+
+          // Mark Permit2 approval as done
+          updateState({ [needsPermit2Key]: false })
+        } else {
+          console.log('[V4 Approval] Step 2 skipped - Permit2 already approved to V4 PM')
+        }
+
+        // All done!
+        updateState({ [statusKey]: 'confirmed', [errorKey]: null })
         return
       }
 
-      // V2/V3: Standard single ERC20 approval
+      // V2/V3: Standard single ERC20 approval (only if needed)
+      if (!needsErc20) {
+        console.log('[Approval] Skipped - already approved')
+        updateState({ [statusKey]: 'confirmed', [errorKey]: null })
+        return
+      }
+
       const spender = SPENDERS[state.version]
       const res = await fetch(`${API_BASE}/build-approval`, {
         method: 'POST',
@@ -513,7 +623,7 @@ export default function AddLiquidityPage() {
       const success = await waitForReceipt(txHash)
 
       if (success) {
-        updateState({ [statusKey]: 'confirmed', [errorKey]: null })
+        updateState({ [statusKey]: 'confirmed', [errorKey]: null, [needsErc20Key]: false })
       } else {
         updateState({ [statusKey]: 'error', [errorKey]: 'Transaction failed on-chain' })
       }
