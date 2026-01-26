@@ -383,6 +383,12 @@ export async function POST(request: NextRequest) {
             ? `https://base-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`
             : 'https://mainnet.base.org'
 
+          console.log('[build-create-pool] Simulating V4 initialize:', {
+            to: initTx.to,
+            dataLength: initTx.data.length,
+            params: { sortedToken0, sortedToken1, fee, tickSpacing, sqrtPriceX96: sqrtPriceX96.toString() }
+          })
+
           const simResponse = await fetch(rpcUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -395,6 +401,8 @@ export async function POST(request: NextRequest) {
           })
           const simResult = await simResponse.json()
 
+          console.log('[build-create-pool] Simulation result:', JSON.stringify(simResult).slice(0, 500))
+
           if (simResult.error) {
             console.error('[build-create-pool] Initialize simulation failed:', simResult.error)
             // Try to decode common V4 errors
@@ -405,9 +413,19 @@ export async function POST(request: NextRequest) {
                 { status: 400 }
               )
             }
-            // Return the actual error message for debugging
+
+            // If simulation failed, double-check if pool exists
+            const recheckPool = await checkV4PoolExists(sortedToken0, sortedToken1, fee, tickSpacing)
+            if (recheckPool.exists) {
+              return NextResponse.json(
+                { error: 'This pool already exists! Our initial check missed it. Try adding liquidity instead.' },
+                { status: 400 }
+              )
+            }
+
+            // Return the actual error message for debugging with more context
             return NextResponse.json(
-              { error: `Initialize simulation failed: ${errMsg || JSON.stringify(simResult.error)}` },
+              { error: `Initialize simulation failed: ${errMsg || JSON.stringify(simResult.error)}. Tokens: ${sortedToken0.slice(0,10)}.../${sortedToken1.slice(0,10)}..., fee: ${fee}` },
               { status: 400 }
             )
           }
