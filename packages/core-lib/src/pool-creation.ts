@@ -459,17 +459,20 @@ export function buildV4InitializePoolTransaction(params: V4CreatePoolParams): Tr
   };
 }
 
-// V4 Position Manager Action Codes
+// V4 Position Manager Action Codes (from Uniswap v4-periphery Actions.sol)
 const V4_ACTIONS = {
+  // Pool liquidity actions
   MINT_POSITION: 0x00,
   INCREASE_LIQUIDITY: 0x01,
   DECREASE_LIQUIDITY: 0x02,
   BURN_POSITION: 0x03,
-  SETTLE: 0x10,
-  SETTLE_PAIR: 0x11,
-  TAKE_PAIR: 0x12,
+  // Delta resolving actions
+  SETTLE_PAIR: 0x10,
+  TAKE_PAIR: 0x11,
+  SETTLE: 0x12,
   TAKE: 0x13,
   CLOSE_CURRENCY: 0x14,
+  CLEAR_OR_TAKE: 0x15,
   SWEEP: 0x16,
 } as const;
 
@@ -511,6 +514,59 @@ function calculateLiquidityFromAmounts(
 }
 
 /**
+ * Encode int24 as a 32-byte hex string (signed)
+ */
+function encodeInt24(value: number): string {
+  // Handle negative numbers with two's complement
+  const unsigned = value < 0 ? (0x1000000 + value) : value;
+  return unsigned.toString(16).padStart(64, '0');
+}
+
+/**
+ * Encode mint position params for V4 Position Manager
+ * V4 uses a packed encoding where the hookData offset is relative to its field position
+ * Format: PoolKey(160) + tickLower(32) + tickUpper(32) + liquidity(32) + amount0Max(32) + amount1Max(32) + owner(32) + hookDataOffset(32) + hookDataLength(32)
+ */
+function encodeMintParams(
+  poolKey: { currency0: Address; currency1: Address; fee: number; tickSpacing: number; hooks: Address },
+  tickLower: number,
+  tickUpper: number,
+  liquidity: bigint,
+  amount0Max: bigint,
+  amount1Max: bigint,
+  owner: Address,
+  hookData: `0x${string}`
+): `0x${string}` {
+  // PoolKey: 5 x 32 bytes = 160 bytes
+  const poolKeyEncoded =
+    poolKey.currency0.slice(2).toLowerCase().padStart(64, '0') +
+    poolKey.currency1.slice(2).toLowerCase().padStart(64, '0') +
+    poolKey.fee.toString(16).padStart(64, '0') +
+    encodeInt24(poolKey.tickSpacing) +
+    poolKey.hooks.slice(2).toLowerCase().padStart(64, '0');
+
+  // Fixed fields after PoolKey
+  const tickLowerEncoded = encodeInt24(tickLower);
+  const tickUpperEncoded = encodeInt24(tickUpper);
+  const liquidityEncoded = liquidity.toString(16).padStart(64, '0');
+  const amount0MaxEncoded = amount0Max.toString(16).padStart(64, '0');
+  const amount1MaxEncoded = amount1Max.toString(16).padStart(64, '0');
+  const ownerEncoded = owner.slice(2).toLowerCase().padStart(64, '0');
+
+  // hookData: For V4's CalldataDecoder.toBytes, the offset at position 0x160 must be RELATIVE
+  // to that position. If hookData length is at 0x180 (32 bytes after offset field),
+  // the relative offset should be 0x20 (32).
+  const hookDataOffset = '0000000000000000000000000000000000000000000000000000000000000020'; // 32 in hex
+
+  // hookData: length (32 bytes) + actual data
+  const hookDataHex = hookData.slice(2); // remove 0x prefix
+  const hookDataLength = (hookDataHex.length / 2).toString(16).padStart(64, '0');
+  const hookDataPadded = hookDataHex.padEnd(Math.ceil(hookDataHex.length / 64) * 64, '0');
+
+  return `0x${poolKeyEncoded}${tickLowerEncoded}${tickUpperEncoded}${liquidityEncoded}${amount0MaxEncoded}${amount1MaxEncoded}${ownerEncoded}${hookDataOffset}${hookDataLength}${hookDataPadded}` as `0x${string}`;
+}
+
+/**
  * Build V4 mint position transaction (full range)
  * Uses modifyLiquidities with MINT_POSITION + SETTLE_PAIR actions
  */
@@ -540,37 +596,23 @@ export function buildV4MintPositionTransaction(params: V4CreatePoolParams): Tran
     hooks: '0x0000000000000000000000000000000000000000' as Address,
   };
 
-  // Encode MINT_POSITION params:
-  // (PoolKey, int24 tickLower, int24 tickUpper, uint256 liquidity, uint128 amount0Max, uint128 amount1Max, address owner, bytes hookData)
-  const mintParams = encodeAbiParameters(
-    [
-      POOL_KEY_ABI,
-      { type: 'int24' },   // tickLower
-      { type: 'int24' },   // tickUpper
-      { type: 'uint256' }, // liquidity
-      { type: 'uint128' }, // amount0Max
-      { type: 'uint128' }, // amount1Max
-      { type: 'address' }, // owner
-      { type: 'bytes' },   // hookData
-    ],
-    [
-      poolKey,
-      minTick,
-      maxTick,
-      liquidity,
-      amount0,  // amount0Max (no slippage - let contract handle)
-      amount1,  // amount1Max
-      params.recipient,
-      '0x' as `0x${string}`,     // empty hookData
-    ]
+  // Encode MINT_POSITION params with V4's expected format (relative hookData offset)
+  const mintParams = encodeMintParams(
+    poolKey,
+    minTick,
+    maxTick,
+    liquidity,
+    amount0,  // amount0Max
+    amount1,  // amount1Max
+    params.recipient,
+    '0x' as `0x${string}`,  // empty hookData
   );
 
-  // Encode SETTLE_PAIR params:
-  // (address currency0, address currency1)
+  // Encode SETTLE_PAIR params: (Currency currency0, Currency currency1)
   const settleParams = encodeAbiParameters(
     [
-      { type: 'address' }, // currency0
-      { type: 'address' }, // currency1
+      { type: 'address' },
+      { type: 'address' },
     ],
     [params.token0, params.token1]
   );
@@ -584,8 +626,8 @@ export function buildV4MintPositionTransaction(params: V4CreatePoolParams): Tran
   // Encode unlockData as: abi.encode(bytes actions, bytes[] params)
   const unlockData = encodeAbiParameters(
     [
-      { type: 'bytes' },   // actions
-      { type: 'bytes[]' }, // params array
+      { type: 'bytes' },
+      { type: 'bytes[]' },
     ],
     [actions, [mintParams, settleParams]]
   );
@@ -608,6 +650,7 @@ export function buildV4MintPositionTransaction(params: V4CreatePoolParams): Tran
   console.log('[V4 Mint] Built transaction to:', V4_POSITION_MANAGER);
   console.log('[V4 Mint] PoolKey:', poolKey);
   console.log('[V4 Mint] Tick range:', minTick, 'to', maxTick);
+  console.log('[V4 Mint] MintParams length:', mintParams.length);
 
   return {
     to: V4_POSITION_MANAGER,
