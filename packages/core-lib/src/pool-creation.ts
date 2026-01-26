@@ -127,19 +127,22 @@ export function setAlchemyKey(key: string | undefined): void {
   _alchemyKey = key;
 }
 
-// Extended timeout for pool existence checks (8 seconds)
-const POOL_CHECK_TIMEOUT = 8000;
+// Reduced timeout for pool existence checks (3 seconds) - fail fast
+const POOL_CHECK_TIMEOUT = 3000;
 
-// Maximum retries for transient errors
-const MAX_RETRIES = 3;
+// Maximum retries - reduced to prevent long waits
+const MAX_RETRIES = 1;
 
-// Build list of RPC URLs to try (Alchemy first if available, then fallbacks)
+// Build list of RPC URLs to try (Alchemy first if available, then 1 fallback max)
 function getRpcUrls(): string[] {
   const urls: string[] = [];
   if (_alchemyKey) {
     urls.push(`https://base-mainnet.g.alchemy.com/v2/${_alchemyKey}`);
   }
-  urls.push(...BASE_RPCS_FALLBACK);
+  // Only use first fallback to keep latency low
+  if (BASE_RPCS_FALLBACK.length > 0) {
+    urls.push(BASE_RPCS_FALLBACK[0]);
+  }
   return urls;
 }
 
@@ -208,9 +211,9 @@ async function rpcCall(method: string, params: any[]): Promise<any> {
         // Log the error for debugging
         console.log(`[pool-creation] RPC error on ${url.includes('alchemy') ? 'Alchemy' : 'fallback'} (attempt ${attempt + 1}/${MAX_RETRIES}):`, err?.code || err?.message);
 
-        // If it's a transient error and we have retries left, wait and retry
+        // If it's a transient error and we have retries left, wait briefly and retry
         if (isTransientError(err) && attempt < MAX_RETRIES - 1) {
-          const backoffMs = Math.min(1000 * Math.pow(2, attempt), 4000); // 1s, 2s, 4s
+          const backoffMs = 500; // Fixed 500ms backoff for faster recovery
           await sleep(backoffMs);
           continue;
         }
