@@ -10,7 +10,7 @@ import { PositionCard } from '@/components/PositionCard'
 import { ROUTES } from '@/utils/constants'
 import type { Position } from '@/utils/types'
 
-const API_BASE = '/app/api'
+const API_BASE = '/api'
 
 export default function PositionsPage() {
   const wallet = useWallet()

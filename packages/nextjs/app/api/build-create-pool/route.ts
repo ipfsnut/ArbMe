@@ -30,7 +30,7 @@ const KNOWN_DECIMALS: Record<string, number> = {
 // Fetch cached prices from our own /api/pools endpoint
 async function getCachedPrices(baseUrl: string): Promise<{ arbmePrice: number; tokenPrices: Record<string, number> } | null> {
   try {
-    const response = await fetch(`${baseUrl}/app/api/pools`, {
+    const response = await fetch(`${baseUrl}/api/pools`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
     })

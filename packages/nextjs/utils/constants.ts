@@ -36,15 +36,13 @@ export const FEATURED_POOLS: FeaturedPoolConfig[] = [
   },
 ];
 
-// Route prefix - /app in production (Express serves miniapp at /app/*), empty in dev
-const ROUTE_PREFIX = process.env.NODE_ENV === 'production' ? '/app' : '';
-
+// Routes - Next.js now serves directly at /
 export const ROUTES = {
-  HOME: ROUTE_PREFIX || '/',
-  MY_POOLS: `${ROUTE_PREFIX}/positions`,
-  POSITION_DETAIL: `${ROUTE_PREFIX}/positions`,
-  ADD_LIQUIDITY: `${ROUTE_PREFIX}/add-liquidity`,
-  THE_GREAT_20_RACE: `${ROUTE_PREFIX}/the-great-20-race`,
+  HOME: '/',
+  MY_POOLS: '/positions',
+  POSITION_DETAIL: '/positions',
+  ADD_LIQUIDITY: '/add-liquidity',
+  THE_GREAT_20_RACE: '/the-great-20-race',
 } as const;
 
 // Position Managers

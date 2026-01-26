@@ -70,7 +70,7 @@ export async function collectFees(positionId: string, recipient: string): Promis
     console.log(`[Actions] Collecting fees for position ${positionId}...`);
 
     // Build the transaction via API
-    const response = await fetch('/app/api/collect-fees', {
+    const response = await fetch('/api/collect-fees', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ positionId, recipient }),
