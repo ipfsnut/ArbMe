@@ -13,7 +13,7 @@ import { ROUTES, ARBME_ADDRESS, WETH_ADDRESS, V2_ROUTER, V3_POSITION_MANAGER, V4
 import sdk from '@farcaster/miniapp-sdk'
 import { useSendTransaction, useWaitForTransactionReceipt } from 'wagmi'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '/app/api'
+const API_BASE = '/api'
 
 // Format a number without scientific notation
 function formatDecimal(num: number): string {

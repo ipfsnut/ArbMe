@@ -4,7 +4,7 @@
 
 import type { PoolsResponse, Position } from '../utils/types';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '/app/api';
+const API_BASE = '/api';
 
 /**
  * Fetch all ARBME pools

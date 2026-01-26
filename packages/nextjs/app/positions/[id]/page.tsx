@@ -11,7 +11,7 @@ import { ROUTES } from '@/utils/constants'
 import type { Position } from '@/utils/types'
 import sdk from '@farcaster/miniapp-sdk'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '/app/api'
+const API_BASE = '/api'
 
 type TxStatus = 'idle' | 'building' | 'pending' | 'success' | 'error'
 
