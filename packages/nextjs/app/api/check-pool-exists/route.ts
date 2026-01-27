@@ -35,6 +35,7 @@ function checkKnownV2Pool(token0: string, token1: string): { exists: boolean; po
 }
 
 // Check known V4 ARBME pools without RPC
+// NOTE: Only return known pools, never assume non-existence - always verify on-chain
 function checkKnownV4Pool(token0: string, token1: string, fee: number): { exists: boolean; initialized: boolean } | null {
   const t0 = token0.toLowerCase()
   const t1 = token1.toLowerCase()
@@ -49,12 +50,8 @@ function checkKnownV4Pool(token0: string, token1: string, fee: number): { exists
     }
   }
 
-  // For ARBME pairs not in our known list, assume pool doesn't exist
-  if (isArbmePair(token0, token1)) {
-    return { exists: false, initialized: false }
-  }
-
-  return null // Unknown non-ARBME pair, need RPC
+  // Always check on-chain for V4 pools - don't assume non-existence
+  return null
 }
 
 export async function POST(request: NextRequest) {
