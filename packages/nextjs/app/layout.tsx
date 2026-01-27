@@ -7,13 +7,27 @@ export const metadata = {
   title: 'ArbMe - Liquidity Pools',
   description: 'ArbMe LP management interface',
   other: {
-    'fc:frame': JSON.stringify({
+    'fc:miniapp': JSON.stringify({
       version: '1',
       imageUrl: 'https://arbme.epicdylan.com/share-image.png',
       button: {
         title: 'View Pools',
         action: {
           type: 'launch_miniapp',
+          name: 'ArbMe',
+          url: 'https://arbme.epicdylan.com/',
+          splashImageUrl: 'https://arbme.epicdylan.com/arbie.png',
+          splashBackgroundColor: '#0a0a0f',
+        },
+      },
+    }),
+    'fc:frame': JSON.stringify({
+      version: '1',
+      imageUrl: 'https://arbme.epicdylan.com/share-image.png',
+      button: {
+        title: 'View Pools',
+        action: {
+          type: 'launch_frame',
           name: 'ArbMe',
           url: 'https://arbme.epicdylan.com/',
           splashImageUrl: 'https://arbme.epicdylan.com/arbie.png',
