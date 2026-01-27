@@ -369,8 +369,8 @@ export async function checkV4PoolExists(
 
   console.log('[checkV4PoolExists] Checking pool:', { token0, token1, fee, tickSpacing, poolId });
 
-  // getSlot0(bytes32) selector: 0x98e5b12a
-  const data = '0x98e5b12a' + poolId.slice(2);
+  // getSlot0(bytes32) selector: 0xc815641c
+  const data = '0xc815641c' + poolId.slice(2);
 
   try {
     const result = await rpcCall('eth_call', [{ to: V4_STATE_VIEW, data }, 'latest']);
