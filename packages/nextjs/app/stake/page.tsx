@@ -280,7 +280,7 @@ export default function StakePage() {
             <div className="staking-stats">
               <div className="stat-card">
                 <span className="stat-label">Total Staked</span>
-                <span className="stat-value">{formatNumber(data.totalStaked)} RATCHET</span>
+                <span className="stat-value">{formatNumber(data.totalStaked)}</span>
               </div>
               <div className="stat-card">
                 <span className="stat-label">APR</span>
@@ -454,6 +454,8 @@ export default function StakePage() {
           display: flex;
           flex-direction: column;
           gap: 0.25rem;
+          min-width: 0;
+          overflow: hidden;
         }
 
         .stat-label {
@@ -465,9 +467,12 @@ export default function StakePage() {
 
         .stat-value {
           font-family: ui-monospace, 'SF Mono', Monaco, monospace;
-          font-size: 0.875rem;
+          font-size: 0.8125rem;
           font-weight: 600;
           color: var(--text-primary);
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
 
         .staking-user-info {
@@ -493,8 +498,12 @@ export default function StakePage() {
 
         .user-stat-value {
           font-family: ui-monospace, 'SF Mono', Monaco, monospace;
-          font-size: 0.875rem;
+          font-size: 0.8125rem;
           font-weight: 600;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          min-width: 0;
         }
 
         .staking-section {
@@ -522,9 +531,12 @@ export default function StakePage() {
         .rewards-amount {
           display: block;
           font-family: ui-monospace, 'SF Mono', Monaco, monospace;
-          font-size: 1.5rem;
+          font-size: 1.25rem;
           font-weight: 700;
           color: var(--accent);
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
 
         .rewards-token {
