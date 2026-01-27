@@ -43,6 +43,7 @@ export const ROUTES = {
   POSITION_DETAIL: '/positions',
   ADD_LIQUIDITY: '/add-liquidity',
   STAKE: '/stake',
+  WRAP: '/wrap',
   THE_GREAT_20_RACE: '/the-great-20-race',
 } as const;
 

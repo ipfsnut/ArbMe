@@ -858,6 +858,23 @@ export default function AddLiquidityPage() {
           </div>
         )}
 
+        {/* WETH Info - show if either token is WETH */}
+        {(state.token0Address.toLowerCase() === WETH_ADDRESS.toLowerCase() ||
+          state.token1Address.toLowerCase() === WETH_ADDRESS.toLowerCase()) && (
+          <div className="create-section">
+            <div className="fee-warning" style={{
+              background: 'rgba(100, 100, 100, 0.1)',
+              borderColor: 'var(--border)',
+              color: 'var(--text-muted)',
+            }}>
+              This pool uses WETH. Need to convert ETH to WETH?{' '}
+              <Link href={ROUTES.WRAP} style={{ color: 'var(--primary)' }}>
+                Wrap ETH →
+              </Link>
+            </div>
+          </div>
+        )}
+
         {/* Navigation */}
         <div className="step-navigation">
           <button
