@@ -112,8 +112,14 @@ export function WalletProvider({ children }: WalletProviderProps) {
         const inIframe = typeof window !== 'undefined' && window.parent !== window
 
         if (inIframe) {
-          // Try to get the Farcaster provider
-          const provider = await sdk.wallet.getEthereumProvider()
+          // Try to get the Farcaster provider with a timeout
+          // The SDK can hang on mobile browsers outside of Warpcast
+          const providerPromise = sdk.wallet.getEthereumProvider()
+          const timeoutPromise = new Promise<null>((resolve) => {
+            setTimeout(() => resolve(null), 2000) // 2 second timeout
+          })
+
+          const provider = await Promise.race([providerPromise, timeoutPromise])
           if (provider) {
             console.log('[WalletProvider] Farcaster environment detected')
             setIsFarcaster(true)

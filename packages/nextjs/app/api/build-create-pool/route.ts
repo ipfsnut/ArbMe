@@ -333,48 +333,42 @@ export async function POST(request: NextRequest) {
         adjustedPrice: adjustedPriceV4,
       })
 
-      const sqrtPriceX96 = calculateSqrtPriceX96(adjustedPriceV4)
-
-      // Check if pool exists
+      // Check if pool exists first
       const poolCheck = await checkV4PoolExists(sortedToken0, sortedToken1, fee, tickSpacing)
 
-      console.log('[build-create-pool] V4 pool check:', {
-        sortedToken0,
-        sortedToken1,
-        fee,
-        tickSpacing,
-        poolExists: poolCheck.exists,
-        poolSqrtPriceX96: poolCheck.sqrtPriceX96,
-        poolTick: poolCheck.tick,
-        newSqrtPriceX96: sqrtPriceX96.toString(),
-      })
+      // Use pool's existing price if it exists, otherwise calculate new price
+      let sqrtPriceX96: bigint
+      if (poolCheck.exists && poolCheck.sqrtPriceX96) {
+        sqrtPriceX96 = BigInt(poolCheck.sqrtPriceX96)
+        console.log('[build-create-pool] V4 using existing pool price:', {
+          sortedToken0,
+          sortedToken1,
+          fee,
+          tickSpacing,
+          poolSqrtPriceX96: poolCheck.sqrtPriceX96,
+          poolTick: poolCheck.tick,
+        })
+      } else {
+        sqrtPriceX96 = calculateSqrtPriceX96(adjustedPriceV4)
 
-      // If pool already exists, return early with pool info
-      if (poolCheck.exists) {
-        return NextResponse.json({
-          success: false,
-          error: 'Pool already exists! Add liquidity to the existing pool instead.',
-          poolExists: true,
-          poolInfo: {
-            token0: sortedToken0,
-            token1: sortedToken1,
-            fee,
-            tickSpacing,
-            sqrtPriceX96: poolCheck.sqrtPriceX96,
-            tick: poolCheck.tick,
-          },
-        }, { status: 400 })
-      }
+        console.log('[build-create-pool] V4 creating new pool with price:', {
+          sortedToken0,
+          sortedToken1,
+          fee,
+          tickSpacing,
+          newSqrtPriceX96: sqrtPriceX96.toString(),
+        })
 
-      // Validate sqrtPriceX96 is within bounds
-      const MIN_SQRT_PRICE = 4295128739n
-      const MAX_SQRT_PRICE = 1461446703485210103287273052203988822378723970342n
-      if (sqrtPriceX96 < MIN_SQRT_PRICE || sqrtPriceX96 > MAX_SQRT_PRICE) {
-        console.error('[build-create-pool] sqrtPriceX96 OUT OF BOUNDS:', sqrtPriceX96.toString())
-        return NextResponse.json(
-          { error: `Price calculation resulted in invalid sqrtPriceX96. Try adjusting the price ratio. (${sqrtPriceX96 < MIN_SQRT_PRICE ? 'too low' : 'too high'})` },
-          { status: 400 }
-        )
+        // Validate sqrtPriceX96 is within bounds (only for new pools)
+        const MIN_SQRT_PRICE = 4295128739n
+        const MAX_SQRT_PRICE = 1461446703485210103287273052203988822378723970342n
+        if (sqrtPriceX96 < MIN_SQRT_PRICE || sqrtPriceX96 > MAX_SQRT_PRICE) {
+          console.error('[build-create-pool] sqrtPriceX96 OUT OF BOUNDS:', sqrtPriceX96.toString())
+          return NextResponse.json(
+            { error: `Price calculation resulted in invalid sqrtPriceX96. Try adjusting the price ratio. (${sqrtPriceX96 < MIN_SQRT_PRICE ? 'too low' : 'too high'})` },
+            { status: 400 }
+          )
+        }
       }
 
       // Adjust amounts based on token order
