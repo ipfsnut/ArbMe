@@ -659,43 +659,86 @@ export default function AddLiquidityPage() {
     try {
       updateState({ txStatus: 'creating', txError: null })
 
-      const res = await fetch(`${API_BASE}/build-create-pool`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          version: state.version.toLowerCase(),
-          token0: state.token0Info.address,
-          token1: state.token1Info.address,
-          amount0: state.amount0,
-          amount1: state.amount1,
-          fee: state.version !== 'V2' ? state.fee : undefined,
-          price: priceRatio,
-          recipient: wallet,
-        }),
-      })
-
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || 'Failed to build transaction')
+      const requestBody = {
+        version: state.version.toLowerCase(),
+        token0: state.token0Info.address,
+        token1: state.token1Info.address,
+        amount0: state.amount0,
+        amount1: state.amount1,
+        fee: state.version !== 'V2' ? state.fee : undefined,
+        price: priceRatio,
+        recipient: wallet,
       }
 
-      const { transactions } = await res.json()
+      // For V4 new pools, we need to execute init and mint separately
+      // because Farcaster simulates txs before user confirms, and mint would fail
+      // if we send both at once (pool doesn't exist yet when mint is simulated)
+      if (state.version === 'V4' && !state.poolExists) {
+        console.log('[addLiquidity] V4 new pool - executing init and mint separately')
 
-      // Execute all transactions in sequence, waiting for each to confirm
-      for (let i = 0; i < transactions.length; i++) {
-        const tx = transactions[i]
-        console.log(`[addLiquidity] Sending tx ${i + 1}/${transactions.length}:`, tx.description)
+        // Step 1: Get and execute init tx only
+        const initRes = await fetch(`${API_BASE}/build-create-pool`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...requestBody, initOnly: true }),
+        })
 
-        const txHash = await sendTransaction(tx)
+        if (!initRes.ok) {
+          const data = await initRes.json()
+          throw new Error(data.error || 'Failed to build init transaction')
+        }
 
-        // Wait for confirmation before sending next tx (critical for init -> mint sequence)
-        if (transactions.length > 1) {
-          console.log(`[addLiquidity] Waiting for confirmation of tx ${i + 1}...`)
-          const success = await waitForReceipt(txHash)
-          if (!success) {
-            throw new Error(`Transaction ${i + 1} (${tx.description || 'unknown'}) failed on-chain`)
+        const initData = await initRes.json()
+        if (initData.transactions && initData.transactions.length > 0) {
+          const initTx = initData.transactions[0]
+          console.log('[addLiquidity] Sending init tx:', initTx.description)
+
+          const initHash = await sendTransaction(initTx)
+          console.log('[addLiquidity] Waiting for init confirmation...')
+          const initSuccess = await waitForReceipt(initHash)
+          if (!initSuccess) {
+            throw new Error('Pool initialization failed on-chain')
           }
-          console.log(`[addLiquidity] Tx ${i + 1} confirmed`)
+          console.log('[addLiquidity] Init confirmed!')
+        }
+
+        // Step 2: Get and execute mint tx (pool now exists)
+        const mintRes = await fetch(`${API_BASE}/build-create-pool`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...requestBody, mintOnly: true }),
+        })
+
+        if (!mintRes.ok) {
+          const data = await mintRes.json()
+          throw new Error(data.error || 'Failed to build mint transaction')
+        }
+
+        const mintData = await mintRes.json()
+        if (mintData.transactions && mintData.transactions.length > 0) {
+          const mintTx = mintData.transactions[0]
+          console.log('[addLiquidity] Sending mint tx:', mintTx.description)
+          await sendTransaction(mintTx)
+        }
+      } else {
+        // For existing pools or V2/V3, use standard flow
+        const res = await fetch(`${API_BASE}/build-create-pool`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody),
+        })
+
+        if (!res.ok) {
+          const data = await res.json()
+          throw new Error(data.error || 'Failed to build transaction')
+        }
+
+        const { transactions } = await res.json()
+
+        // Execute transactions
+        for (const tx of transactions) {
+          console.log('[addLiquidity] Sending tx:', tx.description)
+          await sendTransaction(tx)
         }
       }
 

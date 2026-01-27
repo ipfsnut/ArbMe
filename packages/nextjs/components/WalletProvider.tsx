@@ -43,6 +43,18 @@ function WalletInner({ children, isFarcaster }: { children: ReactNode; isFarcast
   // Get wagmi account (used in browser mode)
   const { address: wagmiAddress, isConnected: wagmiConnected } = useAccount()
 
+  // Signal ready to Farcaster ASAP
+  useEffect(() => {
+    if (isFarcaster) {
+      try {
+        sdk.actions.ready()
+        console.log('[Wallet] Signaled ready to Farcaster')
+      } catch (e) {
+        console.log('[Wallet] Could not signal ready:', e)
+      }
+    }
+  }, [isFarcaster])
+
   // Load Farcaster wallet if in Farcaster mode
   useEffect(() => {
     if (!isFarcaster) return
@@ -50,18 +62,27 @@ function WalletInner({ children, isFarcaster }: { children: ReactNode; isFarcast
     async function loadFarcasterWallet() {
       try {
         console.log('[Wallet] Loading Farcaster wallet...')
-        sdk.actions.ready()
 
-        const provider = await sdk.wallet.getEthereumProvider()
+        // Add timeout to provider request
+        const providerPromise = sdk.wallet.getEthereumProvider()
+        const timeoutPromise = new Promise<null>((resolve) => {
+          setTimeout(() => resolve(null), 3000)
+        })
+
+        const provider = await Promise.race([providerPromise, timeoutPromise])
         if (!provider) {
-          console.log('[Wallet] No Farcaster provider')
+          console.log('[Wallet] No Farcaster provider (timeout)')
           setIsLoading(false)
           return
         }
 
-        const accounts = await provider.request({
-          method: 'eth_accounts'
-        }) as string[]
+        // Add timeout to accounts request too
+        const accountsPromise = provider.request({ method: 'eth_accounts' })
+        const accountsTimeout = new Promise<string[]>((resolve) => {
+          setTimeout(() => resolve([]), 3000)
+        })
+
+        const accounts = await Promise.race([accountsPromise, accountsTimeout]) as string[]
 
         if (accounts && accounts.length > 0) {
           console.log('[Wallet] Farcaster wallet:', accounts[0])

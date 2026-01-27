@@ -69,6 +69,8 @@ export async function POST(request: NextRequest) {
       price,
       recipient,
       slippageTolerance,
+      initOnly,  // V4: only return init tx
+      mintOnly,  // V4: only return mint tx (assumes pool exists)
     } = await request.json()
 
     if (!version || !token0 || !token1 || !amount0 || !amount1 || !recipient) {
@@ -386,21 +388,26 @@ export async function POST(request: NextRequest) {
         slippageTolerance: slippageTolerance || 0.5,
       }
 
-      if (!poolCheck.exists) {
-        // Pool doesn't exist - need to initialize first
+      // Handle initOnly flag - return only the init tx
+      if (initOnly) {
+        if (poolCheck.exists) {
+          // Pool already exists, no init needed
+          return NextResponse.json({
+            success: true,
+            version: 'V4',
+            poolExists: true,
+            transactions: [],
+            message: 'Pool already exists, no initialization needed',
+          })
+        }
+
         const initTx = buildV4InitializePoolTransaction(params)
 
-        // Try to simulate the initialize to catch errors early
+        // Simulate to catch errors early
         try {
           const rpcUrl = ALCHEMY_KEY
             ? `https://base-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`
             : 'https://mainnet.base.org'
-
-          console.log('[build-create-pool] Simulating V4 initialize:', {
-            to: initTx.to,
-            dataLength: initTx.data.length,
-            params: { sortedToken0, sortedToken1, fee, tickSpacing, sqrtPriceX96: sqrtPriceX96.toString() }
-          })
 
           const simResponse = await fetch(rpcUrl, {
             method: 'POST',
@@ -414,71 +421,120 @@ export async function POST(request: NextRequest) {
           })
           const simResult = await simResponse.json()
 
-          console.log('[build-create-pool] Simulation result:', JSON.stringify(simResult).slice(0, 500))
-
           if (simResult.error) {
-            console.error('[build-create-pool] Initialize simulation failed:', simResult.error)
-            // Try to decode common V4 errors
             const errMsg = simResult.error.message || simResult.error.data || ''
-            // PoolAlreadyInitialized can be 0x7983c051 or 0x83b25734 depending on V4 version
             if (errMsg.includes('PoolAlreadyInitialized') || errMsg.includes('0x7983c051') || errMsg.includes('0x83b25734')) {
-              return NextResponse.json(
-                { error: 'This pool already exists! Try adding liquidity instead of creating.' },
-                { status: 400 }
-              )
+              return NextResponse.json({
+                success: true,
+                version: 'V4',
+                poolExists: true,
+                transactions: [],
+                message: 'Pool already initialized',
+              })
             }
-
-            // If simulation failed, double-check if pool exists
-            const recheckPool = await checkV4PoolExists(sortedToken0, sortedToken1, fee, tickSpacing)
-            if (recheckPool.exists) {
-              return NextResponse.json(
-                { error: 'This pool already exists! Our initial check missed it. Try adding liquidity instead.' },
-                { status: 400 }
-              )
-            }
-
-            // Return the actual error message for debugging with more context
-            return NextResponse.json(
-              { error: `Initialize simulation failed: ${errMsg || JSON.stringify(simResult.error)}. Tokens: ${sortedToken0.slice(0,10)}.../${sortedToken1.slice(0,10)}..., fee: ${fee}` },
-              { status: 400 }
-            )
-          }
-
-          // Also check for revert in result (some RPCs return it differently)
-          if (simResult.result) {
-            const r = simResult.result.toLowerCase()
-            // Check for V4 custom error selectors
-            // PoolAlreadyInitialized: 0x7983c051 or 0x83b25734
-            if (r.startsWith('0x7983c051') || r.startsWith('0x83b25734')) {
-              // PoolAlreadyInitialized
-              return NextResponse.json(
-                { error: 'This pool already exists! Try adding liquidity instead of creating.' },
-                { status: 400 }
-              )
-            }
-            if (r.startsWith('0x08c379a0')) {
-              // Standard Error(string) revert
-              console.error('[build-create-pool] Initialize reverted:', simResult.result)
-              return NextResponse.json(
-                { error: 'Pool initialization would revert. The pool may already exist or the parameters are invalid.' },
-                { status: 400 }
-              )
-            }
-            // Success case: int24 tick returned (66 chars = 0x + 64 hex)
-            // Any other result length is suspicious but let it through
-            console.log('[build-create-pool] Initialize simulation result:', r.slice(0, 20) + '...')
           }
         } catch (simErr) {
           console.warn('[build-create-pool] Could not simulate initialize:', simErr)
-          // Continue anyway - let the user try
         }
 
-        transactions.push({
-          to: initTx.to,
-          data: initTx.data,
-          value: initTx.value,
-          description: 'Initialize V4 pool with initial price',
+        return NextResponse.json({
+          success: true,
+          version: 'V4',
+          poolExists: false,
+          transactions: [{
+            to: initTx.to,
+            data: initTx.data,
+            value: initTx.value,
+            description: 'Initialize V4 pool with initial price',
+          }],
         })
+      }
+
+      // Handle mintOnly flag - return only the mint tx (assumes pool exists)
+      if (mintOnly) {
+        // Re-check pool exists and get current price
+        const freshPoolCheck = await checkV4PoolExists(sortedToken0, sortedToken1, fee, tickSpacing)
+        if (!freshPoolCheck.exists) {
+          return NextResponse.json(
+            { error: 'Pool does not exist. Initialize it first.' },
+            { status: 400 }
+          )
+        }
+
+        // Use pool's actual sqrtPriceX96 for the mint
+        const poolSqrtPriceX96 = BigInt(freshPoolCheck.sqrtPriceX96 || '0')
+        const mintParams = {
+          ...params,
+          sqrtPriceX96: poolSqrtPriceX96,
+        }
+
+        const mintTx = buildV4MintPositionTransaction(mintParams)
+        return NextResponse.json({
+          success: true,
+          version: 'V4',
+          poolExists: true,
+          transactions: [{
+            to: mintTx.to,
+            data: mintTx.data,
+            value: mintTx.value,
+            description: 'Mint V4 LP position',
+          }],
+        })
+      }
+
+      // Standard flow: return both init (if needed) and mint
+      if (!poolCheck.exists) {
+        const initTx = buildV4InitializePoolTransaction(params)
+
+        // Try to simulate the initialize
+        try {
+          const rpcUrl = ALCHEMY_KEY
+            ? `https://base-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`
+            : 'https://mainnet.base.org'
+
+          const simResponse = await fetch(rpcUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: 1,
+              method: 'eth_call',
+              params: [{ to: initTx.to, data: initTx.data }, 'latest']
+            })
+          })
+          const simResult = await simResponse.json()
+
+          if (simResult.error) {
+            const errMsg = simResult.error.message || simResult.error.data || ''
+            if (errMsg.includes('PoolAlreadyInitialized') || errMsg.includes('0x7983c051') || errMsg.includes('0x83b25734')) {
+              // Pool exists, skip init
+            } else {
+              const recheckPool = await checkV4PoolExists(sortedToken0, sortedToken1, fee, tickSpacing)
+              if (!recheckPool.exists) {
+                return NextResponse.json(
+                  { error: `Initialize simulation failed: ${errMsg}` },
+                  { status: 400 }
+                )
+              }
+            }
+          } else {
+            // Init would succeed, add it
+            transactions.push({
+              to: initTx.to,
+              data: initTx.data,
+              value: initTx.value,
+              description: 'Initialize V4 pool with initial price',
+            })
+          }
+        } catch (simErr) {
+          // Can't simulate, add init tx anyway
+          transactions.push({
+            to: initTx.to,
+            data: initTx.data,
+            value: initTx.value,
+            description: 'Initialize V4 pool with initial price',
+          })
+        }
       }
 
       // Mint position
