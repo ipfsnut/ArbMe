@@ -11,6 +11,7 @@ import { buyRatchet } from '@/lib/actions'
 import { useSendTransaction } from 'wagmi'
 
 const API_BASE = '/api'
+const RATCHET_TOKEN = '0x392bc5DeEa227043d69Af0e67BadCbBAeD511B07'
 
 interface StakingData {
   contractDeployed: boolean
@@ -49,6 +50,16 @@ function formatCountdown(periodFinish: number): string {
   return `${hours}h ${minutes}m`
 }
 
+// Format calculator amounts (from plain numbers, not wei)
+function formatCalcAmount(num: number): string {
+  if (num === 0) return '0'
+  if (num < 0.01) return '<0.01'
+  if (num >= 1_000_000_000) return (num / 1_000_000_000).toFixed(2) + 'B'
+  if (num >= 1_000_000) return (num / 1_000_000).toFixed(2) + 'M'
+  if (num >= 1_000) return (num / 1_000).toFixed(2) + 'K'
+  return num.toFixed(2)
+}
+
 // Parse input to wei
 function parseToWei(value: string, decimals: number = 18): string {
   const num = parseFloat(value)
@@ -67,6 +78,10 @@ export default function StakePage() {
   const [stakeAmount, setStakeAmount] = useState('')
   const [withdrawAmount, setWithdrawAmount] = useState('')
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+
+  // Reward calculator state
+  const [calcAmount, setCalcAmount] = useState('')
+  const [ratchetPrice, setRatchetPrice] = useState<number>(0)
 
   // Wagmi hook for browser transactions
   const { sendTransactionAsync } = useSendTransaction()
@@ -127,6 +142,14 @@ export default function StakePage() {
   useEffect(() => {
     fetchData()
   }, [fetchData])
+
+  // Fetch RATCHET price for reward calculator
+  useEffect(() => {
+    fetch(`${API_BASE}/token-price?address=${RATCHET_TOKEN}`)
+      .then(res => res.json())
+      .then(data => { if (data.price) setRatchetPrice(data.price) })
+      .catch(() => {})
+  }, [])
 
   // Calculate if approval is needed
   const needsApproval = data
@@ -414,6 +437,62 @@ export default function StakePage() {
               </div>
             </div>
 
+            {/* Reward Calculator */}
+            {data.apr > 0 && (
+              <div className="staking-section">
+                <h3>Reward Calculator</h3>
+                <div className="input-group">
+                  <div className="input-label">
+                    <span>If you stake</span>
+                    {ratchetPrice > 0 && calcAmount && (
+                      <span className="input-balance">
+                        ~${(parseFloat(calcAmount) * ratchetPrice).toFixed(2)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="input-wrapper">
+                    <input
+                      type="number"
+                      className="amount-input"
+                      placeholder="0.00"
+                      value={calcAmount}
+                      onChange={(e) => setCalcAmount(e.target.value)}
+                      min="0"
+                      step="any"
+                    />
+                    <div className="input-token">RATCHET</div>
+                  </div>
+                </div>
+                {calcAmount && parseFloat(calcAmount) > 0 && (
+                  <div className="calc-results">
+                    {[
+                      { label: 'Daily', divisor: 365 },
+                      { label: 'Weekly', divisor: 52 },
+                      { label: 'Monthly', divisor: 12 },
+                      { label: 'Yearly', divisor: 1 },
+                    ].map(({ label, divisor }) => {
+                      const yearly = parseFloat(calcAmount) * (data.apr / 100)
+                      const amount = yearly / divisor
+                      return (
+                        <div className="calc-row" key={label}>
+                          <span className="calc-label">{label}</span>
+                          <div className="calc-values">
+                            <span className="calc-ratchet">{formatCalcAmount(amount)} RATCHET</span>
+                            {ratchetPrice > 0 && (
+                              <span className="calc-usd">${(amount * ratchetPrice).toFixed(2)}</span>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                    <div className="calc-note">
+                      Based on current {data.apr.toFixed(1)}% APR{ratchetPrice > 0 ? ` · $${ratchetPrice.toFixed(6)}/RATCHET` : ''}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Contract Transparency */}
             <div className="contract-info">
               <span className="contract-label">Staking Contract</span>
@@ -560,6 +639,59 @@ export default function StakePage() {
         .buy-ratchet-btn {
           width: 100%;
           margin-top: 0.75rem;
+        }
+
+        .calc-results {
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+          margin-top: 0.75rem;
+          padding-top: 0.75rem;
+          border-top: 1px solid var(--border);
+        }
+
+        .calc-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        .calc-label {
+          font-size: 0.75rem;
+          color: var(--text-secondary);
+          flex-shrink: 0;
+        }
+
+        .calc-values {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          min-width: 0;
+        }
+
+        .calc-ratchet {
+          font-family: ui-monospace, 'SF Mono', Monaco, monospace;
+          font-size: 0.8125rem;
+          font-weight: 600;
+          color: var(--text-primary);
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .calc-usd {
+          font-size: 0.6875rem;
+          color: var(--text-muted);
+        }
+
+        .calc-note {
+          font-size: 0.625rem;
+          color: var(--text-muted);
+          text-align: center;
+          margin-top: 0.25rem;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
 
         .contract-info {
