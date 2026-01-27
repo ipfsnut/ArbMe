@@ -15,12 +15,18 @@ export function PositionCard({ position }: PositionCardProps) {
   const formatUsd = (value: number | undefined) => {
     if (value === undefined || value === null) return '$0.00'
     if (value < 0.01) return '<$0.01'
+    if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`
+    if (value >= 1_000) return `$${(value / 1_000).toFixed(2)}K`
     return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   }
 
   const formatAmount = (amount: number | undefined, decimals: number = 4) => {
     if (amount === undefined || amount === null) return '0'
     if (amount < 0.0001) return '<0.0001'
+    if (amount >= 1_000_000_000) return `${(amount / 1_000_000_000).toFixed(2)}B`
+    if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(2)}M`
+    if (amount >= 100_000) return `${(amount / 1_000).toFixed(1)}K`
+    if (amount >= 1_000) return amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })
     return amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: decimals })
   }
 

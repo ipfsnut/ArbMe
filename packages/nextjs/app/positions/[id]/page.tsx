@@ -3,13 +3,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { useWallet } from '@/hooks/useWallet'
+import { useWallet, useIsFarcaster } from '@/hooks/useWallet'
 import { AppHeader } from '@/components/AppHeader'
 import { Footer } from '@/components/Footer'
 import { BackButton } from '@/components/BackButton'
 import { ROUTES } from '@/utils/constants'
 import type { Position } from '@/utils/types'
 // SDK imported dynamically to avoid module-level crashes on mobile
+import { useSendTransaction } from 'wagmi'
 
 const API_BASE = '/api'
 
@@ -19,6 +20,8 @@ export default function PositionDetailPage() {
   const params = useParams()
   const router = useRouter()
   const wallet = useWallet()
+  const isFarcaster = useIsFarcaster()
+  const { sendTransactionAsync } = useSendTransaction()
   const positionId = params.id as string
 
   const [position, setPosition] = useState<Position | null>(null)
@@ -72,21 +75,36 @@ export default function PositionDetailPage() {
   const sendTransaction = async (tx: { to: string; data: string; value: string }) => {
     if (!wallet) throw new Error('No wallet connected')
 
-    const farcasterSdk = (await import('@farcaster/miniapp-sdk')).default
-    const provider = await farcasterSdk.wallet.getEthereumProvider()
-    if (!provider) throw new Error('No wallet provider')
+    try {
+      if (isFarcaster) {
+        const farcasterSdk = (await import('@farcaster/miniapp-sdk')).default
+        const provider = await farcasterSdk.wallet.getEthereumProvider()
+        if (!provider) throw new Error('No wallet provider')
 
-    const txHash = await provider.request({
-      method: 'eth_sendTransaction',
-      params: [{
-        from: wallet as `0x${string}`,
-        to: tx.to as `0x${string}`,
-        data: tx.data as `0x${string}`,
-        value: tx.value !== '0' ? `0x${BigInt(tx.value).toString(16)}` as `0x${string}` : '0x0',
-      }],
-    })
+        const txHash = await provider.request({
+          method: 'eth_sendTransaction',
+          params: [{
+            from: wallet as `0x${string}`,
+            to: tx.to as `0x${string}`,
+            data: tx.data as `0x${string}`,
+            value: tx.value !== '0' ? `0x${BigInt(tx.value).toString(16)}` as `0x${string}` : '0x0',
+          }],
+        })
 
-    return txHash as string
+        return txHash as string
+      } else {
+        const txHash = await sendTransactionAsync({
+          to: tx.to as `0x${string}`,
+          data: tx.data as `0x${string}`,
+          value: tx.value !== '0' ? BigInt(tx.value) : 0n,
+        })
+
+        return txHash
+      }
+    } catch (err: any) {
+      const message = err?.message || err?.shortMessage || err?.error?.message || 'Transaction failed'
+      throw new Error(message)
+    }
   }
 
   const handleCollectFees = async () => {
@@ -185,12 +203,18 @@ export default function PositionDetailPage() {
   const formatUsd = (value: number | undefined) => {
     if (value === undefined || value === null) return '$0.00'
     if (value < 0.01) return '<$0.01'
+    if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`
+    if (value >= 1_000) return `$${(value / 1_000).toFixed(2)}K`
     return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   }
 
-  const formatAmount = (amount: number | undefined, decimals: number = 6) => {
+  const formatAmount = (amount: number | undefined, decimals: number = 4) => {
     if (amount === undefined || amount === null) return '0'
-    if (amount < 0.000001) return '<0.000001'
+    if (amount < 0.0001) return '<0.0001'
+    if (amount >= 1_000_000_000) return `${(amount / 1_000_000_000).toFixed(2)}B`
+    if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(2)}M`
+    if (amount >= 100_000) return `${(amount / 1_000).toFixed(1)}K`
+    if (amount >= 1_000) return amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })
     return amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: decimals })
   }
 
@@ -242,7 +266,7 @@ export default function PositionDetailPage() {
                   )}
                 </div>
               </div>
-              <div className="position-value" style={{ fontSize: '1.5rem' }}>
+              <div className="position-value">
                 {formatUsd(position.liquidityUsd)}
               </div>
             </div>

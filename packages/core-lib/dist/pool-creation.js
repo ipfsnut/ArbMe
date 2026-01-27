@@ -440,18 +440,20 @@ export function buildV4InitializePoolTransaction(params) {
 // V4 Position Manager Action Codes (from Uniswap v4-periphery Actions.sol)
 const V4_ACTIONS = {
     // Pool liquidity actions
-    MINT_POSITION: 0x00,
-    INCREASE_LIQUIDITY: 0x01,
-    DECREASE_LIQUIDITY: 0x02,
+    INCREASE_LIQUIDITY: 0x00,
+    DECREASE_LIQUIDITY: 0x01,
+    MINT_POSITION: 0x02,
     BURN_POSITION: 0x03,
     // Delta resolving actions
-    SETTLE_PAIR: 0x10,
+    SETTLE: 0x0b,
+    SETTLE_ALL: 0x0c,
+    SETTLE_PAIR: 0x0d,
+    TAKE: 0x0e,
+    TAKE_ALL: 0x0f,
     TAKE_PAIR: 0x11,
-    SETTLE: 0x12,
-    TAKE: 0x13,
-    CLOSE_CURRENCY: 0x14,
-    CLEAR_OR_TAKE: 0x15,
-    SWEEP: 0x16,
+    CLOSE_CURRENCY: 0x12,
+    CLEAR_OR_TAKE: 0x13,
+    SWEEP: 0x14,
 };
 // ABI types for V4 encoding
 const POOL_KEY_ABI = {
@@ -632,7 +634,7 @@ export function buildV3MintPositionTransaction(params) {
     // MintParams struct
     // mint((address,address,uint24,int24,int24,uint256,uint256,uint256,uint256,address,uint256))
     // selector: 0x88316456
-    const tickLowerHex = (minTick < 0 ? (BigInt(minTick) + BigInt('0x100000000000000000000000000000000000000000000000000000000000000')) : BigInt(minTick)).toString(16).padStart(64, '0');
+    const tickLowerHex = (minTick < 0 ? (BigInt(minTick) + (1n << 256n)) : BigInt(minTick)).toString(16).padStart(64, '0');
     const tickUpperHex = BigInt(maxTick).toString(16).padStart(64, '0');
     const data = '0x88316456' +
         '0000000000000000000000000000000000000000000000000000000000000020' + // offset to struct

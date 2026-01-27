@@ -10,11 +10,11 @@ const V3_POSITION_MANAGER = '0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1';
 const V4_POSITION_MANAGER = '0x7c5f5a4bbd8fd63184577525326123b519429bdc';
 // V4 Action codes (from Uniswap v4-periphery Actions.sol)
 const V4_ACTIONS = {
-    INCREASE_LIQUIDITY: 0x01,
-    DECREASE_LIQUIDITY: 0x02,
+    INCREASE_LIQUIDITY: 0x00,
+    DECREASE_LIQUIDITY: 0x01,
     BURN_POSITION: 0x03,
     TAKE_PAIR: 0x11,
-    CLOSE_CURRENCY: 0x14,
+    CLOSE_CURRENCY: 0x12,
 };
 // V3 Position Manager ABIs
 const V3_INCREASE_LIQUIDITY_ABI = [
@@ -174,7 +174,8 @@ export function buildDecreaseLiquidityTransaction(params) {
     const [version, tokenIdStr] = positionId.split('-');
     const tokenId = BigInt(tokenIdStr);
     // Calculate liquidity to remove
-    const totalLiquidity = BigInt(currentLiquidity);
+    // currentLiquidity may be a display string like "12345678 liquidity" — strip non-digits
+    const totalLiquidity = BigInt(currentLiquidity.replace(/[^\d]/g, ''));
     const liquidityToRemove = (totalLiquidity * BigInt(Math.floor(liquidityPercentage * 100))) / BigInt(10000);
     // Minimum amounts with slippage (set to 0 for simplicity - real impl should calculate from pool price)
     const amount0Min = BigInt(0);

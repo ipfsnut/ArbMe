@@ -34,7 +34,7 @@ const V3_COLLECT_ABI = [
 ];
 // V4 Action codes (from Uniswap v4-periphery Actions.sol)
 const V4_ACTIONS = {
-    DECREASE_LIQUIDITY: 0x02,
+    DECREASE_LIQUIDITY: 0x01,
     TAKE_PAIR: 0x11,
 };
 /**

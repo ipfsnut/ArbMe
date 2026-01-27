@@ -752,10 +752,22 @@ export default function AddLiquidityPage() {
 
         const { transactions } = await res.json()
 
-        // Execute transactions
-        for (const tx of transactions) {
+        // Execute transactions sequentially, waiting for each to confirm
+        // before sending the next (e.g., V3 init must confirm before mint)
+        for (let i = 0; i < transactions.length; i++) {
+          const tx = transactions[i]
           console.log('[addLiquidity] Sending tx:', tx.description)
-          await sendTransaction(tx)
+          const txHash = await sendTransaction(tx)
+
+          // If there are more transactions after this one, wait for confirmation
+          if (i < transactions.length - 1) {
+            console.log('[addLiquidity] Waiting for confirmation before next tx...')
+            const success = await waitForReceipt(txHash)
+            if (!success) {
+              throw new Error(`Transaction failed on-chain: ${tx.description}`)
+            }
+            console.log('[addLiquidity] Confirmed!')
+          }
         }
       }
 
