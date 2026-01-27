@@ -2,8 +2,11 @@
  * Farcaster action handlers (Buy, Tip, etc.)
  */
 
-import sdk from '@farcaster/miniapp-sdk';
 import { ARBME_ADDRESS } from '../utils/constants';
+
+async function getSDK() {
+  return (await import('@farcaster/miniapp-sdk')).default;
+}
 
 // Tip jar wallet address
 const TIP_JAR_ADDRESS = '0x2C421b1c21bB88F1418cC525934E62F2c48C19df';
@@ -22,6 +25,7 @@ export async function buyArbme(): Promise<void> {
     // Base = chain 8453
     const arbmeToken = `eip155:8453/erc20:${ARBME_ADDRESS}`;
 
+    const sdk = await getSDK();
     const result = await sdk.actions.swapToken({
       buyToken: arbmeToken,
     });
@@ -47,6 +51,7 @@ export async function buyRatchet(): Promise<void> {
     // Base = chain 8453
     const ratchetToken = `eip155:8453/erc20:${RATCHET_ADDRESS}`;
 
+    const sdk = await getSDK();
     const result = await sdk.actions.swapToken({
       buyToken: ratchetToken,
     });
@@ -74,6 +79,7 @@ export async function sendTip(amountArbme: string = '1'): Promise<void> {
     // Convert to wei (18 decimals)
     const amountWei = (parseFloat(amountArbme) * 1e18).toString();
 
+    const sdk = await getSDK();
     const result = await sdk.actions.sendToken({
       token: arbmeToken,
       amount: amountWei,
@@ -111,6 +117,7 @@ export async function collectFees(positionId: string, recipient: string): Promis
     const tx = await response.json();
 
     // Send transaction via Ethereum provider
+    const sdk = await getSDK();
     const provider = await sdk.wallet.getEthereumProvider();
     if (!provider) {
       throw new Error('No Ethereum provider available');

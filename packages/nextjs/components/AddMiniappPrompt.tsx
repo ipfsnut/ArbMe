@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import sdk from '@farcaster/miniapp-sdk'
 import { useIsFarcaster } from '@/hooks/useWallet'
 
 export function AddMiniappPrompt() {
@@ -18,6 +17,7 @@ export function AddMiniappPrompt() {
 
   async function checkIfAdded() {
     try {
+      const sdk = (await import('@farcaster/miniapp-sdk')).default
       // Check if miniapp is already added
       const context = await sdk.context
       const added = context?.client?.added || false
@@ -35,6 +35,7 @@ export function AddMiniappPrompt() {
 
   async function handleAddMiniapp() {
     try {
+      const sdk = (await import('@farcaster/miniapp-sdk')).default
       await sdk.actions.addFrame()
       setIsAdded(true)
       setShowPrompt(false)

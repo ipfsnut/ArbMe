@@ -5,7 +5,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { WagmiProvider, useAccount } from 'wagmi'
 import { RainbowKitProvider, ConnectButton, darkTheme } from '@rainbow-me/rainbowkit'
 import '@rainbow-me/rainbowkit/styles.css'
-import sdk from '@farcaster/miniapp-sdk'
 import { wagmiConfig } from '@/config/wagmi'
 
 const queryClient = new QueryClient()
@@ -43,25 +42,22 @@ function WalletInner({ children, isFarcaster }: { children: ReactNode; isFarcast
   // Get wagmi account (used in browser mode)
   const { address: wagmiAddress, isConnected: wagmiConnected } = useAccount()
 
-  // Signal ready to Farcaster ASAP
-  useEffect(() => {
-    if (isFarcaster) {
-      try {
-        sdk.actions.ready()
-        console.log('[Wallet] Signaled ready to Farcaster')
-      } catch (e) {
-        console.log('[Wallet] Could not signal ready:', e)
-      }
-    }
-  }, [isFarcaster])
-
-  // Load Farcaster wallet if in Farcaster mode
+  // Load Farcaster wallet if in Farcaster mode (dynamic import)
   useEffect(() => {
     if (!isFarcaster) return
 
     async function loadFarcasterWallet() {
       try {
         console.log('[Wallet] Loading Farcaster wallet...')
+        const sdk = (await import('@farcaster/miniapp-sdk')).default
+
+        // Signal ready
+        try {
+          sdk.actions.ready()
+          console.log('[Wallet] Signaled ready to Farcaster')
+        } catch (e) {
+          console.log('[Wallet] Could not signal ready:', e)
+        }
 
         // Add timeout to provider request
         const providerPromise = sdk.wallet.getEthereumProvider()
@@ -124,97 +120,67 @@ interface WalletProviderProps {
 }
 
 export function WalletProvider({ children }: WalletProviderProps) {
-  const [isFarcaster, setIsFarcaster] = useState<boolean | null>(null)
+  // Default to browser mode immediately - no blocking loading screen
+  const [isFarcaster, setIsFarcaster] = useState(false)
 
   useEffect(() => {
-    let resolved = false
-
     const detectEnvironment = async () => {
-      // Check if we're in an iframe (Farcaster frames run in iframes)
-      const inIframe = typeof window !== 'undefined' && window.parent !== window
-      console.log('[WalletProvider] Starting detection, inIframe:', inIframe)
+      try {
+        // Check if we're in an iframe (Farcaster frames run in iframes)
+        const inIframe = typeof window !== 'undefined' && window.parent !== window
+        console.log('[WalletProvider] Starting detection, inIframe:', inIframe)
 
-      if (!inIframe) {
-        console.log('[WalletProvider] Not in iframe, using browser mode')
-        if (!resolved) {
-          resolved = true
-          setIsFarcaster(false)
+        if (!inIframe) {
+          console.log('[WalletProvider] Not in iframe, using browser mode')
+          return
         }
-        return
-      }
 
-      // In an iframe - try to detect Farcaster with aggressive timeout
-      // Signal ready first (required by Farcaster SDK)
-      try {
-        sdk.actions.ready()
-        console.log('[WalletProvider] Called sdk.actions.ready()')
-      } catch (e) {
-        console.log('[WalletProvider] sdk.actions.ready() failed:', e)
-      }
+        // Dynamic import to avoid module-level crashes
+        let sdk: any
+        try {
+          sdk = (await import('@farcaster/miniapp-sdk')).default
+        } catch (e) {
+          console.log('[WalletProvider] Failed to import SDK:', e)
+          return
+        }
 
-      // Try to get provider with timeout
-      let provider = null
-      try {
+        if (!sdk?.wallet?.getEthereumProvider || !sdk?.actions?.ready) {
+          console.log('[WalletProvider] SDK missing required methods')
+          return
+        }
+
+        // Signal ready first (required by Farcaster SDK)
+        try {
+          sdk.actions.ready()
+          console.log('[WalletProvider] Called sdk.actions.ready()')
+        } catch (e) {
+          console.log('[WalletProvider] sdk.actions.ready() failed:', e)
+        }
+
+        // Try to get provider with timeout
         const providerPromise = sdk.wallet.getEthereumProvider()
         const timeoutPromise = new Promise<null>((resolve) => {
-          setTimeout(() => {
-            console.log('[WalletProvider] Provider request timed out')
-            resolve(null)
-          }, 2000)
+          setTimeout(() => resolve(null), 2000)
         })
 
-        provider = await Promise.race([providerPromise, timeoutPromise])
+        const provider = await Promise.race([providerPromise, timeoutPromise])
         console.log('[WalletProvider] Provider result:', !!provider)
-      } catch (error) {
-        console.log('[WalletProvider] Provider request error:', error)
-      }
 
-      if (!resolved) {
-        resolved = true
         if (provider) {
           console.log('[WalletProvider] Farcaster environment detected')
           setIsFarcaster(true)
         } else {
-          console.log('[WalletProvider] No provider, falling back to browser mode')
-          setIsFarcaster(false)
+          console.log('[WalletProvider] No provider, staying in browser mode')
         }
+      } catch (error) {
+        console.log('[WalletProvider] Detection error:', error)
       }
     }
 
-    // Hard fallback - if detection hasn't resolved in 3 seconds, force browser mode
-    const fallbackTimer = setTimeout(() => {
-      if (!resolved) {
-        console.log('[WalletProvider] HARD FALLBACK - forcing browser mode after 3s')
-        resolved = true
-        setIsFarcaster(false)
-      }
-    }, 3000)
-
     detectEnvironment()
-
-    return () => clearTimeout(fallbackTimer)
   }, [])
 
-  // Still detecting environment
-  if (isFarcaster === null) {
-    return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '100vh',
-        background: '#0a0a0a',
-        color: '#666',
-        fontFamily: 'system-ui, sans-serif',
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ marginBottom: '8px' }}>Loading...</div>
-        </div>
-      </div>
-    )
-  }
-
-  // Always wrap in WagmiProvider so wagmi hooks work in both environments
+  // Always render immediately - no blocking loading screen
   return (
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>

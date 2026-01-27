@@ -9,7 +9,7 @@ import { Footer } from '@/components/Footer'
 import { BackButton } from '@/components/BackButton'
 import { ROUTES } from '@/utils/constants'
 import type { Position } from '@/utils/types'
-import sdk from '@farcaster/miniapp-sdk'
+// SDK imported dynamically to avoid module-level crashes on mobile
 
 const API_BASE = '/api'
 
@@ -72,7 +72,8 @@ export default function PositionDetailPage() {
   const sendTransaction = async (tx: { to: string; data: string; value: string }) => {
     if (!wallet) throw new Error('No wallet connected')
 
-    const provider = await sdk.wallet.getEthereumProvider()
+    const farcasterSdk = (await import('@farcaster/miniapp-sdk')).default
+    const provider = await farcasterSdk.wallet.getEthereumProvider()
     if (!provider) throw new Error('No wallet provider')
 
     const txHash = await provider.request({

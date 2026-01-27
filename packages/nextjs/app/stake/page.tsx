@@ -7,7 +7,7 @@ import { Footer } from '@/components/Footer'
 import { BackButton } from '@/components/BackButton'
 import { ROUTES } from '@/utils/constants'
 import { buyRatchet } from '@/lib/actions'
-import sdk from '@farcaster/miniapp-sdk'
+// SDK imported dynamically to avoid module-level crashes on mobile
 import { useSendTransaction } from 'wagmi'
 
 const API_BASE = '/api'
@@ -75,7 +75,8 @@ export default function StakePage() {
   const sendTx = async (tx: { to: string; data: string; value: string }): Promise<string> => {
     if (isFarcaster) {
       // Use Farcaster SDK for miniapp
-      const provider = await sdk.wallet.getEthereumProvider()
+      const farcasterSdk = (await import('@farcaster/miniapp-sdk')).default
+      const provider = await farcasterSdk.wallet.getEthereumProvider()
       if (!provider) throw new Error('No wallet provider')
 
       const txHash = await provider.request({

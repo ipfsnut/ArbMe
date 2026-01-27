@@ -6,7 +6,7 @@ import { AppHeader } from '@/components/AppHeader'
 import { Footer } from '@/components/Footer'
 import { BackButton } from '@/components/BackButton'
 import { ROUTES, WETH_ADDRESS } from '@/utils/constants'
-import sdk from '@farcaster/miniapp-sdk'
+// SDK imported dynamically to avoid module-level crashes on mobile
 import { useSendTransaction } from 'wagmi'
 import { parseEther, formatEther } from 'viem'
 
@@ -69,7 +69,8 @@ export default function WrapPage() {
     if (!wallet) throw new Error('No wallet connected')
 
     if (isFarcaster) {
-      const provider = await sdk.wallet.getEthereumProvider()
+      const farcasterSdk = (await import('@farcaster/miniapp-sdk')).default
+      const provider = await farcasterSdk.wallet.getEthereumProvider()
       if (!provider) throw new Error('No wallet provider')
 
       const txHash = await provider.request({

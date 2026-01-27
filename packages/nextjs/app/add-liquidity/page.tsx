@@ -10,7 +10,7 @@ import { TokenInput } from '@/components/TokenInput'
 import { FeeTierSelector } from '@/components/FeeTierSelector'
 import { StepIndicator } from '@/components/StepIndicator'
 import { ROUTES, ARBME_ADDRESS, WETH_ADDRESS, V2_ROUTER, V3_POSITION_MANAGER, V4_POSITION_MANAGER, V3_FEE_TIERS, V4_FEE_TIERS } from '@/utils/constants'
-import sdk from '@farcaster/miniapp-sdk'
+// SDK imported dynamically to avoid module-level crashes on mobile
 import { useSendTransaction } from 'wagmi'
 
 const API_BASE = '/api'
@@ -376,7 +376,8 @@ export default function AddLiquidityPage() {
     try {
       if (isFarcaster) {
         // Use Farcaster SDK for miniapp
-        const provider = await sdk.wallet.getEthereumProvider()
+        const farcasterSdk = (await import('@farcaster/miniapp-sdk')).default
+        const provider = await farcasterSdk.wallet.getEthereumProvider()
         if (!provider) throw new Error('No wallet provider')
 
         const txHash = await provider.request({
