@@ -3758,9 +3758,15 @@ button.button-primary:hover {
 
 .buy-tokens-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: 1fr;
   gap: var(--spacing-sm);
   margin-top: var(--spacing-md);
+}
+
+@media (min-width: 480px) {
+  .buy-tokens-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 
 .buy-token-card {
