@@ -35,47 +35,44 @@ export function PositionCard({ position }: PositionCardProps) {
       href={`${ROUTES.POSITION_DETAIL}/${position.id}`}
       className={`position-card ${isClosed ? 'closed' : ''}`}
     >
-      <div className="position-header">
-        <div className="position-pair">
-          <span className="pair-name">{position.pair}</span>
-          <span className={`version-badge ${position.version.toLowerCase()}`}>
-            {position.version}
-          </span>
-        </div>
-        <div className="position-value">
-          {formatUsd(position.liquidityUsd)}
-        </div>
-      </div>
-
-      <div className="position-details">
-        <div className="position-status">
+      <div className="position-card-top">
+        <span className="position-pair-name">{position.pair}</span>
+        <div className="position-badges">
+          <span className="position-version-badge">{position.version}</span>
           {position.version !== 'V2' && position.inRange !== undefined && (
-            <span className={`range-badge ${position.inRange ? 'in-range' : 'out-of-range'}`}>
+            <span className={`position-range-badge ${position.inRange ? 'in-range' : 'out-of-range'}`}>
               {position.inRange ? 'In Range' : 'Out of Range'}
             </span>
           )}
-          {position.fee && (
-            <span className="fee-badge">{(position.fee / 10000).toFixed(2)}%</span>
-          )}
         </div>
+      </div>
 
-        <div className="position-amounts">
-          <div className="amount-row">
-            <span className="token-symbol">{position.token0?.symbol || '???'}</span>
-            <span className="amount">{formatAmount(position.token0?.amount)}</span>
-          </div>
-          <div className="amount-row">
-            <span className="token-symbol">{position.token1?.symbol || '???'}</span>
-            <span className="amount">{formatAmount(position.token1?.amount)}</span>
-          </div>
+      <div className="position-card-stats">
+        <div className="position-stat-col">
+          <span className="position-stat-label">Value</span>
+          <span className="position-stat-value accent">{formatUsd(position.liquidityUsd)}</span>
         </div>
-
         {hasFees && !isClosed && (
-          <div className="unclaimed-fees">
-            <span className="fees-label">Unclaimed Fees</span>
-            {formatUsd(position.feesEarnedUsd)}
+          <div className="position-stat-col">
+            <span className="position-stat-label">Fees</span>
+            <span className="position-stat-value">{formatUsd(position.feesEarnedUsd)}</span>
           </div>
         )}
+        {position.fee && (
+          <div className="position-stat-col">
+            <span className="position-stat-label">Fee Tier</span>
+            <span className="position-stat-value">{(position.fee / 10000).toFixed(2)}%</span>
+          </div>
+        )}
+      </div>
+
+      <div className="position-card-amounts">
+        <span className="position-token-amount">
+          {position.token0?.symbol || '???'}: {formatAmount(position.token0?.amount)}
+        </span>
+        <span className="position-token-amount">
+          {position.token1?.symbol || '???'}: {formatAmount(position.token1?.amount)}
+        </span>
       </div>
     </Link>
   )
