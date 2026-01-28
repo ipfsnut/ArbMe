@@ -585,10 +585,21 @@ async function _fetchPoolsInternal(alchemyKey, cached) {
                 allPools.push(balPool);
             }
         }
-        // Add RATCHET, ABC, and CLAWD pools (avoid duplicates by pairAddress)
+        // Add RATCHET, ABC, and CLAWD pools — only if they contain at least one
+        // of our core tokens (ARBME, RATCHET, or ABC)
+        const coreTokens = [
+            ARBME.address.toLowerCase(),
+            TOKENS.RATCHET.toLowerCase(),
+            TOKENS.ABC.toLowerCase(),
+        ];
+        const hasCoreToken = (pool) => {
+            const t0 = pool.token0?.toLowerCase();
+            const t1 = pool.token1?.toLowerCase();
+            return coreTokens.some(ct => ct === t0 || ct === t1);
+        };
         for (const pool of [...ratchetPools, ...abcPools, ...clawdPools]) {
             const alreadyExists = allPools.some(p => p.pairAddress.toLowerCase() === pool.pairAddress.toLowerCase());
-            if (!alreadyExists) {
+            if (!alreadyExists && hasCoreToken(pool)) {
                 allPools.push(pool);
             }
         }
@@ -609,7 +620,11 @@ async function _fetchPoolsInternal(alchemyKey, cached) {
         }
         // Sort by TVL
         allPools.sort((a, b) => b.tvl - a.tvl);
-        const totalTvl = allPools.reduce((sum, p) => sum + p.tvl, 0);
+        // Total TVL = sum of all pools containing ARBME, RATCHET, or ABC
+        // (allPools is already filtered to only include these, but be explicit)
+        const totalTvl = allPools
+            .filter(p => hasCoreToken(p))
+            .reduce((sum, p) => sum + p.tvl, 0);
         // Per-token TVL (sum TVL of pools containing each token)
         const tokenTvl = (tokenAddr) => {
             const addr = tokenAddr.toLowerCase();
@@ -620,7 +635,7 @@ async function _fetchPoolsInternal(alchemyKey, cached) {
         const arbmeTvl = tokenTvl(ARBME.address);
         const ratchetTvl = tokenTvl(TOKENS.RATCHET);
         const abcTvl = tokenTvl(TOKENS.ABC);
-        const clawdTvl = tokenTvl(TOKENS.CLAWD);
+        const clawdTvl = tokenTvl(TOKENS.CLAWD); // Keep for API compatibility but not featured
         // Get canonical prices from each token's V4/WETH pool
         const findV4WethPrice = (tokenAddr) => {
             const addr = tokenAddr.toLowerCase();
