@@ -20,6 +20,7 @@ const RATCHET_ADDRESS = '0x392bc5DeEa227043d69Af0e67BadCbBAeD511B07';
 // $ABC token address
 const ABC_ADDRESS = '0x5c0872b790Bb73e2B3A9778Db6E7704095624b07';
 
+
 /**
  * Launch Farcaster's swap widget to buy $ARBME
  */
@@ -98,6 +99,7 @@ export async function buyAbc(): Promise<void> {
     console.error('[Actions] Error opening buy widget:', error);
   }
 }
+
 
 /**
  * Send tip in $ARBME to the tip jar

@@ -13,6 +13,7 @@ export declare const TOKENS: {
     CLANKER: string;
     RATCHET: string;
     ABC: string;
+    CLAWD: string;
 };
 export declare const GECKO_API = "https://api.geckoterminal.com/api/v2";
 export declare const DEFAULT_TIMEOUT = 5000;

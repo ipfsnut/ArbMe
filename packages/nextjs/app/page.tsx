@@ -30,10 +30,12 @@ export default function HomePage() {
         arbmePrice: data.arbmePrice,
         ratchetPrice: data.ratchetPrice,
         abcPrice: data.abcPrice,
+        clawdPrice: data.clawdPrice,
         totalTvl: data.totalTvl,
         arbmeTvl: data.arbmeTvl,
         ratchetTvl: data.ratchetTvl,
         abcTvl: data.abcTvl,
+        clawdTvl: data.clawdTvl,
       },
       loading: false
     })

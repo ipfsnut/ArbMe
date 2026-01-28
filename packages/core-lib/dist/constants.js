@@ -19,6 +19,7 @@ export const TOKENS = {
     CLANKER: '0x1bc0c42215582d5a085795f4badbac3ff36d1bcb',
     RATCHET: '0x392bc5DeEa227043d69Af0e67BadCbBAeD511B07',
     ABC: '0x5c0872b790Bb73e2B3A9778Db6E7704095624b07',
+    CLAWD: '0x9f86db9fc6f7c9408e8fda3ff8ce4e78ac7a6b07',
 };
 // ═══════════════════════════════════════════════════════════════════════════════
 // External APIs
