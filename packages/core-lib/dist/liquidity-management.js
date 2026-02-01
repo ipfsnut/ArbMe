@@ -108,10 +108,14 @@ export function buildIncreaseLiquidityTransaction(params) {
     const { positionId, amount0Desired, amount1Desired, slippageTolerance = 0.5 } = params;
     const [version, tokenIdStr] = positionId.split('-');
     const tokenId = BigInt(tokenIdStr);
-    // Calculate minimum amounts with slippage tolerance
-    const slippageMultiplier = 1 - slippageTolerance / 100;
-    const amount0Min = BigInt(Math.floor(Number(amount0Desired) * slippageMultiplier));
-    const amount1Min = BigInt(Math.floor(Number(amount1Desired) * slippageMultiplier));
+    // Calculate minimum amounts with slippage tolerance using BigInt arithmetic
+    // to avoid precision loss for large wei values (JavaScript Number loses precision > 2^53)
+    const slippageBps = BigInt(Math.floor(slippageTolerance * 100)); // e.g., 50 = 0.5%
+    const basisPoints = 10000n;
+    const amount0 = BigInt(amount0Desired);
+    const amount1 = BigInt(amount1Desired);
+    const amount0Min = amount0 * (basisPoints - slippageBps) / basisPoints;
+    const amount1Min = amount1 * (basisPoints - slippageBps) / basisPoints;
     // Deadline: 20 minutes from now
     const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200);
     if (version === 'v3') {
@@ -170,7 +174,7 @@ export function buildIncreaseLiquidityTransaction(params) {
  * Build transaction to remove liquidity from a position
  */
 export function buildDecreaseLiquidityTransaction(params) {
-    const { positionId, liquidityPercentage, currentLiquidity, slippageTolerance = 0.5 } = params;
+    const { positionId, liquidityPercentage, currentLiquidity, slippageTolerance: _slippageTolerance = 0.5 } = params;
     const [version, tokenIdStr] = positionId.split('-');
     const tokenId = BigInt(tokenIdStr);
     // Calculate liquidity to remove

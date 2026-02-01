@@ -3,7 +3,7 @@
  * Handles Uniswap V2/V3/V4 pool creation and liquidity provision
  */
 
-import { FEE_TO_TICK_SPACING, BASE_RPCS_FALLBACK, RPC_TIMEOUT } from './constants.js';
+import { FEE_TO_TICK_SPACING, BASE_RPCS_FALLBACK } from './constants.js';
 import { keccak256, encodeAbiParameters, encodeFunctionData, encodePacked } from 'viem';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -605,18 +605,6 @@ const V4_ACTIONS = {
   SWEEP: 0x14,
 } as const;
 
-// ABI types for V4 encoding
-const POOL_KEY_ABI = {
-  components: [
-    { name: 'currency0', type: 'address' },
-    { name: 'currency1', type: 'address' },
-    { name: 'fee', type: 'uint24' },
-    { name: 'tickSpacing', type: 'int24' },
-    { name: 'hooks', type: 'address' },
-  ],
-  type: 'tuple',
-} as const;
-
 /**
  * Calculate liquidity from amounts and sqrtPriceX96 for full-range position
  * For a full-range position, liquidity is approximately:
@@ -835,32 +823,56 @@ export function buildV3MintPositionTransaction(params: V3CreatePoolParams): Tran
   const tickSpacing = FEE_TO_TICK_SPACING[params.fee] || 60;
   const { minTick, maxTick } = getTickRange(tickSpacing);
 
-  const slippage = params.slippageTolerance || 0.5;
-  const slippageMultiplier = 1 - (slippage / 100);
+  // Calculate slippage using BigInt arithmetic to avoid precision loss
+  // JavaScript's Number type loses precision for large wei values (> 2^53)
+  const slippageBps = BigInt(Math.floor((params.slippageTolerance || 0.5) * 100)); // 50 = 0.5%
+  const basisPoints = 10000n;
+  const amount0 = BigInt(params.amount0);
+  const amount1 = BigInt(params.amount1);
+  const amount0Min = amount0 * (basisPoints - slippageBps) / basisPoints;
+  const amount1Min = amount1 * (basisPoints - slippageBps) / basisPoints;
+  const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200);
 
-  const amount0Min = BigInt(Math.floor(Number(params.amount0) * slippageMultiplier));
-  const amount1Min = BigInt(Math.floor(Number(params.amount1) * slippageMultiplier));
-  const deadline = Math.floor(Date.now() / 1000) + 1200;
-
-  // MintParams struct
-  // mint((address,address,uint24,int24,int24,uint256,uint256,uint256,uint256,address,uint256))
-  // selector: 0x88316456
-  const tickLowerHex = (minTick < 0 ? (BigInt(minTick) + (1n << 256n)) : BigInt(minTick)).toString(16).padStart(64, '0');
-  const tickUpperHex = BigInt(maxTick).toString(16).padStart(64, '0');
-
-  const data = '0x88316456' +
-    '0000000000000000000000000000000000000000000000000000000000000020' + // offset to struct
-    params.token0.slice(2).padStart(64, '0') +
-    params.token1.slice(2).padStart(64, '0') +
-    params.fee.toString(16).padStart(64, '0') +
-    tickLowerHex +
-    tickUpperHex +
-    BigInt(params.amount0).toString(16).padStart(64, '0') + // amount0Desired
-    BigInt(params.amount1).toString(16).padStart(64, '0') + // amount1Desired
-    amount0Min.toString(16).padStart(64, '0') +
-    amount1Min.toString(16).padStart(64, '0') +
-    params.recipient.slice(2).padStart(64, '0') +
-    deadline.toString(16).padStart(64, '0');
+  // Use viem's encodeFunctionData for correct ABI encoding
+  // The MintParams tuple is static (all fixed-size types), so it's encoded inline without offset
+  const data = encodeFunctionData({
+    abi: [{
+      name: 'mint',
+      type: 'function',
+      inputs: [{
+        name: 'params',
+        type: 'tuple',
+        components: [
+          { name: 'token0', type: 'address' },
+          { name: 'token1', type: 'address' },
+          { name: 'fee', type: 'uint24' },
+          { name: 'tickLower', type: 'int24' },
+          { name: 'tickUpper', type: 'int24' },
+          { name: 'amount0Desired', type: 'uint256' },
+          { name: 'amount1Desired', type: 'uint256' },
+          { name: 'amount0Min', type: 'uint256' },
+          { name: 'amount1Min', type: 'uint256' },
+          { name: 'recipient', type: 'address' },
+          { name: 'deadline', type: 'uint256' },
+        ],
+      }],
+      outputs: [],
+    }],
+    functionName: 'mint',
+    args: [{
+      token0: params.token0,
+      token1: params.token1,
+      fee: params.fee,
+      tickLower: minTick,
+      tickUpper: maxTick,
+      amount0Desired: amount0,
+      amount1Desired: amount1,
+      amount0Min,
+      amount1Min,
+      recipient: params.recipient,
+      deadline,
+    }],
+  });
 
   return {
     to: V3_POSITION_MANAGER,
@@ -877,11 +889,14 @@ export function buildV3MintPositionTransaction(params: V3CreatePoolParams): Tran
  * Build V2 create pool & add liquidity transaction
  */
 export function buildV2CreatePoolTransaction(params: V2CreatePoolParams): Transaction {
-  const slippage = params.slippageTolerance || 0.5;
-  const slippageMultiplier = 1 - (slippage / 100);
-
-  const amountAMin = BigInt(Math.floor(Number(params.amountA) * slippageMultiplier));
-  const amountBMin = BigInt(Math.floor(Number(params.amountB) * slippageMultiplier));
+  // Calculate slippage using BigInt arithmetic to avoid precision loss
+  // JavaScript's Number type loses precision for large wei values (> 2^53)
+  const slippageBps = BigInt(Math.floor((params.slippageTolerance || 0.5) * 100)); // 50 = 0.5%
+  const basisPoints = 10000n;
+  const amountA = BigInt(params.amountA);
+  const amountB = BigInt(params.amountB);
+  const amountAMin = amountA * (basisPoints - slippageBps) / basisPoints;
+  const amountBMin = amountB * (basisPoints - slippageBps) / basisPoints;
   const deadline = Math.floor(Date.now() / 1000) + 1200;
 
   // addLiquidity(address,address,uint256,uint256,uint256,uint256,address,uint256)
