@@ -8,6 +8,10 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { fetchPools } from '@/services/api';
 import type { Pool, PoolsResponse } from '@/utils/types';
+import { AppHeader } from '@/components/AppHeader';
+import { Footer } from '@/components/Footer';
+import { BackButton } from '@/components/BackButton';
+import { ROUTES } from '@/utils/constants';
 import styles from './traffic.module.css';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -566,31 +570,41 @@ export default function TrafficPage() {
   }, [loadPools, loadSwaps]);
 
   return (
-    <div className={styles.page}>
-      <header className={styles.header}>
-        <h1 className={styles.title}>Market Traffic</h1>
-        <p className={styles.subtitle}>Real-time ecosystem activity</p>
-        {lastUpdate && (
-          <span className={styles.lastUpdate}>
-            Updated: {lastUpdate.toLocaleTimeString()}
-          </span>
-        )}
-      </header>
+    <div className="app">
+      <AppHeader />
 
-      {loading ? (
-        <div className={styles.loading}>Loading market data...</div>
-      ) : (
-        <div className={styles.grid}>
-          {/* Spread Index */}
-          <SpreadIndex pools={poolsWithMetrics} mainPrice={mainArbmePrice} />
+      <div className="main-content">
+        <BackButton href={ROUTES.HOME} label="Back to Home" />
 
-          {/* Pool Heat Map */}
-          <PoolHeatMap pools={poolsWithMetrics} />
+        <div className={styles.page}>
+          <header className={styles.header}>
+            <h1 className={styles.title}>Market Traffic</h1>
+            <p className={styles.subtitle}>Real-time ecosystem activity</p>
+            {lastUpdate && (
+              <span className={styles.lastUpdate}>
+                Updated: {lastUpdate.toLocaleTimeString()}
+              </span>
+            )}
+          </header>
 
-          {/* Live Swaps Feed */}
-          <LiveSwapsFeed swaps={swaps} loading={swapsLoading} />
+          {loading ? (
+            <div className={styles.loading}>Loading market data...</div>
+          ) : (
+            <div className={styles.grid}>
+              {/* Spread Index */}
+              <SpreadIndex pools={poolsWithMetrics} mainPrice={mainArbmePrice} />
+
+              {/* Pool Heat Map */}
+              <PoolHeatMap pools={poolsWithMetrics} />
+
+              {/* Live Swaps Feed */}
+              <LiveSwapsFeed swaps={swaps} loading={swapsLoading} />
+            </div>
+          )}
         </div>
-      )}
+      </div>
+
+      <Footer />
     </div>
   );
 }
