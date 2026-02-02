@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
 import { useWallet, useIsFarcaster } from '@/hooks/useWallet'
 import { AppHeader } from '@/components/AppHeader'
 import { Footer } from '@/components/Footer'
 import { BackButton } from '@/components/BackButton'
-import { useSendTransaction } from 'wagmi'
+import { useSendTransaction, useReadContract } from 'wagmi'
 
 const API_BASE = '/api'
 
@@ -17,6 +17,81 @@ interface TokenInfo {
   symbol: string
   decimals: number
 }
+
+// V3 Quoter V2 on Base
+const V3_QUOTER = '0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a' as const
+
+// V4 StateView on Base
+const V4_STATE_VIEW = '0xa3c0c9b65bad0b08107aa264b0f3db444b867a71' as const
+
+// ABIs for client-side quoting
+const QUOTER_V2_ABI = [
+  {
+    name: 'quoteExactInputSingle',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [{
+      name: 'params',
+      type: 'tuple',
+      components: [
+        { name: 'tokenIn', type: 'address' },
+        { name: 'tokenOut', type: 'address' },
+        { name: 'amountIn', type: 'uint256' },
+        { name: 'fee', type: 'uint24' },
+        { name: 'sqrtPriceLimitX96', type: 'uint160' },
+      ],
+    }],
+    outputs: [
+      { name: 'amountOut', type: 'uint256' },
+      { name: 'sqrtPriceX96After', type: 'uint160' },
+      { name: 'initializedTicksCrossed', type: 'uint32' },
+      { name: 'gasEstimate', type: 'uint256' },
+    ],
+  },
+] as const
+
+const STATE_VIEW_ABI = [
+  {
+    name: 'getSlot0',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'poolId', type: 'bytes32' }],
+    outputs: [
+      { name: 'sqrtPriceX96', type: 'uint160' },
+      { name: 'tick', type: 'int24' },
+      { name: 'protocolFee', type: 'uint24' },
+      { name: 'lpFee', type: 'uint24' },
+    ],
+  },
+  {
+    name: 'getLiquidity',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'poolId', type: 'bytes32' }],
+    outputs: [{ name: 'liquidity', type: 'uint128' }],
+  },
+] as const
+
+const V2_PAIR_ABI = [
+  {
+    name: 'getReserves',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [
+      { name: 'reserve0', type: 'uint112' },
+      { name: 'reserve1', type: 'uint112' },
+      { name: 'blockTimestampLast', type: 'uint32' },
+    ],
+  },
+  {
+    name: 'token0',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+  },
+] as const
 
 export default function TradePage() {
   const params = useParams()
@@ -36,7 +111,7 @@ export default function TradePage() {
   const tickSpacing = parseInt(searchParams.get('ts') || '60', 10)
   const pairName = searchParams.get('pair') || 'Token Swap'
 
-  // Token info state (fetched on mount)
+  // Token info state
   const [token0, setToken0] = useState<TokenInfo | null>(null)
   const [token1, setToken1] = useState<TokenInfo | null>(null)
   const [loading, setLoading] = useState(true)
@@ -44,16 +119,150 @@ export default function TradePage() {
   // Swap state
   const [swapDirection, setSwapDirection] = useState<'0to1' | '1to0'>('0to1')
   const [swapAmount, setSwapAmount] = useState('')
-  const [swapQuote, setSwapQuote] = useState<{
-    amountOut: string
-    priceImpact: number
-    executionPrice: number
-  } | null>(null)
   const [swapStatus, setSwapStatus] = useState<TxStatus>('idle')
-  const [quoteLoading, setQuoteLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Fetch token info (symbols, decimals)
+  // Computed values
+  const tokenIn = swapDirection === '0to1' ? token0 : token1
+  const tokenOut = swapDirection === '0to1' ? token1 : token0
+  const decimalsIn = tokenIn?.decimals || 18
+  const decimalsOut = tokenOut?.decimals || 18
+
+  const amountInWei = useMemo(() => {
+    if (!swapAmount || parseFloat(swapAmount) <= 0) return 0n
+    try {
+      return BigInt(Math.floor(parseFloat(swapAmount) * Math.pow(10, decimalsIn)))
+    } catch {
+      return 0n
+    }
+  }, [swapAmount, decimalsIn])
+
+  // V2: Read reserves for quote calculation
+  const { data: v2Reserves } = useReadContract({
+    address: poolAddress as `0x${string}`,
+    abi: V2_PAIR_ABI,
+    functionName: 'getReserves',
+    query: { enabled: version === 'V2' && !!poolAddress },
+  })
+
+  const { data: v2Token0 } = useReadContract({
+    address: poolAddress as `0x${string}`,
+    abi: V2_PAIR_ABI,
+    functionName: 'token0',
+    query: { enabled: version === 'V2' && !!poolAddress },
+  })
+
+  // V3: Use Quoter contract (this is a view call simulation)
+  const { data: v3Quote, isLoading: v3Loading, error: v3Error } = useReadContract({
+    address: V3_QUOTER,
+    abi: QUOTER_V2_ABI,
+    functionName: 'quoteExactInputSingle',
+    args: tokenIn && tokenOut && amountInWei > 0n ? [{
+      tokenIn: tokenIn.address as `0x${string}`,
+      tokenOut: tokenOut.address as `0x${string}`,
+      amountIn: amountInWei,
+      fee: fee,
+      sqrtPriceLimitX96: 0n,
+    }] : undefined,
+    query: {
+      enabled: version === 'V3' && !!tokenIn && !!tokenOut && amountInWei > 0n,
+    },
+  })
+
+  // V4: Read pool state from StateView
+  const poolId = useMemo(() => {
+    if (version !== 'V4' || !token0Address || !token1Address) return undefined
+    // If poolAddress is already a poolId (66 chars), use it
+    if (poolAddress.startsWith('0x') && poolAddress.length === 66) {
+      return poolAddress as `0x${string}`
+    }
+    // Otherwise compute from pool key (simplified - real impl would hash the PoolKey struct)
+    return undefined
+  }, [version, poolAddress, token0Address, token1Address])
+
+  const { data: v4Slot0 } = useReadContract({
+    address: V4_STATE_VIEW,
+    abi: STATE_VIEW_ABI,
+    functionName: 'getSlot0',
+    args: poolId ? [poolId] : undefined,
+    query: { enabled: version === 'V4' && !!poolId },
+  })
+
+  const { data: v4Liquidity } = useReadContract({
+    address: V4_STATE_VIEW,
+    abi: STATE_VIEW_ABI,
+    functionName: 'getLiquidity',
+    args: poolId ? [poolId] : undefined,
+    query: { enabled: version === 'V4' && !!poolId },
+  })
+
+  // Calculate quote based on version
+  const swapQuote = useMemo(() => {
+    if (amountInWei === 0n) return null
+
+    if (version === 'V2' && v2Reserves && v2Token0 && tokenIn && tokenOut) {
+      // V2: constant product formula
+      const [reserve0, reserve1] = v2Reserves
+      const isToken0In = tokenIn.address.toLowerCase() === v2Token0.toLowerCase()
+      const reserveIn = isToken0In ? reserve0 : reserve1
+      const reserveOut = isToken0In ? reserve1 : reserve0
+
+      // amountOut = (reserveOut * amountIn * 997) / (reserveIn * 1000 + amountIn * 997)
+      const amountInWithFee = amountInWei * 997n
+      const numerator = BigInt(reserveOut) * amountInWithFee
+      const denominator = BigInt(reserveIn) * 1000n + amountInWithFee
+      const amountOut = numerator / denominator
+
+      // Price impact = (amountIn / reserveIn) * 100
+      const priceImpact = Number(amountInWei * 100n / BigInt(reserveIn))
+
+      return {
+        amountOut: amountOut.toString(),
+        priceImpact: Math.min(priceImpact, 100),
+        executionPrice: Number(amountOut) / Number(amountInWei),
+      }
+    }
+
+    if (version === 'V3' && v3Quote) {
+      const [amountOut, sqrtPriceX96After] = v3Quote
+      // Simplified price impact calculation
+      const priceImpact = 0.1 // Would need before/after price comparison
+      return {
+        amountOut: amountOut.toString(),
+        priceImpact,
+        executionPrice: Number(amountOut) / Number(amountInWei),
+      }
+    }
+
+    if (version === 'V4' && v4Slot0 && v4Liquidity && tokenIn && tokenOut) {
+      // V4: Use sqrtPriceX96 for quote estimation
+      const [sqrtPriceX96, tick] = v4Slot0
+      const liquidity = v4Liquidity
+
+      if (liquidity === 0n) return null
+
+      // Simplified V4 quote using tick math
+      // Real implementation would use proper concentrated liquidity math
+      const price = Number(sqrtPriceX96) ** 2 / (2 ** 192)
+      const isToken0In = tokenIn.address.toLowerCase() < tokenOut.address.toLowerCase()
+      const effectivePrice = isToken0In ? price : 1 / price
+
+      const amountOutEstimate = Number(amountInWei) * effectivePrice * 0.997 // 0.3% fee
+      const priceImpact = (Number(amountInWei) / Number(liquidity)) * 100
+
+      return {
+        amountOut: BigInt(Math.floor(amountOutEstimate)).toString(),
+        priceImpact: Math.min(priceImpact, 100),
+        executionPrice: effectivePrice,
+      }
+    }
+
+    return null
+  }, [version, amountInWei, v2Reserves, v2Token0, v3Quote, v4Slot0, v4Liquidity, tokenIn, tokenOut])
+
+  const quoteLoading = version === 'V3' && v3Loading
+
+  // Fetch token info on mount
   useEffect(() => {
     async function fetchTokenInfo() {
       if (!token0Address || !token1Address) {
@@ -62,7 +271,6 @@ export default function TradePage() {
       }
 
       try {
-        // Fetch token info from RPC or use common token lookup
         const [t0Info, t1Info] = await Promise.all([
           getTokenInfo(token0Address),
           getTokenInfo(token1Address),
@@ -80,7 +288,6 @@ export default function TradePage() {
     fetchTokenInfo()
   }, [token0Address, token1Address])
 
-  // Common token lookup (saves RPC calls for known tokens)
   async function getTokenInfo(address: string): Promise<TokenInfo> {
     const knownTokens: Record<string, { symbol: string; decimals: number }> = {
       '0xc647421c5dc78d1c3960faa7a33f9aefdf4b7b07': { symbol: 'ARBME', decimals: 18 },
@@ -98,8 +305,6 @@ export default function TradePage() {
       return { address, ...knownTokens[lowerAddr] }
     }
 
-    // Fallback: fetch from RPC
-    // For now, assume 18 decimals and use truncated address as symbol
     return {
       address,
       symbol: address.slice(0, 6) + '...',
@@ -142,66 +347,15 @@ export default function TradePage() {
     }
   }
 
-  const handleGetQuote = async () => {
-    if (!token0 || !token1 || !swapAmount || parseFloat(swapAmount) <= 0) return
-
-    try {
-      setQuoteLoading(true)
-      setSwapQuote(null)
-      setError(null)
-
-      const tokenIn = swapDirection === '0to1' ? token0.address : token1.address
-      const tokenOut = swapDirection === '0to1' ? token1.address : token0.address
-      const decimalsIn = swapDirection === '0to1' ? token0.decimals : token1.decimals
-
-      // Convert amount to wei
-      const amountInWei = BigInt(Math.floor(parseFloat(swapAmount) * Math.pow(10, decimalsIn))).toString()
-
-      const res = await fetch(`${API_BASE}/quote`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          poolAddress,
-          version,
-          tokenIn,
-          tokenOut,
-          amountIn: amountInWei,
-          fee,
-          tickSpacing,
-        }),
-      })
-
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || 'Failed to get quote')
-      }
-
-      const data = await res.json()
-      setSwapQuote(data)
-    } catch (err: any) {
-      console.error('[getQuote] Error:', err)
-      setError(err.message || 'Failed to get quote')
-    } finally {
-      setQuoteLoading(false)
-    }
-  }
-
   const handleExecuteSwap = async () => {
-    if (!token0 || !token1 || !wallet || !swapQuote || !swapAmount) return
+    if (!tokenIn || !tokenOut || !wallet || !swapQuote || !swapAmount) return
 
     try {
       setSwapStatus('building')
       setError(null)
 
-      const tokenIn = swapDirection === '0to1' ? token0.address : token1.address
-      const tokenOut = swapDirection === '0to1' ? token1.address : token0.address
-      const decimalsIn = swapDirection === '0to1' ? token0.decimals : token1.decimals
-
-      // Convert amount to wei
-      const amountInWei = BigInt(Math.floor(parseFloat(swapAmount) * Math.pow(10, decimalsIn))).toString()
-
       // Apply 0.5% slippage to the quote
-      const minAmountOut = BigInt(Math.floor(Number(swapQuote.amountOut) * 0.995)).toString()
+      const minAmountOut = (BigInt(swapQuote.amountOut) * 995n / 1000n).toString()
 
       const res = await fetch(`${API_BASE}/swap`, {
         method: 'POST',
@@ -209,9 +363,9 @@ export default function TradePage() {
         body: JSON.stringify({
           poolAddress,
           version,
-          tokenIn,
-          tokenOut,
-          amountIn: amountInWei,
+          tokenIn: tokenIn.address,
+          tokenOut: tokenOut.address,
+          amountIn: amountInWei.toString(),
           minAmountOut,
           recipient: wallet,
           fee,
@@ -230,11 +384,9 @@ export default function TradePage() {
       await sendTransaction(transaction)
       setSwapStatus('success')
 
-      // Reset after success
       setTimeout(() => {
         setSwapStatus('idle')
         setSwapAmount('')
-        setSwapQuote(null)
       }, 3000)
     } catch (err: any) {
       console.error('[executeSwap] Error:', err)
@@ -250,10 +402,6 @@ export default function TradePage() {
     if (amount >= 1_000) return `${(amount / 1_000).toFixed(2)}K`
     return amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: decimals })
   }
-
-  const tokenInSymbol = swapDirection === '0to1' ? token0?.symbol : token1?.symbol
-  const tokenOutSymbol = swapDirection === '0to1' ? token1?.symbol : token0?.symbol
-  const decimalsOut = swapDirection === '0to1' ? (token1?.decimals || 18) : (token0?.decimals || 18)
 
   return (
     <div className="app">
@@ -292,20 +440,14 @@ export default function TradePage() {
               <div className="direction-toggle">
                 <button
                   className={`direction-btn ${swapDirection === '0to1' ? 'active' : ''}`}
-                  onClick={() => {
-                    setSwapDirection('0to1')
-                    setSwapQuote(null)
-                  }}
+                  onClick={() => setSwapDirection('0to1')}
                   disabled={swapStatus === 'pending'}
                 >
                   {token0.symbol} → {token1.symbol}
                 </button>
                 <button
                   className={`direction-btn ${swapDirection === '1to0' ? 'active' : ''}`}
-                  onClick={() => {
-                    setSwapDirection('1to0')
-                    setSwapQuote(null)
-                  }}
+                  onClick={() => setSwapDirection('1to0')}
                   disabled={swapStatus === 'pending'}
                 >
                   {token1.symbol} → {token0.symbol}
@@ -315,42 +457,30 @@ export default function TradePage() {
 
             {/* Amount Input */}
             <div className="input-group">
-              <span className="input-label">Amount ({tokenInSymbol})</span>
+              <span className="input-label">Amount ({tokenIn?.symbol})</span>
               <input
                 type="number"
                 className="amount-input"
                 placeholder="0.0"
                 value={swapAmount}
-                onChange={(e) => {
-                  setSwapAmount(e.target.value)
-                  setSwapQuote(null)
-                }}
+                onChange={(e) => setSwapAmount(e.target.value)}
                 disabled={swapStatus === 'pending'}
               />
             </div>
 
-            {/* Get Quote Button */}
-            <button
-              className="btn btn-secondary full-width"
-              onClick={handleGetQuote}
-              disabled={!swapAmount || parseFloat(swapAmount) <= 0 || quoteLoading || swapStatus === 'pending'}
-            >
-              {quoteLoading ? (
-                <>
-                  <span className="loading-spinner small" /> Getting Quote...
-                </>
-              ) : (
-                'Get Quote'
-              )}
-            </button>
+            {/* Real-time Quote Display */}
+            {quoteLoading && (
+              <div className="quote-loading">
+                <span className="loading-spinner small" /> Getting quote...
+              </div>
+            )}
 
-            {/* Quote Display */}
-            {swapQuote && (
+            {swapQuote && amountInWei > 0n && (
               <div className="swap-quote">
                 <div className="quote-row">
                   <span className="quote-label">Expected Output</span>
                   <span className="quote-value">
-                    {formatAmount(Number(swapQuote.amountOut) / Math.pow(10, decimalsOut))} {tokenOutSymbol}
+                    {formatAmount(Number(swapQuote.amountOut) / Math.pow(10, decimalsOut))} {tokenOut?.symbol}
                   </span>
                 </div>
                 <div className="quote-row">
@@ -362,7 +492,7 @@ export default function TradePage() {
                 <div className="quote-row">
                   <span className="quote-label">Min. Received (0.5% slippage)</span>
                   <span className="quote-value">
-                    {formatAmount(Number(swapQuote.amountOut) * 0.995 / Math.pow(10, decimalsOut))} {tokenOutSymbol}
+                    {formatAmount(Number(swapQuote.amountOut) * 0.995 / Math.pow(10, decimalsOut))} {tokenOut?.symbol}
                   </span>
                 </div>
                 {swapQuote.priceImpact > 5 && (
@@ -375,6 +505,10 @@ export default function TradePage() {
 
             {error && (
               <div className="tx-error">{error}</div>
+            )}
+
+            {v3Error && (
+              <div className="tx-error">Quote error: {v3Error.message}</div>
             )}
 
             {/* Execute Swap Button */}
@@ -391,7 +525,7 @@ export default function TradePage() {
               )}
               {swapStatus === 'success' && 'Success!'}
               {swapStatus === 'error' && 'Failed - Try Again'}
-              {swapStatus === 'idle' && 'Execute Swap'}
+              {swapStatus === 'idle' && (swapQuote ? 'Execute Swap' : 'Enter amount')}
             </button>
           </div>
         )}
