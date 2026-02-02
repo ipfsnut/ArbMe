@@ -179,8 +179,8 @@ export default function PoolsWidget({
     const wethRefPrice = data.arbmePrice ? parseFloat(data.arbmePrice) : 0;
 
     return data.pools
-      // Filter to ARBME-only pools
-      .filter(pool => pool.pair.toUpperCase().includes('ARBME'))
+      // Filter to ARBME-only pools with meaningful TVL (> $1)
+      .filter(pool => pool.pair.toUpperCase().includes('ARBME') && pool.tvl > 1)
       .map(pool => {
         // Heat = Vol/TVL ratio as percentage (capital efficiency)
         const heat = pool.tvl > 0 ? (pool.volume24h / pool.tvl) * 100 : 0;
