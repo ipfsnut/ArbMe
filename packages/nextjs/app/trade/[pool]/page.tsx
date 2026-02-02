@@ -202,8 +202,11 @@ export default function TradePage() {
 
     if (version === 'V2' && v2Reserves && v2Token0 && tokenIn && tokenOut) {
       // V2: constant product formula
-      const [reserve0, reserve1] = v2Reserves
-      const isToken0In = tokenIn.address.toLowerCase() === v2Token0.toLowerCase()
+      // v2Reserves returns [reserve0, reserve1, blockTimestampLast]
+      const reserves = v2Reserves as readonly [bigint, bigint, number]
+      const reserve0 = reserves[0]
+      const reserve1 = reserves[1]
+      const isToken0In = tokenIn.address.toLowerCase() === (v2Token0 as string).toLowerCase()
       const reserveIn = isToken0In ? reserve0 : reserve1
       const reserveOut = isToken0In ? reserve1 : reserve0
 
@@ -224,7 +227,8 @@ export default function TradePage() {
     }
 
     if (version === 'V3' && v3Quote) {
-      const [amountOut, sqrtPriceX96After] = v3Quote
+      // v3Quote returns [amountOut, sqrtPriceX96After, initializedTicksCrossed, gasEstimate]
+      const amountOut = (v3Quote as readonly [bigint, bigint, number, bigint])[0]
       // Simplified price impact calculation
       const priceImpact = 0.1 // Would need before/after price comparison
       return {
@@ -236,8 +240,10 @@ export default function TradePage() {
 
     if (version === 'V4' && v4Slot0 && v4Liquidity && tokenIn && tokenOut) {
       // V4: Use sqrtPriceX96 for quote estimation
-      const [sqrtPriceX96, tick] = v4Slot0
-      const liquidity = v4Liquidity
+      // v4Slot0 returns [sqrtPriceX96, tick, protocolFee, lpFee]
+      const slot0 = v4Slot0 as readonly [bigint, number, number, number]
+      const sqrtPriceX96 = slot0[0]
+      const liquidity = v4Liquidity as bigint
 
       if (liquidity === 0n) return null
 
