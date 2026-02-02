@@ -26,8 +26,8 @@ const ERC20_ABI = [
   'function decimals() view returns (uint8)',
 ]
 
-// V4 StateView address
-const STATE_VIEW = '0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6'
+// V4 StateView address (Base mainnet - verified 2026-02-01)
+const STATE_VIEW = '0xa3c0c9b65bad0b08107aa264b0f3db444b867a71'
 
 // V4 StateView ABI (minimal)
 const STATE_VIEW_ABI = [
