@@ -101,16 +101,33 @@ export default function AppPage() {
         <h2 className="section-title">Buy Tokens</h2>
         <div className="buy-tokens-grid">
           <div className="buy-token-card">
+            <img
+              src="/arbie.png"
+              alt="ARBME"
+              className="buy-token-logo"
+            />
             <div className="buy-token-name">$ARBME</div>
             <div className="buy-token-price">{loading ? '...' : formatPrice(arbmePrice)}</div>
             <button className="btn btn-primary" onClick={buyArbme}>Buy $ARBME</button>
           </div>
           <div className="buy-token-card">
+            <img
+              src="https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/base/assets/0x768BE13e1680b5EbE0024C42c896E3dB59ec0149/logo.png"
+              alt="RATCHET"
+              className="buy-token-logo"
+              onError={(e) => { e.currentTarget.style.display = 'none' }}
+            />
             <div className="buy-token-name">$RATCHET</div>
             <div className="buy-token-price">{loading ? '...' : formatPrice(ratchetPrice)}</div>
             <button className="btn btn-primary" onClick={buyRatchet}>Buy $RATCHET</button>
           </div>
           <div className="buy-token-card">
+            <img
+              src="https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/base/assets/0x60c39541540E49a18E4C591C74B3487B4CD2aA27/logo.png"
+              alt="ABC"
+              className="buy-token-logo"
+              onError={(e) => { e.currentTarget.style.display = 'none' }}
+            />
             <div className="buy-token-name">$ABC</div>
             <div className="buy-token-price">{loading ? '...' : formatPrice(abcPrice)}</div>
             <button className="btn btn-primary" onClick={buyAbc}>Buy $ABC</button>

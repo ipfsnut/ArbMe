@@ -318,30 +318,36 @@ function PoolHeatMap({ pools }: { pools: PoolWithMetrics[] }) {
           const emojis = getHeatEmojis(pool.heat);
 
           return (
-            <div key={pool.pairAddress} className={styles.heatRow}>
-              <span className={styles.heatRank}>#{index + 1}</span>
-              <div className={styles.heatInfo}>
+            <a
+              key={pool.pairAddress}
+              href={pool.url || `https://dexscreener.com/base/${pool.pairAddress}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={styles.heatRowLink}
+            >
+              <div className={styles.heatRowTop}>
+                <span className={styles.heatRank}>#{index + 1}</span>
                 <span className={styles.heatPair}>{pool.pair}</span>
-                <span className={styles.heatDex}>{pool.dex.replace('_', ' ').toUpperCase()}</span>
-              </div>
-              <div className={styles.heatBarContainer}>
-                <div
-                  className={styles.heatBar}
-                  style={{ width: `${heatBar}%` }}
-                />
-              </div>
-              <div className={styles.heatStats}>
-                <span className={styles.heatValue}>{pool.heat.toFixed(0)}%</span>
                 <span className={styles.heatEmoji}>{emojis}</span>
               </div>
-              <span className={styles.heatVolume}>{formatUsd(pool.volume24h)}</span>
-            </div>
+              <div className={styles.heatRowBottom}>
+                <span className={styles.heatDex}>{pool.dex.replace('_', ' ').toUpperCase()}</span>
+                <div className={styles.heatBarContainer}>
+                  <div
+                    className={styles.heatBar}
+                    style={{ width: `${heatBar}%` }}
+                  />
+                </div>
+                <span className={styles.heatValue}>{pool.heat.toFixed(0)}%</span>
+                <span className={styles.heatVolume}>{formatUsd(pool.volume24h)}</span>
+              </div>
+            </a>
           );
         })}
       </div>
 
       <p className={styles.heatHint}>
-        Heat = 24h Volume / TVL (capital efficiency)
+        Heat = 24h Volume / TVL (capital efficiency) • Click pool to view on DexScreener
       </p>
     </div>
   );

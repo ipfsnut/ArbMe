@@ -184,7 +184,7 @@ export default function TreasuryPage() {
         <BackButton href="/" label="Back" />
 
         <div className="page-header">
-          <h1>ABCDAO Treasury</h1>
+          <h1 style={{ fontFamily: 'var(--font-mono)' }}>ABC_DAO_Treasury</h1>
           <p className="page-subtitle">Live balances from the multisig</p>
         </div>
 

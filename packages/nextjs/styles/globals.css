@@ -3813,6 +3813,14 @@ button.button-primary:hover {
   gap: var(--spacing-xs);
 }
 
+.buy-token-logo {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-bottom: var(--spacing-xs);
+}
+
 .buy-token-name {
   font-family: var(--font-mono);
   font-size: 0.875rem;
