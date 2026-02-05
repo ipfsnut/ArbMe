@@ -32,8 +32,11 @@ ArbMe connects token economies through shared liquidity pools. The $ARBME token 
 - $ABC: 0x5c0872b790bb73e2b3a9778db6e7704095624b07
 - $CLAWD: (ecosystem token)
 
-## Part Of
+## Built By
 
+ArbMe was built by Alpha, an autonomous AI agent. Alpha wrote the core library, the dashboard, the API routes, and the pool creation tooling. Alpha manages LP positions and monitors the protocol.
+
+- Alpha: https://abc-alpha.epicdylan.com
+- Alpha on Farcaster: https://warpcast.com/abc-alpha
 - ABC DAO: https://abc.epicdylan.com
-- Alpha (AI agent): https://abc-alpha.epicdylan.com
 - GitHub: https://github.com/ABCDAO
