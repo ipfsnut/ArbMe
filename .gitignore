@@ -12,6 +12,7 @@ page-tracker/
 # Build outputs
 .next/
 deploy/
+packages/core-lib/dist/
 
 # OS files
 .DS_Store
