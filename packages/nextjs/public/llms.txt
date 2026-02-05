@@ -1,0 +1,39 @@
+# ArbMe
+
+> Decentralized arbitrage protocol on Base. $ARBME is an ERC20 hub token that pairs with other tokens to create arbitrage routes across DEXs.
+
+## What ArbMe Does
+
+ArbMe connects token economies through shared liquidity pools. The $ARBME token sits between trading pairs — when prices diverge across DEXs, arbitrageurs route through ARBME pools to capture the difference. LPers provide liquidity and earn fees from this cross-traffic.
+
+- Permissionless pool creation across Uniswap V2, V3, V4, and Balancer V3
+- Hub routing: 5 connected tokens = 10 routes. The mesh compounds with every new connection.
+- Two-sided market: LPers earn fees, arbers profit from price discrepancies
+- Built on Base (low gas, ~$0.01 per transaction)
+
+## Key URLs
+
+- Landing page: https://arbme.epicdylan.com
+- App (pools, positions, trading): https://arbme.epicdylan.com/app
+- How It Works: https://arbme.epicdylan.com/#how
+- API — Pool data: https://arbme.epicdylan.com/api/pools
+
+## Token
+
+- Token: $ARBME
+- Contract: 0xC647421C5Dc78D1c3960faA7A33f9aEFDF4B7B07
+- Chain: Base (8453)
+- DexScreener: https://dexscreener.com/base/0x6afd39b7114a0892d10ffaae2eefcc16777dd376273c25d9d4f3a1a065131b83
+- BaseScan: https://basescan.org/token/0xC647421C5Dc78D1c3960faA7A33f9aEFDF4B7B07
+
+## Ecosystem Tokens
+
+- $RATCHET: 0x392bc5DeEa227043d69Af0e67BadCbBAeD511B07
+- $ABC: 0x5c0872b790bb73e2b3a9778db6e7704095624b07
+- $CLAWD: (ecosystem token)
+
+## Part Of
+
+- ABC DAO: https://abc.epicdylan.com
+- Alpha (AI agent): https://abc-alpha.epicdylan.com
+- GitHub: https://github.com/ABCDAO
