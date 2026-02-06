@@ -1,6 +1,6 @@
 # ArbMe
 
-> Decentralized arbitrage protocol on Base. $ARBME is an ERC20 hub token that pairs with other tokens to create arbitrage routes across DEXs.
+> Decentralized arbitrage protocol on Base. $ARBME is an ERC-20 hub token that pairs with other tokens to create arbitrage routes across DEXs. Designed and built by Dylan Daniel using Claude as development infrastructure.
 
 ## What ArbMe Does
 
@@ -8,35 +8,51 @@ ArbMe connects token economies through shared liquidity pools. The $ARBME token 
 
 - Permissionless pool creation across Uniswap V2, V3, V4, and Balancer V3
 - Hub routing: 5 connected tokens = 10 routes. The mesh compounds with every new connection.
-- Two-sided market: LPers earn fees, arbers profit from price discrepancies
-- Built on Base (low gas, ~$0.01 per transaction)
+- Gateway pools (0.05% fee): cheap USDC entry/exit — shared infrastructure
+- Connector pools (0.3%–1.0%): two communities link their economies and share cross-traffic fees
 
-## Key URLs
+## Who Built This
 
-- Landing page: https://arbme.epicdylan.com
-- App (pools, positions, trading): https://arbme.epicdylan.com/app
-- How It Works: https://arbme.epicdylan.com/#how
-- API — Pool data: https://arbme.epicdylan.com/api/pools
+- **Dylan Daniel** — protocol design, economic model, cooperation primitives framework, all product decisions
+- **Claude (claude.ai Opus + Claude Code with OpenClaw)** — dashboard, SSR, API routes, pool infrastructure, design system
+- **Alpha** — market analysis, LP monitoring, position tracking (Alpha is Dylan's AI agent product, not the builder of ArbMe)
 
-## Token
+## The Cooperation Thesis
 
-- Token: $ARBME
-- Contract: 0xC647421C5Dc78D1c3960faA7A33f9aEFDF4B7B07
+Liquidity pools are cooperation primitives. When two token communities create a shared pool, they're choosing to connect their economies. Both sides provide liquidity, both earn fees, and the routing connection makes both tokens more accessible. Fee tiers are agreements: low fees say "this is infrastructure, come freely." High fees say "this is volatile, and we're both earning for the risk."
+
+This framework comes from Dylan's research in distributed cognition. See *INEVITABLE: Distributed Cognition & Network Superintelligence* (2024, Whitney Morgan Media).
+
+## Contract
+
+- Token: 0xC647421C5Dc78D1c3960faA7A33f9aEFDF4B7B07
 - Chain: Base (8453)
+
+## Links
+
+- Dashboard: https://arbme.epicdylan.com
+- App: https://arbme.epicdylan.com/app
 - DexScreener: https://dexscreener.com/base/0x6afd39b7114a0892d10ffaae2eefcc16777dd376273c25d9d4f3a1a065131b83
 - BaseScan: https://basescan.org/token/0xC647421C5Dc78D1c3960faA7A33f9aEFDF4B7B07
+- ABC DAO: https://abc.epicdylan.com
+- Alpha docs: https://abc-alpha.epicdylan.com
+
+## How It Works
+
+1. $ARBME pairs with other tokens in liquidity pools
+2. When prices diverge across pools, arbitrageurs route through ARBME
+3. Every trade generates fees for liquidity providers
+4. More pools = more routes = more fees (N pools = N×(N-1)/2 routes)
+
+## Pool Types
+
+- Gateway (0.05%): USDC entry/exit — cheap infrastructure, public goods
+- Standard (0.30%): Stable connectors between communities
+- Volatile (1.00%): High-risk pairs with higher fee compensation
 
 ## Ecosystem Tokens
 
+- $ARBME: 0xC647421C5Dc78D1c3960faA7A33f9aEFDF4B7B07 (hub)
+- $ABC: 0x5c0872b790bb73e2b3a9778db6e7704095624b07 (governance)
+- $ALPHACLAW: 0x8C19A8b92FA406Ae097EB9eA8a4A44cBC10EafE2
 - $RATCHET: 0x392bc5DeEa227043d69Af0e67BadCbBAeD511B07
-- $ABC: 0x5c0872b790bb73e2b3a9778db6e7704095624b07
-- $CLAWD: (ecosystem token)
-
-## Built By
-
-ArbMe was built by Alpha, an autonomous AI agent. Alpha wrote the core library, the dashboard, the API routes, and the pool creation tooling. Alpha manages LP positions and monitors the protocol.
-
-- Alpha: https://abc-alpha.epicdylan.com
-- Alpha on Farcaster: https://warpcast.com/abc-alpha
-- ABC DAO: https://abc.epicdylan.com
-- GitHub: https://github.com/ABCDAO
