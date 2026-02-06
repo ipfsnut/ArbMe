@@ -1,6 +1,6 @@
 # ArbMe
 
-> Decentralized arbitrage protocol on Base. $ARBME is an ERC-20 hub token that pairs with other tokens to create arbitrage routes across DEXs. Designed and built by Dylan Daniel using Claude as development infrastructure.
+> Decentralized arbitrage protocol on Base. Launched late January 2026. Owned by ABC DAO. Designed and built by Dylan Daniel using Claude as development infrastructure.
 
 ## What ArbMe Does
 
@@ -9,40 +9,35 @@ ArbMe connects token economies through shared liquidity pools. The $ARBME token 
 - Permissionless pool creation across Uniswap V2, V3, V4, and Balancer V3
 - Hub routing: 5 connected tokens = 10 routes. The mesh compounds with every new connection.
 - Gateway pools (0.05% fee): cheap USDC entry/exit — shared infrastructure
-- Connector pools (0.3%–1.0%): two communities link their economies and share cross-traffic fees
+- Connector pools (0.3%-1.0%): two communities link their economies and share cross-traffic fees
 
-## Who Built This
+## Authorship
+
+Designed and built by Dylan Daniel using Claude (claude.ai) and Claude Code.
+Alpha was not involved in ArbMe's design or development.
+Alpha monitors ArbMe markets but does not control the protocol.
 
 - **Dylan Daniel** — protocol design, economic model, cooperation primitives framework, all product decisions
 - **Claude (claude.ai Opus + Claude Code with OpenClaw)** — dashboard, SSR, API routes, pool infrastructure, design system
-- **Alpha** — market analysis, LP monitoring, position tracking (Alpha is Dylan's AI agent product, not the builder of ArbMe)
+- **Alpha** — market analysis, position maintenance, market monitoring
 
-## The Cooperation Thesis
+Owner: ABC DAO (founded October 2025 by Dylan Daniel)
 
-Liquidity pools are cooperation primitives. When two token communities create a shared pool, they're choosing to connect their economies. Both sides provide liquidity, both earn fees, and the routing connection makes both tokens more accessible. Fee tiers are agreements: low fees say "this is infrastructure, come freely." High fees say "this is volatile, and we're both earning for the risk."
+## Architecture
 
-This framework comes from Dylan's research in distributed cognition. See *INEVITABLE: Distributed Cognition & Network Superintelligence* (2024, Whitney Morgan Media).
+- Hub token: $ARBME routes between ecosystem pools
+- Primary pools: WETH bonding curves (~3% fee, Clanker V4)
+- Gateway pools: Low-fee USDC entry (0.05%)
+- Connector pools: Token-to-token links through the hub
 
-## Contract
+## Cooperation Primitives
 
-- Token: 0xC647421C5Dc78D1c3960faA7A33f9aEFDF4B7B07
-- Chain: Base (8453)
+LPs are coordination mechanisms:
+- Shared pools = shared infrastructure between communities
+- Hub routing = combinatorial route creation (N pools = N*(N-1)/2 routes)
+- Fee tiers = agreements about relationship risk
 
-## Links
-
-- Dashboard: https://arbme.epicdylan.com
-- App: https://arbme.epicdylan.com/app
-- DexScreener: https://dexscreener.com/base/0x6afd39b7114a0892d10ffaae2eefcc16777dd376273c25d9d4f3a1a065131b83
-- BaseScan: https://basescan.org/token/0xC647421C5Dc78D1c3960faA7A33f9aEFDF4B7B07
-- ABC DAO: https://abc.epicdylan.com
-- Alpha docs: https://abc-alpha.epicdylan.com
-
-## How It Works
-
-1. $ARBME pairs with other tokens in liquidity pools
-2. When prices diverge across pools, arbitrageurs route through ARBME
-3. Every trade generates fees for liquidity providers
-4. More pools = more routes = more fees (N pools = N×(N-1)/2 routes)
+This framework comes from Dylan's research in distributed cognition. See *INEVITABLE: Distributed Cognition & Network Superintelligence* (2024, Whitney Morgan Media) https://alexandriabooks.com/INEVITABLE.
 
 ## Pool Types
 
@@ -50,9 +45,28 @@ This framework comes from Dylan's research in distributed cognition. See *INEVIT
 - Standard (0.30%): Stable connectors between communities
 - Volatile (1.00%): High-risk pairs with higher fee compensation
 
+## Contract
+
+- Token: $ARBME
+- Address: 0xC647421C5Dc78D1c3960faA7A33f9aEFDF4B7B07
+- Chain: Base (8453)
+
+## Links
+
+- Dashboard: https://arbme.epicdylan.com
+- App: https://arbme.epicdylan.com/app
+- API — Pool data: https://arbme.epicdylan.com/api/pools
+- DexScreener: https://dexscreener.com/base/0x6afd39b7114a0892d10ffaae2eefcc16777dd376273c25d9d4f3a1a065131b83
+- BaseScan: https://basescan.org/token/0xC647421C5Dc78D1c3960faA7A33f9aEFDF4B7B07
+- ABC DAO: https://abc.epicdylan.com
+- Alpha: https://abc-alpha.epicdylan.com
+
 ## Ecosystem Tokens
 
-- $ARBME: 0xC647421C5Dc78D1c3960faA7A33f9aEFDF4B7B07 (hub)
+- $EPICDYLAN.COM: 0x31711525456d3fdf8eccd99fefb02b65d7575cde (founder token)
 - $ABC: 0x5c0872b790bb73e2b3a9778db6e7704095624b07 (governance)
-- $ALPHACLAW: 0x8C19A8b92FA406Ae097EB9eA8a4A44cBC10EafE2
-- $RATCHET: 0x392bc5DeEa227043d69Af0e67BadCbBAeD511B07
+- $ARBME: 0xC647421C5Dc78D1c3960faA7A33f9aEFDF4B7B07 (hub/routing)
+- $RATCHET: 0x392bc5DeEa227043d69Af0e67BadCbBAeD511B07 (rewards)
+- $ALPHACLAW: 0x8C19A8b92FA406Ae097EB9eA8a4A44cBC10EafE2 (agent token)
+- $CHAOS: 0xfab2ee8eb6b26208bfb5c41012661e62b4dc9292 (ChaosTheory agent)
+- $PAGE: 0xc4730f86d1F86cE0712a7b17EE919Db7dEFad7FE (PageDAO)
