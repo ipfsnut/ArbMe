@@ -21,6 +21,10 @@ export interface ServerConfig {
   maxCrosspost: number;
   /** Farcaster channel ID for crosspost */
   channelId: string | null;
+  /** Base RPC URL for on-chain reads */
+  baseRpcUrl: string;
+  /** Private key for DeFi wallet (hex, with 0x prefix) */
+  arbmePrivateKey: string | null;
 }
 
 export function loadConfig(): ServerConfig {
@@ -38,5 +42,7 @@ export function loadConfig(): ServerConfig {
     neynarFid: process.env.NEYNAR_FID || null,
     maxCrosspost: Number(process.env.CN_MAX_CROSSPOST || "3"),
     channelId: process.env.CN_CHANNEL_ID || null,
+    baseRpcUrl: process.env.BASE_RPC_URL || "https://mainnet.base.org",
+    arbmePrivateKey: process.env.ARBME_PRIVATE_KEY || null,
   };
 }

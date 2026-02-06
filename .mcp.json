@@ -7,7 +7,9 @@
         "CN_AGENT_PRIVATE_KEY": "",
         "NEYNAR_API_KEY": "",
         "NEYNAR_SIGNER_UUID": "",
-        "NEYNAR_FID": ""
+        "NEYNAR_FID": "",
+        "ARBME_PRIVATE_KEY": "",
+        "BASE_RPC_URL": ""
       }
     }
   }

@@ -3,6 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { loadConfig } from "./lib/config.js";
 import { registerClankerNewsTools } from "./tools/clanker-news.js";
 import { registerFarcasterTools } from "./tools/farcaster.js";
+import { registerDefiTools } from "./tools/defi.js";
 
 const config = loadConfig();
 
@@ -13,6 +14,7 @@ const server = new McpServer({
 
 registerClankerNewsTools(server, config);
 registerFarcasterTools(server, config);
+registerDefiTools(server, config);
 
 const transport = new StdioServerTransport();
 await server.connect(transport);
