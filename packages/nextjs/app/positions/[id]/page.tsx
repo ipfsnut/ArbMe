@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { useWallet, useIsFarcaster } from '@/hooks/useWallet'
+import { useWallet, useIsFarcaster, useIsSafe } from '@/hooks/useWallet'
 import { AppHeader } from '@/components/AppHeader'
 import { Footer } from '@/components/Footer'
 import { BackButton } from '@/components/BackButton'
@@ -20,6 +20,7 @@ export default function PositionDetailPage() {
   const router = useRouter()
   const wallet = useWallet()
   const isFarcaster = useIsFarcaster()
+  const isSafe = useIsSafe()
   const { sendTransactionAsync } = useSendTransaction()
   const positionId = params.id as string
 
@@ -313,7 +314,7 @@ export default function PositionDetailPage() {
                         <span className="loading-spinner small" /> Collecting...
                       </>
                     )}
-                    {collectStatus === 'success' && 'Collected!'}
+                    {collectStatus === 'success' && (isSafe ? 'Proposed to Safe' : 'Collected!')}
                     {collectStatus === 'error' && 'Failed - Try Again'}
                     {collectStatus === 'idle' && 'Collect Fees'}
                   </button>
@@ -436,7 +437,7 @@ export default function PositionDetailPage() {
                       <span className="loading-spinner small" /> Removing...
                     </>
                   )}
-                  {removeStatus === 'success' && 'Success!'}
+                  {removeStatus === 'success' && (isSafe ? 'Proposed to Safe' : 'Success!')}
                   {removeStatus === 'error' && 'Failed - Try Again'}
                   {removeStatus === 'idle' && (
                     removePercentage === 100 ? 'Remove All & Close Position' : `Remove ${removePercentage}%`

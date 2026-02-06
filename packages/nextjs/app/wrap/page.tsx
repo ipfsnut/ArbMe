@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useWallet, useIsFarcaster } from '@/hooks/useWallet'
+import { useWallet, useIsFarcaster, useIsSafe } from '@/hooks/useWallet'
 import { AppHeader } from '@/components/AppHeader'
 import { Footer } from '@/components/Footer'
 import { BackButton } from '@/components/BackButton'
@@ -19,6 +19,7 @@ const WETH_WITHDRAW_SELECTOR = '0x2e1a7d4d' // withdraw(uint256)
 export default function WrapPage() {
   const wallet = useWallet()
   const isFarcaster = useIsFarcaster()
+  const isSafe = useIsSafe()
   const { sendTransactionAsync } = useSendTransaction()
 
   const [ethBalance, setEthBalance] = useState<string>('0')
@@ -273,7 +274,9 @@ export default function WrapPage() {
                 color: 'var(--positive)',
                 marginBottom: '1rem',
               }}>
-                {isWrapping ? 'ETH wrapped to WETH successfully!' : 'WETH unwrapped to ETH successfully!'}
+                {isSafe
+                  ? (isWrapping ? 'Wrap proposed to Safe' : 'Unwrap proposed to Safe')
+                  : (isWrapping ? 'ETH wrapped to WETH successfully!' : 'WETH unwrapped to ETH successfully!')}
               </div>
             )}
 

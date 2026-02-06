@@ -31,3 +31,11 @@ export function useIsFarcaster(): boolean {
   const { isFarcaster } = useWalletContext();
   return isFarcaster;
 }
+
+/**
+ * Check if running inside a Gnosis Safe
+ */
+export function useIsSafe(): boolean {
+  const { isSafe } = useWalletContext();
+  return isSafe;
+}

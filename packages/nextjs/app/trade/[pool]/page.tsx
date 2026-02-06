@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
-import { useWallet, useIsFarcaster } from '@/hooks/useWallet'
+import { useWallet, useIsFarcaster, useIsSafe } from '@/hooks/useWallet'
 import { AppHeader } from '@/components/AppHeader'
 import { Footer } from '@/components/Footer'
 import { BackButton } from '@/components/BackButton'
@@ -100,6 +100,7 @@ export default function TradePage() {
   const router = useRouter()
   const wallet = useWallet()
   const isFarcaster = useIsFarcaster()
+  const isSafe = useIsSafe()
   const { sendTransactionAsync } = useSendTransaction()
 
   const poolAddress = params.pool as string
@@ -550,7 +551,7 @@ export default function TradePage() {
                   <span className="loading-spinner small" /> Swapping...
                 </>
               )}
-              {swapStatus === 'success' && 'Success!'}
+              {swapStatus === 'success' && (isSafe ? 'Proposed to Safe' : 'Success!')}
               {swapStatus === 'error' && 'Failed - Try Again'}
               {swapStatus === 'idle' && (swapQuote ? 'Execute Swap' : 'Enter amount')}
             </button>

@@ -17,6 +17,7 @@ interface WalletContextType {
   address: string | null
   isConnected: boolean
   isFarcaster: boolean
+  isSafe: boolean
   isLoading: boolean
 }
 
@@ -24,6 +25,7 @@ const WalletContext = createContext<WalletContextType>({
   address: null,
   isConnected: false,
   isFarcaster: false,
+  isSafe: false,
   isLoading: true,
 })
 
@@ -35,7 +37,7 @@ export function useWalletContext() {
 // Inner Wallet Logic (runs inside WagmiProvider)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function WalletInner({ children, isFarcaster }: { children: ReactNode; isFarcaster: boolean }) {
+function WalletInner({ children, isFarcaster, isSafe }: { children: ReactNode; isFarcaster: boolean; isSafe: boolean }) {
   const [farcasterAddress, setFarcasterAddress] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(isFarcaster)
 
@@ -129,6 +131,7 @@ function WalletInner({ children, isFarcaster }: { children: ReactNode; isFarcast
       address,
       isConnected,
       isFarcaster,
+      isSafe,
       isLoading,
     }}>
       {children}
@@ -148,9 +151,27 @@ interface WalletProviderProps {
 export function WalletProvider({ children }: WalletProviderProps) {
   // Default to browser mode immediately - no blocking loading screen
   const [isFarcaster, setIsFarcaster] = useState(false)
+  const [isSafe, setIsSafe] = useState(false)
 
   useEffect(() => {
     const detectEnvironment = async () => {
+      // Safe detection — check if running inside Safe iframe
+      try {
+        const { default: SafeAppsSDK } = await import('@safe-global/safe-apps-sdk')
+        const safeSdk = new SafeAppsSDK()
+        const safeInfo = await Promise.race([
+          safeSdk.safe.getInfo(),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000)),
+        ])
+        if (safeInfo && safeInfo.safeAddress) {
+          console.log('[WalletProvider] Safe environment detected:', safeInfo.safeAddress)
+          setIsSafe(true)
+          return // Skip Farcaster detection
+        }
+      } catch (e) {
+        console.log('[WalletProvider] Not in Safe context')
+      }
+
       try {
         console.log('[WalletProvider] Starting Farcaster detection...')
 
@@ -213,7 +234,7 @@ export function WalletProvider({ children }: WalletProviderProps) {
             borderRadius: 'medium',
           })}
         >
-          <WalletInner isFarcaster={isFarcaster}>
+          <WalletInner isFarcaster={isFarcaster} isSafe={isSafe}>
             {children}
           </WalletInner>
         </RainbowKitProvider>
@@ -227,7 +248,18 @@ export function WalletProvider({ children }: WalletProviderProps) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export function WalletConnectButton() {
-  const { isFarcaster, address, isConnected } = useWalletContext()
+  const { isFarcaster, isSafe, address, isConnected } = useWalletContext()
+
+  // In Safe, wallet is auto-connected via wagmi Safe connector
+  if (isSafe && address) {
+    return (
+      <div className="wallet-status">
+        <span className="wallet-address">
+          Safe: {address.slice(0, 6)}...{address.slice(-4)}
+        </span>
+      </div>
+    )
+  }
 
   // In Farcaster, wallet is auto-connected, just show address
   if (isFarcaster) {

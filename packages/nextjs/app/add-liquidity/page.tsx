@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { useWallet, useIsFarcaster } from '@/hooks/useWallet'
+import { useWallet, useIsFarcaster, useIsSafe } from '@/hooks/useWallet'
 import { AppHeader } from '@/components/AppHeader'
 import { Footer } from '@/components/Footer'
 import { BackButton } from '@/components/BackButton'
@@ -115,6 +115,7 @@ export default function AddLiquidityPageWrapper() {
 function AddLiquidityPage() {
   const wallet = useWallet()
   const isFarcaster = useIsFarcaster()
+  const isSafe = useIsSafe()
   const searchParams = useSearchParams()
 
   // Read URL params for pre-population (from "Add More Liquidity" on position detail)
@@ -1145,9 +1146,11 @@ function AddLiquidityPage() {
           <div className="create-pool-card">
             <div className="success-state">
               <div className="success-icon">✅</div>
-              <h2 className="success-title">Position Created!</h2>
+              <h2 className="success-title">{isSafe ? 'Proposed to Safe' : 'Position Created!'}</h2>
               <p className="success-message">
-                Your liquidity has been successfully added to the {state.token0Info?.symbol}/{state.token1Info?.symbol} pool.
+                {isSafe
+                  ? `Your liquidity transaction for the ${state.token0Info?.symbol}/${state.token1Info?.symbol} pool has been proposed to the Safe for signing.`
+                  : `Your liquidity has been successfully added to the ${state.token0Info?.symbol}/${state.token1Info?.symbol} pool.`}
               </p>
               <div className="success-actions">
                 <Link href={ROUTES.MY_POOLS} className="button-primary" style={{ textAlign: 'center', textDecoration: 'none' }}>
