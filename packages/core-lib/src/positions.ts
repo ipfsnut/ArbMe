@@ -12,13 +12,29 @@ const V2_ROUTER = '0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24';
 const V3_POSITION_MANAGER = '0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1';
 const V4_POSITION_MANAGER = '0x7c5f5a4bbd8fd63184577525326123b519429bdc';
 
-// Known ARBME pools
+// Known V2 pools — V2 has no NFT enumeration so pools must be listed explicitly.
+// V3/V4 positions are discovered automatically via on-chain NFT ownership.
 const KNOWN_POOLS = {
   V2: [
     { address: '0x11FD4947bE07E721B57622df3ef1E1C773ED5655', name: 'PAGE/ARBME' },
     { address: '0x14aeb8cfdf477001a60f5196ec2ddfe94771b794', name: 'CLANKER/ARBME' },
+    // Add new V2 pools here as they're created
   ],
 };
+
+// Retry helper for flaky RPC calls
+async function withRetry<T>(fn: () => Promise<T>, label: string, retries = 2): Promise<T> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (attempt === retries) throw error;
+      console.warn(`[Positions] ${label} attempt ${attempt + 1} failed, retrying...`);
+      await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
+    }
+  }
+  throw new Error('unreachable');
+}
 
 // ABIs
 const ERC20_ABI = [
@@ -236,31 +252,31 @@ export async function fetchUserPositions(
 
   console.log(`[Positions] Fetching positions for wallet: ${walletAddress}`);
 
-  try {
-    // Fetch V2 positions
-    const v2Positions = await fetchV2Positions(client, walletAddress as Address);
-    console.log(`[Positions] Found ${v2Positions.length} V2 positions`);
-    rawPositions.push(...v2Positions);
+  // Fetch V2, V3, V4 independently — one failing doesn't kill the others
+  const results = await Promise.allSettled([
+    fetchV2Positions(client, walletAddress as Address),
+    fetchV3Positions(client, walletAddress as Address),
+    fetchV4Positions(client, walletAddress as Address, alchemyKey),
+  ]);
 
-    // Fetch V3 positions
-    const v3Positions = await fetchV3Positions(client, walletAddress as Address);
-    rawPositions.push(...v3Positions);
-
-    // Fetch V4 positions
-    const v4Positions = await fetchV4Positions(client, walletAddress as Address, alchemyKey);
-    rawPositions.push(...v4Positions);
-
-    // Enrich with token metadata and prices, converting to final Position type
-    const positions = await enrichPositionsWithMetadata(rawPositions, alchemyKey);
-
-    // Sort by TVL descending (highest value first)
-    positions.sort((a, b) => b.liquidityUsd - a.liquidityUsd);
-
-    return positions;
-  } catch (error) {
-    console.error('[Positions] Error fetching positions:', error);
-    return [];
+  const labels = ['V2', 'V3', 'V4'];
+  for (let i = 0; i < results.length; i++) {
+    const result = results[i];
+    if (result.status === 'fulfilled') {
+      console.log(`[Positions] Found ${result.value.length} ${labels[i]} positions`);
+      rawPositions.push(...result.value);
+    } else {
+      console.error(`[Positions] ${labels[i]} fetch failed (continuing with others):`, result.reason);
+    }
   }
+
+  // Enrich with token metadata and prices, converting to final Position type
+  const positions = await enrichPositionsWithMetadata(rawPositions, alchemyKey);
+
+  // Sort by TVL descending (highest value first), positions without USD go to end
+  positions.sort((a, b) => b.liquidityUsd - a.liquidityUsd);
+
+  return positions;
 }
 
 /**
@@ -354,21 +370,21 @@ async function fetchV3Positions(client: any, wallet: Address): Promise<RawPositi
     // Enumerate positions
     for (let i = 0; i < count; i++) {
       try {
-        // Get token ID
-        const tokenId = await client.readContract({
+        // Get token ID (with retry)
+        const tokenId = await withRetry(() => client.readContract({
           address: V3_POSITION_MANAGER as Address,
           abi: V3_NFT_ABI,
           functionName: 'tokenOfOwnerByIndex',
           args: [wallet, BigInt(i)],
-        });
+        }), `V3 tokenOfOwnerByIndex(${i})`) as bigint;
 
-        // Get position details
-        const position = await client.readContract({
+        // Get position details (with retry)
+        const position = await withRetry(() => client.readContract({
           address: V3_POSITION_MANAGER as Address,
           abi: V3_NFT_ABI,
           functionName: 'positions',
           args: [tokenId],
-        });
+        }), `V3 positions(${tokenId})`) as readonly [bigint, string, string, string, number, number, number, bigint, bigint, bigint, bigint, bigint];
 
         const [
           nonce,
@@ -446,11 +462,23 @@ async function fetchV4Positions(client: any, wallet: Address, alchemyKey?: strin
 
     if (alchemyKey) {
       try {
-        const alchemyUrl = `https://base-mainnet.g.alchemy.com/nft/v3/${alchemyKey}/getNFTsForOwner?owner=${wallet}&contractAddresses[]=${V4_POSITION_MANAGER}&withMetadata=false`;
-        const response = await fetch(alchemyUrl);
-        const data = await response.json() as any;
+        // Paginate through all V4 NFTs (Alchemy returns max ~100 per page)
+        let pageKey: string | undefined;
+        do {
+          const url = new URL(`https://base-mainnet.g.alchemy.com/nft/v3/${alchemyKey}/getNFTsForOwner`);
+          url.searchParams.set('owner', wallet);
+          url.searchParams.append('contractAddresses[]', V4_POSITION_MANAGER);
+          url.searchParams.set('withMetadata', 'false');
+          if (pageKey) url.searchParams.set('pageKey', pageKey);
 
-        ownedTokenIds = data.ownedNfts?.map((nft: any) => nft.tokenId) || [];
+          const response = await fetch(url.toString());
+          const data = await response.json() as any;
+
+          const pageIds = data.ownedNfts?.map((nft: any) => nft.tokenId) || [];
+          ownedTokenIds.push(...pageIds);
+          pageKey = data.pageKey; // undefined when no more pages
+        } while (pageKey);
+
         console.log(`[Positions] Found ${ownedTokenIds.length} V4 token IDs via Alchemy NFT API`);
       } catch (error) {
         console.error('[Positions] Alchemy NFT API failed, skipping V4 positions:', error);
@@ -483,24 +511,25 @@ async function fetchV4Positions(client: any, wallet: Address, alchemyKey?: strin
         // Alchemy returns hex tokenIds, convert to BigInt
         const tokenId = BigInt(tokenIdStr);
 
-        // Get position details
-        const [poolKey, packedInfo] = await client.readContract({
+        // Get position details (with retry)
+        const positionInfo = await withRetry(() => client.readContract({
           address: V4_POSITION_MANAGER as Address,
           abi: V4_NFT_ABI,
           functionName: 'getPoolAndPositionInfo',
           args: [tokenId],
-        });
+        }), `V4 getPoolAndPositionInfo(${tokenId})`) as readonly [any, bigint];
+        const [poolKey, packedInfo] = positionInfo;
 
-        // Get liquidity
-        const liquidity = await client.readContract({
+        // Get liquidity (with retry)
+        const liquidity = await withRetry(() => client.readContract({
           address: V4_POSITION_MANAGER as Address,
           abi: V4_NFT_ABI,
           functionName: 'getPositionLiquidity',
           args: [tokenId],
-        });
+        }), `V4 getPositionLiquidity(${tokenId})`) as bigint;
 
         const { currency0, currency1, fee, tickSpacing, hooks } = poolKey as any;
-        const { tickLower, tickUpper } = extractTicks(packedInfo as bigint);
+        const { tickLower, tickUpper } = extractTicks(packedInfo);
 
         if (liquidity > 0n) {
           positions.push({
@@ -669,7 +698,10 @@ async function enrichPositionsWithMetadata(
 
       console.log(`[Positions] Enriching ${raw.id}: token0=${token0Meta?.symbol} ($${token0Price}), token1=${token1Meta?.symbol} ($${token1Price})`);
 
-    // Calculate enrichment data
+    // Calculate enrichment data — use fallback decimals (18) if metadata unavailable
+    const d0 = token0Meta?.decimals ?? 18;
+    const d1 = token1Meta?.decimals ?? 18;
+
     const enrichmentData: EnrichmentData = {
       token0Amount: 0,
       token1Amount: 0,
@@ -679,58 +711,38 @@ async function enrichPositionsWithMetadata(
       inRange: raw.inRange,
     };
 
-    if (token0Meta && token1Meta) {
-      // Calculate USD values for V2 positions
-      if (raw.version === 'V2' && raw.v2Balance && raw.v2TotalSupply && raw.v2Reserve0 && raw.v2Reserve1) {
-        console.log(`[Positions] → Calculating V2 amounts for ${raw.id}`);
-        const v2Data = calculateV2Amounts(
-          raw,
-          token0Meta.decimals,
-          token1Meta.decimals,
-          token0Price,
-          token1Price
-        );
-        Object.assign(enrichmentData, v2Data);
-      }
+    if (!token0Meta || !token1Meta) {
+      console.warn(`[Positions] ⚠️  Missing metadata for ${raw.id}: token0Meta=${!!token0Meta}, token1Meta=${!!token1Meta} — position included with partial data`);
+    }
 
-      // Calculate USD values for V3/V4 positions
-      if ((raw.version === 'V3' || raw.version === 'V4') && raw.fee !== undefined) {
-        console.log(`[Positions] → Calculating concentrated liquidity amounts for ${raw.id}`);
-        const clData = await calculateConcentratedLiquidityAmounts(
-          raw,
-          token0Meta.decimals,
-          token1Meta.decimals,
-          token0Price,
-          token1Price,
-          alchemyKey
-        );
-        Object.assign(enrichmentData, clData);
+    // Calculate USD values for V2 positions
+    if (raw.version === 'V2' && raw.v2Balance && raw.v2TotalSupply && raw.v2Reserve0 && raw.v2Reserve1) {
+      console.log(`[Positions] → Calculating V2 amounts for ${raw.id}`);
+      const v2Data = calculateV2Amounts(raw, d0, d1, token0Price, token1Price);
+      Object.assign(enrichmentData, v2Data);
+    }
 
-        // Calculate V3 fees
-        if (raw.version === 'V3' && raw.v3TokensOwed0 !== undefined && raw.v3TokensOwed1 !== undefined) {
-          const fees0 = Number(raw.v3TokensOwed0) / Math.pow(10, token0Meta.decimals);
-          const fees1 = Number(raw.v3TokensOwed1) / Math.pow(10, token1Meta.decimals);
-          enrichmentData.feesEarnedUsd = fees0 * token0Price + fees1 * token1Price;
-          enrichmentData.feesEarned = `${fees0.toFixed(6)} / ${fees1.toFixed(6)}`;
-        }
-      }
+    // Calculate USD values for V3/V4 positions
+    if ((raw.version === 'V3' || raw.version === 'V4') && raw.fee !== undefined) {
+      console.log(`[Positions] → Calculating concentrated liquidity amounts for ${raw.id}`);
+      const clData = await calculateConcentratedLiquidityAmounts(raw, d0, d1, token0Price, token1Price, alchemyKey);
+      Object.assign(enrichmentData, clData);
 
-      // Calculate uncollected fees for V4 positions
-      if (raw.version === 'V4' && raw.tokenId && raw.fee !== undefined && raw.tickSpacing !== undefined && raw.hooks) {
-        console.log(`[Positions] → Calculating V4 fees for ${raw.id}`);
-        const v4Fees = await calculateV4Fees(
-          raw,
-          token0Meta.decimals,
-          token1Meta.decimals,
-          token0Price,
-          token1Price,
-          alchemyKey
-        );
-        enrichmentData.feesEarnedUsd = v4Fees.feesEarnedUsd;
-        enrichmentData.feesEarned = v4Fees.feesEarned;
+      // Calculate V3 fees
+      if (raw.version === 'V3' && raw.v3TokensOwed0 !== undefined && raw.v3TokensOwed1 !== undefined) {
+        const fees0 = Number(raw.v3TokensOwed0) / Math.pow(10, d0);
+        const fees1 = Number(raw.v3TokensOwed1) / Math.pow(10, d1);
+        enrichmentData.feesEarnedUsd = fees0 * token0Price + fees1 * token1Price;
+        enrichmentData.feesEarned = `${fees0.toFixed(6)} / ${fees1.toFixed(6)}`;
       }
-    } else {
-      console.warn(`[Positions] ⚠️  Missing metadata for ${raw.id}: token0Meta=${!!token0Meta}, token1Meta=${!!token1Meta}`);
+    }
+
+    // Calculate uncollected fees for V4 positions
+    if (raw.version === 'V4' && raw.tokenId && raw.fee !== undefined && raw.tickSpacing !== undefined && raw.hooks) {
+      console.log(`[Positions] → Calculating V4 fees for ${raw.id}`);
+      const v4Fees = await calculateV4Fees(raw, d0, d1, token0Price, token1Price, alchemyKey);
+      enrichmentData.feesEarnedUsd = v4Fees.feesEarnedUsd;
+      enrichmentData.feesEarned = v4Fees.feesEarned;
     }
 
     // Build the final Position object
@@ -764,7 +776,23 @@ async function enrichPositionsWithMetadata(
       positions.push(position);
     } catch (error) {
       console.error(`[Positions] Error enriching position ${raw.id}:`, error);
-      // Continue with other positions instead of failing completely
+      // Still include the position with raw data rather than dropping it
+      positions.push({
+        id: raw.id,
+        version: raw.version,
+        pair: raw.pair,
+        poolAddress: raw.poolAddress,
+        token0: { symbol: '???', address: raw.token0Address, amount: 0 },
+        token1: { symbol: '???', address: raw.token1Address, amount: 0 },
+        liquidity: raw.liquidity,
+        liquidityUsd: 0,
+        feesEarned: raw.feesEarned,
+        feesEarnedUsd: 0,
+        tokenId: raw.tokenId,
+        fee: raw.fee,
+        tickSpacing: raw.tickSpacing,
+        hooks: raw.hooks,
+      });
     }
   }
 

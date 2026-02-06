@@ -46,14 +46,12 @@ export default function PositionsPage() {
     fetchPositions()
   }, [wallet])
 
-  const activePositions = positions.filter(p =>
-    p.liquidityUsd && p.liquidityUsd > 0
-  )
-  const closedPositions = positions.filter(p =>
-    !p.liquidityUsd || p.liquidityUsd === 0
-  )
+  // All positions returned from the API have on-chain liquidity.
+  // Positions with liquidityUsd === 0 have active liquidity but missing price data.
+  const pricedPositions = positions.filter(p => p.liquidityUsd > 0)
+  const unpricedPositions = positions.filter(p => !p.liquidityUsd || p.liquidityUsd === 0)
 
-  const displayedPositions = showClosed ? positions : activePositions
+  const displayedPositions = showClosed ? positions : pricedPositions
 
   return (
     <div className="app">
@@ -65,9 +63,9 @@ export default function PositionsPage() {
         <div className="section-header">
           <h2>
             My Positions
-            <span className="count">({activePositions.length})</span>
-            {closedPositions.length > 0 && (
-              <span className="closed-count">+ {closedPositions.length} closed</span>
+            <span className="count">({pricedPositions.length})</span>
+            {unpricedPositions.length > 0 && (
+              <span className="closed-count">+ {unpricedPositions.length} unpriced</span>
             )}
           </h2>
           <div className="header-actions">
@@ -103,7 +101,7 @@ export default function PositionsPage() {
           </div>
         ) : (
           <>
-            {closedPositions.length > 0 && (
+            {unpricedPositions.length > 0 && (
               <div className="positions-filter">
                 <label className="filter-toggle">
                   <input
@@ -111,7 +109,7 @@ export default function PositionsPage() {
                     checked={showClosed}
                     onChange={(e) => setShowClosed(e.target.checked)}
                   />
-                  <span className="filter-label">Show closed positions</span>
+                  <span className="filter-label">Show positions without price data</span>
                 </label>
               </div>
             )}
