@@ -323,10 +323,10 @@ export default function TradePage() {
       '0xc647421c5dc78d1c3960faa7a33f9aefdf4b7b07': { symbol: 'ARBME', decimals: 18 },
       '0x4200000000000000000000000000000000000006': { symbol: 'WETH', decimals: 18 },
       '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913': { symbol: 'USDC', decimals: 6 },
-      '0x1bc0c42215582d5a085795f3ee422eca40256c17': { symbol: 'CLANKER', decimals: 18 },
-      '0x5a845d59b57ee3eb076cefc100c68c0aa8e3d7e2': { symbol: 'PAGE', decimals: 18 },
+      '0x1bc0c42215582d5a085795f4badbac3ff36d1bcb': { symbol: 'CLANKER', decimals: 18 },
+      '0xc4730f86d1f86ce0712a7b17ee919db7defad7fe': { symbol: 'PAGE', decimals: 18 },
       '0x1c466dfcce7c2c18eb9f54a3cbb6d2e36da7c821': { symbol: 'OINC', decimals: 18 },
-      '0x768be13e1680b5ebe0024c42c896e3db59ec0149': { symbol: 'RATCHET', decimals: 18 },
+      '0x392bc5deea227043d69af0e67badcbbaed511b07': { symbol: 'RATCHET', decimals: 18 },
       '0x60c39541540e49a18e4c591c74b3487b4cd2aa27': { symbol: 'ABC', decimals: 18 },
     }
 
