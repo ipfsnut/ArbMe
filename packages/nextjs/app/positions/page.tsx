@@ -161,24 +161,25 @@ export default function PositionsPage() {
             >
               {refreshing ? '...' : '\u21BB'}
             </button>
-            {collectablePositions.length > 0 && (
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={handleCollectAll}
-                disabled={collectAllStatus === 'collecting'}
-                style={{ minWidth: 'auto' }}
-              >
-                {collectAllStatus === 'idle' && `Collect All (${formatUsd(totalFees)})`}
-                {collectAllStatus === 'collecting' && `${collectProgress.current}/${collectProgress.total}...`}
-                {collectAllStatus === 'done' && (isSafe ? 'Proposed!' : `Done! (${collectProgress.succeeded}/${collectProgress.total})`)}
-                {collectAllStatus === 'error' && 'Failed'}
-              </button>
-            )}
             <Link href={ROUTES.ADD_LIQUIDITY} className="btn btn-primary btn-sm">
               + Add
             </Link>
           </div>
         </div>
+
+        {collectablePositions.length > 0 && (
+          <button
+            className="btn btn-primary full-width"
+            onClick={handleCollectAll}
+            disabled={collectAllStatus === 'collecting'}
+            style={{ marginBottom: '1rem' }}
+          >
+            {collectAllStatus === 'idle' && `Collect All Fees (${formatUsd(totalFees)})`}
+            {collectAllStatus === 'collecting' && `Collecting ${collectProgress.current}/${collectProgress.total}...`}
+            {collectAllStatus === 'done' && (isSafe ? 'Proposed!' : `Done! (${collectProgress.succeeded}/${collectProgress.total})`)}
+            {collectAllStatus === 'error' && 'Failed — Try Again'}
+          </button>
+        )}
 
         {!wallet ? (
           <div className="empty-state">
