@@ -31,7 +31,13 @@ export default function PositionsPage() {
   const pricedPositions = positions.filter(p => p.liquidityUsd > 0)
   const unpricedPositions = positions.filter(p => !p.liquidityUsd || p.liquidityUsd === 0)
 
-  const displayedPositions = showClosed ? positions : pricedPositions
+  const baseDisplayed = showClosed ? positions : pricedPositions
+
+  // Farcaster: paginate to avoid webview memory issues
+  const PAGE_SIZE = 3
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  const displayedPositions = isFarcaster ? baseDisplayed.slice(0, visibleCount) : baseDisplayed
+  const hasMore = isFarcaster && visibleCount < baseDisplayed.length
 
   // Positions eligible for fee collection
   const collectablePositions = useMemo(() =>
@@ -218,6 +224,16 @@ export default function PositionsPage() {
                 <PositionCard key={position.id} position={position} />
               ))}
             </div>
+
+            {hasMore && (
+              <button
+                className="btn btn-secondary full-width"
+                onClick={() => setVisibleCount(v => v + PAGE_SIZE)}
+                style={{ marginTop: '1rem' }}
+              >
+                Load More ({baseDisplayed.length - visibleCount} remaining)
+              </button>
+            )}
           </>
         )}
       </div>
