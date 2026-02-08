@@ -34,6 +34,8 @@ export const TOKENS: Record<string, Address> = {
   OPENCLAW: getAddress("0xf3bb567d4c79cb32d92b9db151255cdd3b91f04a"),
   WOLF: getAddress("0xc3a366c03a0fc57d96065e3adb27dd0036d83b80"),
   EDGE: getAddress("0x1966a17d806a79f742e6e228ecc9421f401a8a32"),
+  OSO: getAddress("0xc78fabc2cb5b9cf59e0af3da8e3bc46d47753a4e"),
+  CNEWS: getAddress("0x01de044ad8eb037334ddda97a38bb0c798e4eb07"),
   // Base Assets
   USDC: getAddress("0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"),
   WETH: getAddress("0x4200000000000000000000000000000000000006"),

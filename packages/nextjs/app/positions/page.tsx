@@ -1,19 +1,30 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import Link from 'next/link'
-import { useWallet } from '@/hooks/useWallet'
+import { useWallet, useIsFarcaster, useIsSafe } from '@/hooks/useWallet'
 import { usePositions } from '@/hooks/usePositions'
+import { useSendTransaction } from 'wagmi'
 import { AppHeader } from '@/components/AppHeader'
 import { Footer } from '@/components/Footer'
 import { BackButton } from '@/components/BackButton'
 import { PositionCard } from '@/components/PositionCard'
 import { ROUTES } from '@/utils/constants'
+import type { Position } from '@/utils/types'
+
+type CollectAllStatus = 'idle' | 'collecting' | 'done' | 'error'
 
 export default function PositionsPage() {
   const wallet = useWallet()
-  const { positions, loading, refreshing, error, lastRefresh, refresh } = usePositions(wallet)
+  const isFarcaster = useIsFarcaster()
+  const isSafe = useIsSafe()
+  const { sendTransactionAsync } = useSendTransaction()
+  const { positions, loading, refreshing, error, lastRefresh, refresh, invalidate } = usePositions(wallet)
   const [showClosed, setShowClosed] = useState(false)
+
+  // Collect All state
+  const [collectAllStatus, setCollectAllStatus] = useState<CollectAllStatus>('idle')
+  const [collectProgress, setCollectProgress] = useState({ current: 0, total: 0, succeeded: 0, failed: 0 })
 
   // All positions returned from the API have on-chain liquidity.
   // Positions with liquidityUsd === 0 have active liquidity but missing price data.
@@ -21,6 +32,101 @@ export default function PositionsPage() {
   const unpricedPositions = positions.filter(p => !p.liquidityUsd || p.liquidityUsd === 0)
 
   const displayedPositions = showClosed ? positions : pricedPositions
+
+  // Positions eligible for fee collection
+  const collectablePositions = useMemo(() =>
+    positions.filter(p =>
+      p.feesEarnedUsd > 0 &&
+      p.version !== 'V2' &&
+      p.liquidityUsd > 0
+    ),
+    [positions]
+  )
+
+  const totalFees = useMemo(() =>
+    collectablePositions.reduce((sum, p) => sum + (p.feesEarnedUsd || 0), 0),
+    [collectablePositions]
+  )
+
+  const sendTx = async (tx: { to: string; data: string; value: string }) => {
+    if (!wallet) throw new Error('No wallet connected')
+
+    if (isFarcaster) {
+      const farcasterSdk = (await import('@farcaster/miniapp-sdk')).default
+      const provider = await farcasterSdk.wallet.getEthereumProvider()
+      if (!provider) throw new Error('No wallet provider')
+
+      return await provider.request({
+        method: 'eth_sendTransaction',
+        params: [{
+          from: wallet as `0x${string}`,
+          to: tx.to as `0x${string}`,
+          data: tx.data as `0x${string}`,
+          value: tx.value !== '0' ? `0x${BigInt(tx.value).toString(16)}` as `0x${string}` : '0x0',
+        }],
+      }) as string
+    } else {
+      return await sendTransactionAsync({
+        to: tx.to as `0x${string}`,
+        data: tx.data as `0x${string}`,
+        value: tx.value !== '0' ? BigInt(tx.value) : 0n,
+      })
+    }
+  }
+
+  const handleCollectAll = async () => {
+    if (collectablePositions.length === 0 || !wallet) return
+
+    setCollectAllStatus('collecting')
+    const progress = { current: 0, total: collectablePositions.length, succeeded: 0, failed: 0 }
+    setCollectProgress(progress)
+
+    for (const pos of collectablePositions) {
+      progress.current++
+      setCollectProgress({ ...progress })
+
+      try {
+        const res = await fetch('/api/collect-fees', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            positionId: pos.id,
+            recipient: wallet,
+            currency0: pos.token0?.address,
+            currency1: pos.token1?.address,
+          }),
+        })
+
+        if (!res.ok) {
+          progress.failed++
+          continue
+        }
+
+        const { transaction } = await res.json()
+        await sendTx(transaction)
+        progress.succeeded++
+      } catch {
+        progress.failed++
+      }
+
+      setCollectProgress({ ...progress })
+    }
+
+    setCollectAllStatus(progress.failed === progress.total ? 'error' : 'done')
+
+    // Refresh positions after collecting
+    setTimeout(async () => {
+      await invalidate()
+      setCollectAllStatus('idle')
+      setCollectProgress({ current: 0, total: 0, succeeded: 0, failed: 0 })
+    }, 3000)
+  }
+
+  const formatUsd = (value: number) => {
+    if (value < 0.01) return '<$0.01'
+    if (value >= 1_000) return `$${(value / 1_000).toFixed(2)}K`
+    return `$${value.toFixed(2)}`
+  }
 
   return (
     <div className="app">
@@ -49,6 +155,19 @@ export default function PositionsPage() {
             >
               {refreshing ? '...' : '\u21BB'}
             </button>
+            {collectablePositions.length > 0 && (
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={handleCollectAll}
+                disabled={collectAllStatus === 'collecting'}
+                style={{ minWidth: 'auto' }}
+              >
+                {collectAllStatus === 'idle' && `Collect All (${formatUsd(totalFees)})`}
+                {collectAllStatus === 'collecting' && `${collectProgress.current}/${collectProgress.total}...`}
+                {collectAllStatus === 'done' && (isSafe ? 'Proposed!' : `Done! (${collectProgress.succeeded}/${collectProgress.total})`)}
+                {collectAllStatus === 'error' && 'Failed'}
+              </button>
+            )}
             <Link href={ROUTES.ADD_LIQUIDITY} className="btn btn-primary btn-sm">
               + Add
             </Link>

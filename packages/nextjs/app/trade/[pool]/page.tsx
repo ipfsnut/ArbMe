@@ -336,6 +336,8 @@ export default function TradePage() {
       '0xf3bb567d4c79cb32d92b9db151255cdd3b91f04a': { symbol: 'OPENCLAW', decimals: 18 },
       '0xc3a366c03a0fc57d96065e3adb27dd0036d83b80': { symbol: 'WOLF', decimals: 18 },
       '0x1966a17d806a79f742e6e228ecc9421f401a8a32': { symbol: 'EDGE', decimals: 18 },
+      '0xc78fabc2cb5b9cf59e0af3da8e3bc46d47753a4e': { symbol: 'OSO', decimals: 18 },
+      '0x01de044ad8eb037334ddda97a38bb0c798e4eb07': { symbol: 'CNEWS', decimals: 18 },
       // Base Assets
       '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913': { symbol: 'USDC', decimals: 6 },
       '0x4200000000000000000000000000000000000006': { symbol: 'WETH', decimals: 18 },
