@@ -8,6 +8,14 @@ interface TokenInputProps {
   onChange: (value: string) => void
   disabled?: boolean
   placeholder?: string
+  usdValue?: number | null
+}
+
+function formatUsdValue(usd: number): string {
+  if (usd < 0.01) return '<$0.01'
+  if (usd >= 1_000_000) return `$${(usd / 1_000_000).toFixed(2)}M`
+  if (usd >= 1_000) return `$${(usd / 1_000).toFixed(2)}K`
+  return `$${usd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 export function TokenInput({
@@ -18,6 +26,7 @@ export function TokenInput({
   onChange,
   disabled = false,
   placeholder = '0.0',
+  usdValue,
 }: TokenInputProps) {
   const handleMaxClick = () => {
     if (balance) {
@@ -50,6 +59,11 @@ export function TokenInput({
         />
         {symbol && <span className="input-token-label">{symbol}</span>}
       </div>
+      {usdValue != null && usdValue > 0 && (
+        <div className="input-usd-value" style={{ fontSize: '0.75rem', color: 'var(--text-muted, #888)', marginTop: '0.25rem', textAlign: 'right' }}>
+          ~{formatUsdValue(usdValue)}
+        </div>
+      )}
     </div>
   )
 }

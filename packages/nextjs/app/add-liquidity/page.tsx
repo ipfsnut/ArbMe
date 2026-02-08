@@ -247,10 +247,12 @@ function AddLiquidityPage() {
     checkPool()
   }, [state.token0Info, state.token1Info, state.version, state.fee, updateState])
 
-  // Fetch USD prices for both tokens when entering step 2
+  // Fetch USD prices for both tokens when entering step 2 or step 3
   useEffect(() => {
     async function fetchUsdPrices() {
-      if (state.step !== 2 || !state.token0Info || !state.token1Info) return
+      if ((state.step !== 2 && state.step !== 3) || !state.token0Info || !state.token1Info) return
+      // On step 3, skip if we already have fetched prices
+      if (state.step === 3 && state.token0FetchedUsdPrice && state.token1FetchedUsdPrice) return
 
       setLoadingPrices(true)
       try {
@@ -1200,6 +1202,7 @@ function AddLiquidityPage() {
                 symbol={state.token0Info?.symbol}
                 balance={state.token0Info?.balance}
                 value={state.amount0}
+                usdValue={state.token0FetchedUsdPrice && state.amount0 ? parseFloat(state.amount0) * state.token0FetchedUsdPrice : null}
                 onChange={(amount0) => {
                   // Auto-calculate amount1 based on price ratio
                   if (effectivePriceRatio && amount0 && parseFloat(amount0) > 0) {
@@ -1216,6 +1219,7 @@ function AddLiquidityPage() {
                 symbol={state.token1Info?.symbol}
                 balance={state.token1Info?.balance}
                 value={state.amount1}
+                usdValue={state.token1FetchedUsdPrice && state.amount1 ? parseFloat(state.amount1) * state.token1FetchedUsdPrice : null}
                 onChange={(amount1) => {
                   // Auto-calculate amount0 based on price ratio
                   if (effectivePriceRatio && effectivePriceRatio > 0 && amount1 && parseFloat(amount1) > 0) {
