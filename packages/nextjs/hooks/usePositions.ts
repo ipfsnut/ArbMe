@@ -21,12 +21,20 @@ export interface UsePositionsResult {
   invalidate: () => Promise<void>
 }
 
-async function fetchPositionsFromApi(wallet: string, bustCache = false): Promise<Position[]> {
+interface ApiResponse {
+  positions: Position[]
+  lastUpdated?: string
+}
+
+async function fetchPositionsFromApi(wallet: string, bustCache = false): Promise<ApiResponse> {
   const url = `${API_BASE}/positions?wallet=${wallet}${bustCache ? '&refresh=true' : ''}`
   const res = await fetch(url)
   if (!res.ok) throw new Error('Failed to fetch positions')
   const data = await res.json()
-  return data.positions || []
+  return {
+    positions: data.positions || [],
+    lastUpdated: data.lastUpdated,
+  }
 }
 
 export function usePositions(wallet: string | null): UsePositionsResult {
@@ -48,12 +56,13 @@ export function usePositions(wallet: string | null): UsePositionsResult {
     setError(null)
 
     try {
-      const fresh = await fetchPositionsFromApi(w)
-      // Only update if wallet hasn't changed during fetch
+      // Bust server cache so we get fresh on-chain data
+      const { positions: fresh, lastUpdated } = await fetchPositionsFromApi(w, true)
       if (walletRef.current === w) {
         setPositions(fresh)
         await setCachedPositions(w, fresh)
-        setLastRefresh(Date.now())
+        const ts = lastUpdated ? new Date(lastUpdated).getTime() : Date.now()
+        setLastRefresh(ts)
       }
     } catch (e: any) {
       if (walletRef.current === w) {
@@ -77,11 +86,12 @@ export function usePositions(wallet: string | null): UsePositionsResult {
     setError(null)
 
     try {
-      const fresh = await fetchPositionsFromApi(w, true)
+      const { positions: fresh, lastUpdated } = await fetchPositionsFromApi(w, true)
       if (walletRef.current === w) {
         setPositions(fresh)
         await setCachedPositions(w, fresh)
-        setLastRefresh(Date.now())
+        const ts = lastUpdated ? new Date(lastUpdated).getTime() : Date.now()
+        setLastRefresh(ts)
       }
     } catch (e: any) {
       if (walletRef.current === w) {
@@ -113,32 +123,27 @@ export function usePositions(wallet: string | null): UsePositionsResult {
       if (cancelled) return
 
       if (cached.positions.length > 0) {
+        // Show cached data and stop — no auto-refresh
         setPositions(cached.positions)
         setLastRefresh(cached.lastRefresh)
         setLoading(false)
-
-        // If cache is fresh, we're done
-        if (cached.isFresh) return
-
-        // Stale cache — show it but refresh in background
-        setRefreshing(true)
+        return
       }
 
-      // 2. Fetch fresh data from API (which has its own server-side cache)
+      // 2. Cache completely empty — first visit for this wallet, fetch from API
       try {
-        const fresh = await fetchPositionsFromApi(w)
+        const { positions: fresh, lastUpdated } = await fetchPositionsFromApi(w)
         if (cancelled) return
         setPositions(fresh)
         await setCachedPositions(w, fresh)
-        setLastRefresh(Date.now())
+        const ts = lastUpdated ? new Date(lastUpdated).getTime() : Date.now()
+        setLastRefresh(ts)
       } catch (e: any) {
         if (cancelled) return
         setError(e.message || 'Failed to load positions')
-        // If we had no cache and fetch failed, user sees the error
       } finally {
         if (!cancelled) {
           setLoading(false)
-          setRefreshing(false)
         }
       }
     }

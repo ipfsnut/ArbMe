@@ -367,65 +367,71 @@ async function fetchV3Positions(client: any, wallet: Address): Promise<RawPositi
     const count = Number(balance);
     console.log(`[Positions] User has ${count} V3 positions`);
 
-    // Enumerate positions
-    for (let i = 0; i < count; i++) {
-      try {
-        // Get token ID (with retry)
-        const tokenId = await withRetry(() => client.readContract({
-          address: V3_POSITION_MANAGER as Address,
-          abi: V3_NFT_ABI,
-          functionName: 'tokenOfOwnerByIndex',
-          args: [wallet, BigInt(i)],
-        }), `V3 tokenOfOwnerByIndex(${i})`) as bigint;
+    // Enumerate positions in parallel batches
+    const BATCH_SIZE = 5;
+    const indices = Array.from({ length: count }, (_, i) => i);
 
-        // Get position details (with retry)
-        const position = await withRetry(() => client.readContract({
-          address: V3_POSITION_MANAGER as Address,
-          abi: V3_NFT_ABI,
-          functionName: 'positions',
-          args: [tokenId],
-        }), `V3 positions(${tokenId})`) as readonly [bigint, string, string, string, number, number, number, bigint, bigint, bigint, bigint, bigint];
+    for (let b = 0; b < indices.length; b += BATCH_SIZE) {
+      const batch = indices.slice(b, b + BATCH_SIZE);
+      const batchResults = await Promise.all(batch.map(async (i) => {
+        try {
+          const tokenId = await withRetry(() => client.readContract({
+            address: V3_POSITION_MANAGER as Address,
+            abi: V3_NFT_ABI,
+            functionName: 'tokenOfOwnerByIndex',
+            args: [wallet, BigInt(i)],
+          }), `V3 tokenOfOwnerByIndex(${i})`) as bigint;
 
-        const [
-          nonce,
-          operator,
-          token0,
-          token1,
-          fee,
-          tickLower,
-          tickUpper,
-          liquidity,
-          feeGrowthInside0LastX128,
-          feeGrowthInside1LastX128,
-          tokensOwed0,
-          tokensOwed1,
-        ] = position;
+          const position = await withRetry(() => client.readContract({
+            address: V3_POSITION_MANAGER as Address,
+            abi: V3_NFT_ABI,
+            functionName: 'positions',
+            args: [tokenId],
+          }), `V3 positions(${tokenId})`) as readonly [bigint, string, string, string, number, number, number, bigint, bigint, bigint, bigint, bigint];
 
-        if (liquidity > 0n) {
-          positions.push({
-            id: `v3-${tokenId}`,
-            version: 'V3',
-            pair: `Token Pair`, // Will be updated in enrichment
-            poolAddress: V3_POSITION_MANAGER,
-            token0Address: token0 as string,
-            token1Address: token1 as string,
-            liquidity: `${formatUnits(liquidity, 0)} liquidity`,
-            liquidityUsd: 0, // Will be calculated in enrichment
-            feesEarned: `${formatUnits(tokensOwed0, 18)} / ${formatUnits(tokensOwed1, 18)}`,
-            feesEarnedUsd: 0, // Will be calculated in enrichment
-            priceRangeLow: `Tick ${tickLower}`,
-            priceRangeHigh: `Tick ${tickUpper}`,
-            inRange: undefined, // Will be calculated in enrichment
-            tokenId: tokenId.toString(),
-            fee: Number(fee),
-            // Store raw values for fee USD calculation
-            v3TokensOwed0: tokensOwed0 as bigint,
-            v3TokensOwed1: tokensOwed1 as bigint,
-          });
+          const [
+            nonce,
+            operator,
+            token0,
+            token1,
+            fee,
+            tickLower,
+            tickUpper,
+            liquidity,
+            feeGrowthInside0LastX128,
+            feeGrowthInside1LastX128,
+            tokensOwed0,
+            tokensOwed1,
+          ] = position;
+
+          if (liquidity > 0n) {
+            return {
+              id: `v3-${tokenId}`,
+              version: 'V3' as const,
+              pair: `Token Pair`,
+              poolAddress: V3_POSITION_MANAGER,
+              token0Address: token0 as string,
+              token1Address: token1 as string,
+              liquidity: `${formatUnits(liquidity, 0)} liquidity`,
+              liquidityUsd: 0,
+              feesEarned: `${formatUnits(tokensOwed0, 18)} / ${formatUnits(tokensOwed1, 18)}`,
+              feesEarnedUsd: 0,
+              priceRangeLow: `Tick ${tickLower}`,
+              priceRangeHigh: `Tick ${tickUpper}`,
+              inRange: undefined,
+              tokenId: tokenId.toString(),
+              fee: Number(fee),
+              v3TokensOwed0: tokensOwed0 as bigint,
+              v3TokensOwed1: tokensOwed1 as bigint,
+            } as RawPosition;
+          }
+          return null;
+        } catch (error) {
+          console.error(`[Positions] Error fetching V3 position ${i}:`, error);
+          return null;
         }
-      } catch (error) {
-        console.error(`[Positions] Error fetching V3 position ${i}:`, error);
-      }
+      }));
+      positions.push(...batchResults.filter((p): p is RawPosition => p !== null));
     }
   } catch (error) {
     console.error('[Positions] Error fetching V3 positions:', error);
@@ -505,56 +511,61 @@ async function fetchV4Positions(client: any, wallet: Address, alchemyKey?: strin
       return { tickLower, tickUpper };
     };
 
-    // Fetch details for each owned position
-    for (const tokenIdStr of ownedTokenIds) {
-      try {
-        // Alchemy returns hex tokenIds, convert to BigInt
-        const tokenId = BigInt(tokenIdStr);
+    // Fetch details for each owned position in parallel batches
+    const V4_BATCH_SIZE = 5;
+    for (let b = 0; b < ownedTokenIds.length; b += V4_BATCH_SIZE) {
+      const batch = ownedTokenIds.slice(b, b + V4_BATCH_SIZE);
+      const batchResults = await Promise.all(batch.map(async (tokenIdStr) => {
+        try {
+          const tokenId = BigInt(tokenIdStr);
 
-        // Get position details (with retry)
-        const positionInfo = await withRetry(() => client.readContract({
-          address: V4_POSITION_MANAGER as Address,
-          abi: V4_NFT_ABI,
-          functionName: 'getPoolAndPositionInfo',
-          args: [tokenId],
-        }), `V4 getPoolAndPositionInfo(${tokenId})`) as readonly [any, bigint];
-        const [poolKey, packedInfo] = positionInfo;
+          const [positionInfo, liquidity] = await Promise.all([
+            withRetry(() => client.readContract({
+              address: V4_POSITION_MANAGER as Address,
+              abi: V4_NFT_ABI,
+              functionName: 'getPoolAndPositionInfo',
+              args: [tokenId],
+            }), `V4 getPoolAndPositionInfo(${tokenId})`) as Promise<readonly [any, bigint]>,
+            withRetry(() => client.readContract({
+              address: V4_POSITION_MANAGER as Address,
+              abi: V4_NFT_ABI,
+              functionName: 'getPositionLiquidity',
+              args: [tokenId],
+            }), `V4 getPositionLiquidity(${tokenId})`) as Promise<bigint>,
+          ]);
 
-        // Get liquidity (with retry)
-        const liquidity = await withRetry(() => client.readContract({
-          address: V4_POSITION_MANAGER as Address,
-          abi: V4_NFT_ABI,
-          functionName: 'getPositionLiquidity',
-          args: [tokenId],
-        }), `V4 getPositionLiquidity(${tokenId})`) as bigint;
+          const [poolKey, packedInfo] = positionInfo;
+          const { currency0, currency1, fee, tickSpacing, hooks } = poolKey as any;
+          const { tickLower, tickUpper } = extractTicks(packedInfo);
 
-        const { currency0, currency1, fee, tickSpacing, hooks } = poolKey as any;
-        const { tickLower, tickUpper } = extractTicks(packedInfo);
-
-        if (liquidity > 0n) {
-          positions.push({
-            id: `v4-${tokenId}`,
-            version: 'V4',
-            pair: `Token Pair`, // Will be updated in enrichment
-            poolAddress: V4_POSITION_MANAGER,
-            token0Address: currency0 as string,
-            token1Address: currency1 as string,
-            liquidity: `${formatUnits(liquidity, 0)} liquidity`,
-            liquidityUsd: 0, // Will be calculated in enrichment
-            feesEarned: 'N/A', // Will be calculated in enrichment
-            feesEarnedUsd: 0,
-            priceRangeLow: `Tick ${tickLower}`,
-            priceRangeHigh: `Tick ${tickUpper}`,
-            inRange: undefined, // Will be calculated in enrichment
-            tokenId: tokenId.toString(),
-            fee: Number(fee),
-            tickSpacing: Number(tickSpacing),
-            hooks: hooks as string,
-          });
+          if (liquidity > 0n) {
+            return {
+              id: `v4-${tokenId}`,
+              version: 'V4' as const,
+              pair: `Token Pair`,
+              poolAddress: V4_POSITION_MANAGER,
+              token0Address: currency0 as string,
+              token1Address: currency1 as string,
+              liquidity: `${formatUnits(liquidity, 0)} liquidity`,
+              liquidityUsd: 0,
+              feesEarned: 'N/A',
+              feesEarnedUsd: 0,
+              priceRangeLow: `Tick ${tickLower}`,
+              priceRangeHigh: `Tick ${tickUpper}`,
+              inRange: undefined,
+              tokenId: tokenId.toString(),
+              fee: Number(fee),
+              tickSpacing: Number(tickSpacing),
+              hooks: hooks as string,
+            } as RawPosition;
+          }
+          return null;
+        } catch (error) {
+          console.error(`[Positions] Error fetching V4 position ${tokenIdStr}:`, error);
+          return null;
         }
-      } catch (error) {
-        console.error(`[Positions] Error fetching V4 position ${tokenIdStr}:`, error);
-      }
+      }));
+      positions.push(...batchResults.filter((p): p is RawPosition => p !== null));
     }
   } catch (error) {
     console.error('[Positions] Error fetching V4 positions:', error);
@@ -686,114 +697,116 @@ async function enrichPositionsWithMetadata(
     }
   }
 
-  // Transform each raw position to final Position
+  // Create a shared RPC client for all enrichment calls
+  const rpcUrl = alchemyKey
+    ? `https://base-mainnet.g.alchemy.com/v2/${alchemyKey}`
+    : 'https://mainnet.base.org';
+  const enrichClient = createPublicClient({
+    chain: base,
+    transport: http(rpcUrl),
+  });
+
+  // Enrich positions in parallel batches
+  const ENRICH_BATCH_SIZE = 5;
   const positions: Position[] = [];
 
-  for (const raw of rawPositions) {
-    try {
-      const token0Meta = metadataMap.get(raw.token0Address.toLowerCase());
-      const token1Meta = metadataMap.get(raw.token1Address.toLowerCase());
-      const token0Price = priceMap.get(raw.token0Address.toLowerCase()) || 0;
-      const token1Price = priceMap.get(raw.token1Address.toLowerCase()) || 0;
+  for (let b = 0; b < rawPositions.length; b += ENRICH_BATCH_SIZE) {
+    const batch = rawPositions.slice(b, b + ENRICH_BATCH_SIZE);
+    const batchResults = await Promise.all(batch.map(async (raw) => {
+      try {
+        const token0Meta = metadataMap.get(raw.token0Address.toLowerCase());
+        const token1Meta = metadataMap.get(raw.token1Address.toLowerCase());
+        const token0Price = priceMap.get(raw.token0Address.toLowerCase()) || 0;
+        const token1Price = priceMap.get(raw.token1Address.toLowerCase()) || 0;
 
-      console.log(`[Positions] Enriching ${raw.id}: token0=${token0Meta?.symbol} ($${token0Price}), token1=${token1Meta?.symbol} ($${token1Price})`);
+        console.log(`[Positions] Enriching ${raw.id}: token0=${token0Meta?.symbol} ($${token0Price}), token1=${token1Meta?.symbol} ($${token1Price})`);
 
-    // Calculate enrichment data — use fallback decimals (18) if metadata unavailable
-    const d0 = token0Meta?.decimals ?? 18;
-    const d1 = token1Meta?.decimals ?? 18;
+        const d0 = token0Meta?.decimals ?? 18;
+        const d1 = token1Meta?.decimals ?? 18;
 
-    const enrichmentData: EnrichmentData = {
-      token0Amount: 0,
-      token1Amount: 0,
-      liquidityUsd: 0,
-      feesEarnedUsd: raw.feesEarnedUsd,
-      feesEarned: raw.feesEarned,
-      inRange: raw.inRange,
-    };
+        const enrichmentData: EnrichmentData = {
+          token0Amount: 0,
+          token1Amount: 0,
+          liquidityUsd: 0,
+          feesEarnedUsd: raw.feesEarnedUsd,
+          feesEarned: raw.feesEarned,
+          inRange: raw.inRange,
+        };
 
-    if (!token0Meta || !token1Meta) {
-      console.warn(`[Positions] ⚠️  Missing metadata for ${raw.id}: token0Meta=${!!token0Meta}, token1Meta=${!!token1Meta} — position included with partial data`);
-    }
+        if (!token0Meta || !token1Meta) {
+          console.warn(`[Positions] Missing metadata for ${raw.id}: token0Meta=${!!token0Meta}, token1Meta=${!!token1Meta}`);
+        }
 
-    // Calculate USD values for V2 positions
-    if (raw.version === 'V2' && raw.v2Balance && raw.v2TotalSupply && raw.v2Reserve0 && raw.v2Reserve1) {
-      console.log(`[Positions] → Calculating V2 amounts for ${raw.id}`);
-      const v2Data = calculateV2Amounts(raw, d0, d1, token0Price, token1Price);
-      Object.assign(enrichmentData, v2Data);
-    }
+        if (raw.version === 'V2' && raw.v2Balance && raw.v2TotalSupply && raw.v2Reserve0 && raw.v2Reserve1) {
+          const v2Data = calculateV2Amounts(raw, d0, d1, token0Price, token1Price);
+          Object.assign(enrichmentData, v2Data);
+        }
 
-    // Calculate USD values for V3/V4 positions
-    if ((raw.version === 'V3' || raw.version === 'V4') && raw.fee !== undefined) {
-      console.log(`[Positions] → Calculating concentrated liquidity amounts for ${raw.id}`);
-      const clData = await calculateConcentratedLiquidityAmounts(raw, d0, d1, token0Price, token1Price, alchemyKey);
-      Object.assign(enrichmentData, clData);
+        if ((raw.version === 'V3' || raw.version === 'V4') && raw.fee !== undefined) {
+          const clData = await calculateConcentratedLiquidityAmounts(raw, d0, d1, token0Price, token1Price, alchemyKey, enrichClient);
+          Object.assign(enrichmentData, clData);
 
-      // Calculate V3 fees
-      if (raw.version === 'V3' && raw.v3TokensOwed0 !== undefined && raw.v3TokensOwed1 !== undefined) {
-        const fees0 = Number(raw.v3TokensOwed0) / Math.pow(10, d0);
-        const fees1 = Number(raw.v3TokensOwed1) / Math.pow(10, d1);
-        enrichmentData.feesEarnedUsd = fees0 * token0Price + fees1 * token1Price;
-        enrichmentData.feesEarned = `${fees0.toFixed(6)} / ${fees1.toFixed(6)}`;
+          if (raw.version === 'V3' && raw.v3TokensOwed0 !== undefined && raw.v3TokensOwed1 !== undefined) {
+            const fees0 = Number(raw.v3TokensOwed0) / Math.pow(10, d0);
+            const fees1 = Number(raw.v3TokensOwed1) / Math.pow(10, d1);
+            enrichmentData.feesEarnedUsd = fees0 * token0Price + fees1 * token1Price;
+            enrichmentData.feesEarned = `${fees0.toFixed(6)} / ${fees1.toFixed(6)}`;
+          }
+        }
+
+        if (raw.version === 'V4' && raw.tokenId && raw.fee !== undefined && raw.tickSpacing !== undefined && raw.hooks) {
+          const v4Fees = await calculateV4Fees(raw, d0, d1, token0Price, token1Price, alchemyKey, enrichClient);
+          enrichmentData.feesEarnedUsd = v4Fees.feesEarnedUsd;
+          enrichmentData.feesEarned = v4Fees.feesEarned;
+        }
+
+        return {
+          id: raw.id,
+          version: raw.version,
+          pair: token0Meta && token1Meta ? `${token0Meta.symbol} / ${token1Meta.symbol}` : raw.pair,
+          poolAddress: raw.poolAddress,
+          token0: {
+            symbol: token0Meta?.symbol || '???',
+            address: raw.token0Address,
+            amount: enrichmentData.token0Amount,
+          },
+          token1: {
+            symbol: token1Meta?.symbol || '???',
+            address: raw.token1Address,
+            amount: enrichmentData.token1Amount,
+          },
+          liquidity: raw.liquidity,
+          liquidityUsd: enrichmentData.liquidityUsd,
+          feesEarned: enrichmentData.feesEarned,
+          feesEarnedUsd: enrichmentData.feesEarnedUsd,
+          inRange: enrichmentData.inRange,
+          priceRange: enrichmentData.priceRange,
+          tokenId: raw.tokenId,
+          fee: raw.fee,
+          tickSpacing: raw.tickSpacing,
+          hooks: raw.hooks,
+        } as Position;
+      } catch (error) {
+        console.error(`[Positions] Error enriching position ${raw.id}:`, error);
+        return {
+          id: raw.id,
+          version: raw.version,
+          pair: raw.pair,
+          poolAddress: raw.poolAddress,
+          token0: { symbol: '???', address: raw.token0Address, amount: 0 },
+          token1: { symbol: '???', address: raw.token1Address, amount: 0 },
+          liquidity: raw.liquidity,
+          liquidityUsd: 0,
+          feesEarned: raw.feesEarned,
+          feesEarnedUsd: 0,
+          tokenId: raw.tokenId,
+          fee: raw.fee,
+          tickSpacing: raw.tickSpacing,
+          hooks: raw.hooks,
+        } as Position;
       }
-    }
-
-    // Calculate uncollected fees for V4 positions
-    if (raw.version === 'V4' && raw.tokenId && raw.fee !== undefined && raw.tickSpacing !== undefined && raw.hooks) {
-      console.log(`[Positions] → Calculating V4 fees for ${raw.id}`);
-      const v4Fees = await calculateV4Fees(raw, d0, d1, token0Price, token1Price, alchemyKey);
-      enrichmentData.feesEarnedUsd = v4Fees.feesEarnedUsd;
-      enrichmentData.feesEarned = v4Fees.feesEarned;
-    }
-
-    // Build the final Position object
-    const position: Position = {
-      id: raw.id,
-      version: raw.version,
-      pair: token0Meta && token1Meta ? `${token0Meta.symbol} / ${token1Meta.symbol}` : raw.pair,
-      poolAddress: raw.poolAddress,
-      token0: {
-        symbol: token0Meta?.symbol || '???',
-        address: raw.token0Address,
-        amount: enrichmentData.token0Amount,
-      },
-      token1: {
-        symbol: token1Meta?.symbol || '???',
-        address: raw.token1Address,
-        amount: enrichmentData.token1Amount,
-      },
-      liquidity: raw.liquidity,
-      liquidityUsd: enrichmentData.liquidityUsd,
-      feesEarned: enrichmentData.feesEarned,
-      feesEarnedUsd: enrichmentData.feesEarnedUsd,
-      inRange: enrichmentData.inRange,
-      priceRange: enrichmentData.priceRange,
-      tokenId: raw.tokenId,
-      fee: raw.fee,
-      tickSpacing: raw.tickSpacing,
-      hooks: raw.hooks,
-    };
-
-      positions.push(position);
-    } catch (error) {
-      console.error(`[Positions] Error enriching position ${raw.id}:`, error);
-      // Still include the position with raw data rather than dropping it
-      positions.push({
-        id: raw.id,
-        version: raw.version,
-        pair: raw.pair,
-        poolAddress: raw.poolAddress,
-        token0: { symbol: '???', address: raw.token0Address, amount: 0 },
-        token1: { symbol: '???', address: raw.token1Address, amount: 0 },
-        liquidity: raw.liquidity,
-        liquidityUsd: 0,
-        feesEarned: raw.feesEarned,
-        feesEarnedUsd: 0,
-        tokenId: raw.tokenId,
-        fee: raw.fee,
-        tickSpacing: raw.tickSpacing,
-        hooks: raw.hooks,
-      });
-    }
+    }));
+    positions.push(...batchResults);
   }
 
   console.log(`[Positions] Enriched ${positions.length} positions with metadata`);
@@ -853,7 +866,8 @@ async function calculateConcentratedLiquidityAmounts(
   decimals1: number,
   price0: number,
   price1: number,
-  alchemyKey?: string
+  alchemyKey?: string,
+  client?: any
 ): Promise<Partial<EnrichmentData>> {
   // Extract tick range from position (already parsed in fetch functions)
   const tickLower = extractTickFromString(raw.priceRangeLow);
@@ -871,7 +885,7 @@ async function calculateConcentratedLiquidityAmounts(
   }
 
   // Fetch current pool price (sqrtPriceX96) and tick
-  const slot0Data = await fetchPoolSqrtPriceForRaw(raw, alchemyKey);
+  const slot0Data = await fetchPoolSqrtPriceForRaw(raw, alchemyKey, client);
 
   if (!slot0Data) {
     console.warn(`[Positions] Cannot fetch pool price for position ${raw.id}, deriving from token prices`);
@@ -989,7 +1003,8 @@ async function calculateV4Fees(
   decimals1: number,
   price0: number,
   price1: number,
-  alchemyKey?: string
+  alchemyKey?: string,
+  existingClient?: any
 ): Promise<{ feesEarnedUsd: number; feesEarned: string }> {
   // Add validation at start with detailed logging
   if (!raw.tokenId || !raw.fee || !raw.tickSpacing || !raw.hooks) {
@@ -1013,14 +1028,16 @@ async function calculateV4Fees(
     return { feesEarnedUsd: 0, feesEarned: 'N/A' };
   }
 
-  const rpcUrl = alchemyKey
-    ? `https://base-mainnet.g.alchemy.com/v2/${alchemyKey}`
-    : 'https://mainnet.base.org';
-
-  const client = createPublicClient({
-    chain: base,
-    transport: http(rpcUrl),
-  });
+  let client = existingClient;
+  if (!client) {
+    const rpcUrl = alchemyKey
+      ? `https://base-mainnet.g.alchemy.com/v2/${alchemyKey}`
+      : 'https://mainnet.base.org';
+    client = createPublicClient({
+      chain: base,
+      transport: http(rpcUrl),
+    });
+  }
 
   try {
     // Calculate pool ID and position ID
@@ -1084,16 +1101,16 @@ async function calculateV4Fees(
 
     // Use on-chain liquidity for accurate fee calculation
     const liquidity = BigInt(raw.liquidity.replace(/[^\d]/g, ''));
-    const actualLiquidity = posLiquidity > BigInt(0) ? posLiquidity : liquidity;
+    const actualLiquidity: bigint = BigInt(posLiquidity) > 0n ? BigInt(posLiquidity) : liquidity;
 
     // Calculate fees: (feeGrowthCurrent - feeGrowthLast) * liquidity / 2^128
     const Q128 = BigInt(2) ** BigInt(128);
-    const feeGrowthDelta0 = feeGrowthInside0 >= feeGrowthInside0Last
-      ? feeGrowthInside0 - feeGrowthInside0Last
-      : BigInt(0);
-    const feeGrowthDelta1 = feeGrowthInside1 >= feeGrowthInside1Last
-      ? feeGrowthInside1 - feeGrowthInside1Last
-      : BigInt(0);
+    const fg0 = BigInt(feeGrowthInside0);
+    const fg1 = BigInt(feeGrowthInside1);
+    const fg0Last = BigInt(feeGrowthInside0Last);
+    const fg1Last = BigInt(feeGrowthInside1Last);
+    const feeGrowthDelta0 = fg0 >= fg0Last ? fg0 - fg0Last : 0n;
+    const feeGrowthDelta1 = fg1 >= fg1Last ? fg1 - fg1Last : 0n;
 
     const fees0Raw = (feeGrowthDelta0 * actualLiquidity) / Q128;
     const fees1Raw = (feeGrowthDelta1 * actualLiquidity) / Q128;
@@ -1279,16 +1296,18 @@ function calculateV4PositionId(
  */
 async function fetchPoolSqrtPriceForRaw(
   raw: RawPosition,
-  alchemyKey?: string
+  alchemyKey?: string,
+  client?: any
 ): Promise<{ sqrtPriceX96: bigint; tick: number } | null> {
-  const rpcUrl = alchemyKey
-    ? `https://base-mainnet.g.alchemy.com/v2/${alchemyKey}`
-    : 'https://mainnet.base.org';
-
-  const client = createPublicClient({
-    chain: base,
-    transport: http(rpcUrl),
-  });
+  if (!client) {
+    const rpcUrl = alchemyKey
+      ? `https://base-mainnet.g.alchemy.com/v2/${alchemyKey}`
+      : 'https://mainnet.base.org';
+    client = createPublicClient({
+      chain: base,
+      transport: http(rpcUrl),
+    });
+  }
 
   try {
     if (raw.version === 'V3' && raw.fee) {

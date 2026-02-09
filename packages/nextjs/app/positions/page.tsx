@@ -20,18 +20,13 @@ export default function PositionsPage() {
   const isSafe = useIsSafe()
   const { sendTransactionAsync } = useSendTransaction()
   const { positions, loading, refreshing, error, lastRefresh, refresh, invalidate } = usePositions(wallet)
-  const [showClosed, setShowClosed] = useState(false)
 
   // Collect All state
   const [collectAllStatus, setCollectAllStatus] = useState<CollectAllStatus>('idle')
   const [collectProgress, setCollectProgress] = useState({ current: 0, total: 0, succeeded: 0, failed: 0 })
 
-  // All positions returned from the API have on-chain liquidity.
-  // Positions with liquidityUsd === 0 have active liquidity but missing price data.
-  const pricedPositions = positions.filter(p => p.liquidityUsd > 0)
-  const unpricedPositions = positions.filter(p => !p.liquidityUsd || p.liquidityUsd === 0)
-
-  const baseDisplayed = showClosed ? positions : pricedPositions
+  // Show all positions by default
+  const baseDisplayed = positions
 
   // Farcaster: paginate to avoid webview memory issues
   const PAGE_SIZE = 3
@@ -144,10 +139,7 @@ export default function PositionsPage() {
         <div className="section-header">
           <h2>
             My Positions
-            <span className="count">({pricedPositions.length})</span>
-            {unpricedPositions.length > 0 && (
-              <span className="closed-count">+ {unpricedPositions.length} unpriced</span>
-            )}
+            <span className="count">({positions.length})</span>
           </h2>
           <div className="header-actions">
             <span className="cache-age" style={{ fontSize: '0.75rem', color: 'var(--text-muted, #888)', marginRight: '0.5rem' }}>
@@ -198,7 +190,7 @@ export default function PositionsPage() {
           </div>
         ) : displayedPositions.length === 0 ? (
           <div className="empty-state">
-            <p>No {showClosed ? '' : 'active '}positions found</p>
+            <p>No positions found</p>
             <p className="hint">Add liquidity to a pool to get started</p>
             <p className="hint">If you believe this is an error, refresh to try again.</p>
             <Link href={ROUTES.ADD_LIQUIDITY} className="btn btn-primary" style={{ marginTop: '1rem' }}>
@@ -207,19 +199,6 @@ export default function PositionsPage() {
           </div>
         ) : (
           <>
-            {unpricedPositions.length > 0 && (
-              <div className="positions-filter">
-                <label className="filter-toggle">
-                  <input
-                    type="checkbox"
-                    checked={showClosed}
-                    onChange={(e) => setShowClosed(e.target.checked)}
-                  />
-                  <span className="filter-label">Show positions without price data</span>
-                </label>
-              </div>
-            )}
-
             <div className="positions-grid">
               {displayedPositions.map((position) => (
                 <PositionCard key={position.id} position={position} />

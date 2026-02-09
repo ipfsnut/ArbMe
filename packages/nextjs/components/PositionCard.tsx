@@ -50,7 +50,9 @@ export function PositionCard({ position }: PositionCardProps) {
       <div className="position-card-stats">
         <div className="position-stat-col">
           <span className="position-stat-label">Value</span>
-          <span className="position-stat-value accent">{formatUsd(position.liquidityUsd)}</span>
+          <span className="position-stat-value accent">
+            {isClosed ? 'Price unavailable' : formatUsd(position.liquidityUsd)}
+          </span>
         </div>
         {hasFees && !isClosed && (
           <div className="position-stat-col">

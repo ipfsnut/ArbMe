@@ -5,41 +5,41 @@ import type { Position } from '@arbme/core-lib'
 const ALCHEMY_KEY = process.env.ALCHEMY_API_KEY
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Position Cache — keyed by wallet, 60s TTL, stale-while-revalidate at 30s
+// Position Cache — keyed by wallet, LRU-evicted at MAX_ENTRIES, manual refresh
 // ═══════════════════════════════════════════════════════════════════════════════
 
 interface CacheEntry {
   positions: Position[]
-  timestamp: number
+  lastUpdated: string // ISO timestamp
 }
 
+const MAX_CACHE_ENTRIES = 500
 const cache = new Map<string, CacheEntry>()
-const CACHE_TTL = 5 * 60_000   // 5min — serve cached data within this window (helps Farcaster miniapp users)
-const STALE_THRESHOLD = 60_000 // 60s — trigger background refresh after this
 
 function getCached(wallet: string): CacheEntry | null {
-  const entry = cache.get(wallet.toLowerCase())
+  const key = wallet.toLowerCase()
+  const entry = cache.get(key)
   if (!entry) return null
-  if (Date.now() - entry.timestamp > CACHE_TTL) {
-    cache.delete(wallet.toLowerCase())
-    return null
-  }
+  // Move to end (most recently accessed) for LRU ordering
+  cache.delete(key)
+  cache.set(key, entry)
   return entry
 }
 
-function setCache(wallet: string, positions: Position[]) {
-  cache.set(wallet.toLowerCase(), { positions, timestamp: Date.now() })
+function setCache(wallet: string, positions: Position[]): CacheEntry {
+  const key = wallet.toLowerCase()
+  const entry: CacheEntry = { positions, lastUpdated: new Date().toISOString() }
+  // Evict oldest entry if at capacity
+  if (cache.size >= MAX_CACHE_ENTRIES && !cache.has(key)) {
+    const oldest = cache.keys().next().value
+    if (oldest) cache.delete(oldest)
+  }
+  cache.set(key, entry)
+  return entry
 }
 
 function invalidateCache(wallet: string) {
   cache.delete(wallet.toLowerCase())
-}
-
-// Background refresh — fire and forget, don't block the response
-function backgroundRefresh(wallet: string) {
-  fetchUserPositions(wallet, ALCHEMY_KEY)
-    .then(positions => setCache(wallet, positions))
-    .catch(err => console.error('[positions] Background refresh failed:', err))
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -70,30 +70,28 @@ export async function GET(request: NextRequest) {
       invalidateCache(wallet)
     }
 
-    // Check cache
+    // Check cache — serves forever until manually refreshed
     const cached = getCached(wallet)
     if (cached) {
-      // If stale (>30s), trigger background refresh for next request
-      if (Date.now() - cached.timestamp > STALE_THRESHOLD) {
-        backgroundRefresh(wallet)
-      }
-
       return NextResponse.json({
         wallet,
         positions: cached.positions,
         count: cached.positions.length,
         cached: true,
+        lastUpdated: cached.lastUpdated,
       })
     }
 
     // Cache miss — fetch fresh
     const positions = await fetchUserPositions(wallet, ALCHEMY_KEY)
-    setCache(wallet, positions)
+    const entry = setCache(wallet, positions)
 
     return NextResponse.json({
       wallet,
       positions,
       count: positions.length,
+      cached: false,
+      lastUpdated: entry.lastUpdated,
     })
   } catch (error: any) {
     console.error('[positions] Error:', error)
