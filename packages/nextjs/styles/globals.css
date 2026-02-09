@@ -1608,6 +1608,51 @@ button:disabled {
   }
 }
 
+/* Collect All Fees Card */
+.collect-all-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-card);
+  border: 1px solid var(--border-active);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.collect-all-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.collect-all-label {
+  font-family: var(--font-mono);
+  font-size: 0.5625rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.collect-all-amount {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.collect-all-detail {
+  font-family: var(--font-mono);
+  font-size: 0.5625rem;
+  color: var(--text-secondary);
+}
+
+.collect-all-btn {
+  flex: none;
+  padding: 0.5rem 1.25rem;
+  white-space: nowrap;
+}
+
 /* Buttons */
 .btn {
   flex: 1;

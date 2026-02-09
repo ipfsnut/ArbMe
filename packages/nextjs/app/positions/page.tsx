@@ -34,12 +34,11 @@ export default function PositionsPage() {
   const displayedPositions = isFarcaster ? baseDisplayed.slice(0, visibleCount) : baseDisplayed
   const hasMore = isFarcaster && visibleCount < baseDisplayed.length
 
-  // Positions eligible for fee collection
+  // Positions eligible for fee collection (V3/V4 with uncollected fees)
   const collectablePositions = useMemo(() =>
     positions.filter(p =>
       p.feesEarnedUsd > 0 &&
-      p.version !== 'V2' &&
-      p.liquidityUsd > 0
+      p.version !== 'V2'
     ),
     [positions]
   )
@@ -160,17 +159,23 @@ export default function PositionsPage() {
         </div>
 
         {collectablePositions.length > 0 && (
-          <button
-            className="btn btn-primary full-width"
-            onClick={handleCollectAll}
-            disabled={collectAllStatus === 'collecting'}
-            style={{ marginBottom: '1rem' }}
-          >
-            {collectAllStatus === 'idle' && `Collect All Fees (${formatUsd(totalFees)})`}
-            {collectAllStatus === 'collecting' && `Collecting ${collectProgress.current}/${collectProgress.total}...`}
-            {collectAllStatus === 'done' && (isSafe ? 'Proposed!' : `Done! (${collectProgress.succeeded}/${collectProgress.total})`)}
-            {collectAllStatus === 'error' && 'Failed — Try Again'}
-          </button>
+          <div className="collect-all-card">
+            <div className="collect-all-info">
+              <span className="collect-all-label">Uncollected Fees</span>
+              <span className="collect-all-amount">{formatUsd(totalFees)}</span>
+              <span className="collect-all-detail">{collectablePositions.length} position{collectablePositions.length !== 1 ? 's' : ''}</span>
+            </div>
+            <button
+              className="btn btn-primary collect-all-btn"
+              onClick={handleCollectAll}
+              disabled={collectAllStatus === 'collecting'}
+            >
+              {collectAllStatus === 'idle' && 'Collect All'}
+              {collectAllStatus === 'collecting' && `${collectProgress.current}/${collectProgress.total}...`}
+              {collectAllStatus === 'done' && (isSafe ? 'Proposed!' : `Done! (${collectProgress.succeeded}/${collectProgress.total})`)}
+              {collectAllStatus === 'error' && 'Retry'}
+            </button>
+          </div>
         )}
 
         {!wallet ? (
