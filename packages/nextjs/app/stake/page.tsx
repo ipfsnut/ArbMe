@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useWallet, useIsFarcaster } from '@/hooks/useWallet'
+import { useWallet, useIsFarcaster, useIsSafe } from '@/hooks/useWallet'
 import { AppHeader } from '@/components/AppHeader'
 import { Footer } from '@/components/Footer'
 import { BackButton } from '@/components/BackButton'
@@ -70,6 +70,7 @@ function parseToWei(value: string, decimals: number = 18): string {
 export default function StakePage() {
   const wallet = useWallet()
   const isFarcaster = useIsFarcaster()
+  const isSafe = useIsSafe()
   const [data, setData] = useState<StakingData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -78,6 +79,7 @@ export default function StakePage() {
   const [stakeAmount, setStakeAmount] = useState('')
   const [withdrawAmount, setWithdrawAmount] = useState('')
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   // Reward calculator state
   const [calcAmount, setCalcAmount] = useState('')
@@ -156,6 +158,18 @@ export default function StakePage() {
     ? BigInt(data.allowance) < BigInt(parseToWei(stakeAmount || '0'))
     : false
 
+  // Wait for tx to be mined before refreshing data
+  const waitAndRefresh = async () => {
+    if (isSafe) {
+      // Safe txs are proposals — refresh after a short delay to show current state
+      await new Promise(r => setTimeout(r, 2000))
+    } else {
+      // Wait for the tx to likely be mined on Base (~2s blocks)
+      await new Promise(r => setTimeout(r, 4000))
+    }
+    await fetchData()
+  }
+
   // Helper to build and send a staking transaction
   const executeStakingAction = async (endpoint: string, body: object = {}): Promise<void> => {
     const response = await fetch(endpoint, {
@@ -177,12 +191,13 @@ export default function StakePage() {
   const handleApprove = async () => {
     if (!wallet) return
     setActionLoading('approve')
+    setActionError(null)
     try {
       await executeStakingAction('/api/staking/approve')
-      await fetchData()
+      await waitAndRefresh()
     } catch (err: any) {
       console.error('[Stake] Approve error:', err)
-      alert(err.message || 'Approval failed')
+      setActionError(err.message || 'Approval failed')
     } finally {
       setActionLoading(null)
     }
@@ -194,13 +209,14 @@ export default function StakePage() {
     if (amount === '0') return
 
     setActionLoading('stake')
+    setActionError(null)
     try {
       await executeStakingAction('/api/staking/stake', { amount })
       setStakeAmount('')
-      await fetchData()
+      await waitAndRefresh()
     } catch (err: any) {
       console.error('[Stake] Stake error:', err)
-      alert(err.message || 'Staking failed')
+      setActionError(err.message || 'Staking failed')
     } finally {
       setActionLoading(null)
     }
@@ -212,13 +228,14 @@ export default function StakePage() {
     if (amount === '0') return
 
     setActionLoading('withdraw')
+    setActionError(null)
     try {
       await executeStakingAction('/api/staking/withdraw', { amount })
       setWithdrawAmount('')
-      await fetchData()
+      await waitAndRefresh()
     } catch (err: any) {
       console.error('[Stake] Withdraw error:', err)
-      alert(err.message || 'Withdrawal failed')
+      setActionError(err.message || 'Withdrawal failed')
     } finally {
       setActionLoading(null)
     }
@@ -227,12 +244,13 @@ export default function StakePage() {
   const handleClaim = async () => {
     if (!wallet) return
     setActionLoading('claim')
+    setActionError(null)
     try {
       await executeStakingAction('/api/staking/claim')
-      await fetchData()
+      await waitAndRefresh()
     } catch (err: any) {
       console.error('[Stake] Claim error:', err)
-      alert(err.message || 'Claim failed')
+      setActionError(err.message || 'Claim failed')
     } finally {
       setActionLoading(null)
     }
@@ -241,12 +259,13 @@ export default function StakePage() {
   const handleExit = async () => {
     if (!wallet) return
     setActionLoading('exit')
+    setActionError(null)
     try {
       await executeStakingAction('/api/staking/exit')
-      await fetchData()
+      await waitAndRefresh()
     } catch (err: any) {
       console.error('[Stake] Exit error:', err)
-      alert(err.message || 'Exit failed')
+      setActionError(err.message || 'Exit failed')
     } finally {
       setActionLoading(null)
     }
@@ -307,7 +326,9 @@ export default function StakePage() {
               </div>
               <div className="stat-card">
                 <span className="stat-label">APR</span>
-                <span className="stat-value text-positive">{data.apr.toFixed(1)}%</span>
+                <span className="stat-value text-positive">
+                  {data.periodFinish > 0 && data.periodFinish < Math.floor(Date.now() / 1000) ? 'Ended' : `${data.apr.toFixed(1)}%`}
+                </span>
               </div>
               <div className="stat-card">
                 <span className="stat-label">Time Remaining</span>
@@ -333,6 +354,13 @@ export default function StakePage() {
                 Buy $RATCHET
               </button>
             </div>
+
+            {/* Action Error */}
+            {actionError && (
+              <div className="action-error" onClick={() => setActionError(null)}>
+                {actionError}
+              </div>
+            )}
 
             {/* Stake Section */}
             <div className="staking-section">
@@ -437,8 +465,8 @@ export default function StakePage() {
               </div>
             </div>
 
-            {/* Reward Calculator */}
-            {data.apr > 0 && (
+            {/* Reward Calculator — only show while rewards are active */}
+            {data.apr > 0 && data.periodFinish > Math.floor(Date.now() / 1000) && (
               <div className="staking-section">
                 <h3>Reward Calculator</h3>
                 <div className="input-group">
@@ -723,6 +751,16 @@ export default function StakePage() {
         .contract-address:hover {
           color: var(--accent);
           text-decoration: underline;
+        }
+
+        .action-error {
+          background: rgba(239, 68, 68, 0.1);
+          border: 1px solid rgba(239, 68, 68, 0.3);
+          color: #ef4444;
+          border-radius: 8px;
+          padding: 0.75rem 1rem;
+          font-size: 0.8125rem;
+          cursor: pointer;
         }
       `}</style>
     </div>
