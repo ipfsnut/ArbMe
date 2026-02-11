@@ -16,6 +16,8 @@ import {
 } from '@arbme/core-lib'
 import { parseUnits } from 'viem'
 
+export const maxDuration = 60
+
 const ALCHEMY_KEY = process.env.ALCHEMY_API_KEY
 
 // Known token decimals to avoid RPC calls for common tokens

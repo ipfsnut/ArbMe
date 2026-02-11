@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { buildSwapTransaction } from '@arbme/core-lib'
 
+export const maxDuration = 60
+
 export async function POST(request: NextRequest) {
   try {
     const { poolAddress, version, tokenIn, tokenOut, amountIn, minAmountOut, recipient, fee, tickSpacing, hooks } = await request.json()

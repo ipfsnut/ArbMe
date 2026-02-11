@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { buildIncreaseLiquidityTransaction } from '@arbme/core-lib'
 
+export const maxDuration = 60
+
 export async function POST(request: NextRequest) {
   try {
     const { positionId, amount0Desired, amount1Desired, slippageTolerance } = await request.json()

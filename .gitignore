@@ -44,3 +44,4 @@ packages/contracts/
 # Strategy docs (local only)
 strategy/
 scripts/
+.vercel

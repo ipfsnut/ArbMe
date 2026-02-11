@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSwapQuote, CLANKER_HOOK_V2, CLANKER_HOOK_V1, CLANKER_DYNAMIC_FEE, CLANKER_TICK_SPACING } from '@arbme/core-lib'
 import { ethers } from 'ethers'
 
+export const maxDuration = 60
+
 const ALCHEMY_KEY = process.env.ALCHEMY_API_KEY
 const PROVIDER_URL = ALCHEMY_KEY
   ? `https://base-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`

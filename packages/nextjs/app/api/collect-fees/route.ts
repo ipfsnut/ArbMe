@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { buildCollectFeesTransaction, canCollectFees } from '@arbme/core-lib'
 
+export const maxDuration = 60
+
 export async function POST(request: NextRequest) {
   try {
     const { positionId, recipient, currency0, currency1 } = await request.json()

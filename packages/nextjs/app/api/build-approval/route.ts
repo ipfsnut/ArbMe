@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { buildApproveTransaction, buildPermit2ApproveTransaction, PERMIT2, V4_POSITION_MANAGER } from '@arbme/core-lib'
 
+export const maxDuration = 60
+
 const MAX_UINT256 = '115792089237316195423570985008687907853269984665640564039457584007913129639935'
 
 export async function POST(request: NextRequest) {

@@ -11,6 +11,8 @@ import {
   ARBME,
 } from '@arbme/core-lib'
 
+export const maxDuration = 60
+
 const ALCHEMY_KEY = process.env.ALCHEMY_API_KEY
 
 // Known token decimals to avoid RPC calls

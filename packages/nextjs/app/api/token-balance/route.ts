@@ -3,6 +3,8 @@ import { createPublicClient, http, formatUnits } from 'viem'
 import { base } from 'viem/chains'
 import { getTokenMetadata } from '@arbme/core-lib'
 
+export const maxDuration = 60
+
 const ALCHEMY_KEY = process.env.ALCHEMY_API_KEY
 
 const ERC20_ABI = [

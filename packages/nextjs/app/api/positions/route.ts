@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { fetchUserPositions } from '@arbme/core-lib'
 import type { Position } from '@arbme/core-lib'
 
+export const maxDuration = 60
+
 const ALCHEMY_KEY = process.env.ALCHEMY_API_KEY
 
 // ═══════════════════════════════════════════════════════════════════════════════

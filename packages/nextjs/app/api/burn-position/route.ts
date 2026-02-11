@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { buildBurnPositionTransaction } from '@arbme/core-lib'
 
+export const maxDuration = 60
+
 export async function POST(request: NextRequest) {
   try {
     const { positionId } = await request.json()

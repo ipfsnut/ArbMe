@@ -11,6 +11,8 @@ import {
   V4_ARBME_POOLS,
 } from '@arbme/core-lib'
 
+export const maxDuration = 60
+
 const ALCHEMY_KEY = process.env.ALCHEMY_API_KEY
 
 // Check if a pair involves ARBME
