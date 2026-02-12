@@ -248,7 +248,7 @@ function AddLiquidityPage() {
     }
 
     checkPool()
-  }, [state.token0Info, state.token1Info, state.version, state.fee, updateState])
+  }, [state.token0Info?.address, state.token1Info?.address, state.version, state.fee, updateState])
 
   // Fetch USD prices for both tokens when entering step 2 or step 3
   useEffect(() => {
@@ -292,23 +292,32 @@ function AddLiquidityPage() {
       if (!wallet || !state.token0Info || !state.token1Info) return
 
       try {
+        const fetchBalance = async (tokenAddress: string) => {
+          const res = await fetch(`${API_BASE}/token-balance`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tokenAddress, walletAddress: wallet }),
+          })
+          if (!res.ok) {
+            console.error(`[balance] ${tokenAddress} fetch failed: ${res.status}`)
+            return null
+          }
+          const data = await res.json()
+          return data.balanceFormatted ?? null
+        }
+
         const [bal0, bal1] = await Promise.all([
-          fetch(`${API_BASE}/token-balance`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tokenAddress: state.token0Info.address, walletAddress: wallet }),
-          }).then(r => r.json()),
-          fetch(`${API_BASE}/token-balance`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tokenAddress: state.token1Info.address, walletAddress: wallet }),
-          }).then(r => r.json()),
+          fetchBalance(state.token0Info.address),
+          fetchBalance(state.token1Info.address),
         ])
 
-        updateState({
-          token0Info: state.token0Info ? { ...state.token0Info, balance: bal0.balanceFormatted } : null,
-          token1Info: state.token1Info ? { ...state.token1Info, balance: bal1.balanceFormatted } : null,
-        })
+        console.log('[balance] Fetched:', { token0: bal0, token1: bal1 })
+
+        setState(prev => ({
+          ...prev,
+          token0Info: prev.token0Info ? { ...prev.token0Info, balance: bal0 ?? prev.token0Info.balance } : null,
+          token1Info: prev.token1Info ? { ...prev.token1Info, balance: bal1 ?? prev.token1Info.balance } : null,
+        }))
       } catch (err) {
         console.error('Failed to fetch balances:', err)
       }

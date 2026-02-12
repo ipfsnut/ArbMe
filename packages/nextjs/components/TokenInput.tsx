@@ -11,6 +11,16 @@ interface TokenInputProps {
   usdValue?: number | null
 }
 
+function formatBalance(bal: string): string {
+  const num = parseFloat(bal)
+  if (isNaN(num)) return '0'
+  if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(2)}M`
+  if (num >= 1_000) return `${(num / 1_000).toFixed(2)}K`
+  if (num >= 1) return num.toFixed(4)
+  if (num > 0) return num.toPrecision(4)
+  return '0'
+}
+
 function formatUsdValue(usd: number): string {
   if (usd < 0.01) return '<$0.01'
   if (usd >= 1_000_000) return `$${(usd / 1_000_000).toFixed(2)}M`
@@ -44,7 +54,7 @@ export function TokenInput({
             onClick={handleMaxClick}
             style={{ cursor: 'pointer' }}
           >
-            Max: {parseFloat(balance).toFixed(4)}
+            Max: {formatBalance(balance)}
           </span>
         )}
       </label>

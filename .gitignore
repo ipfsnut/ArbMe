@@ -13,6 +13,7 @@ page-tracker/
 .next/
 deploy/
 packages/core-lib/dist/
+*.tsbuildinfo
 
 # OS files
 .DS_Store
