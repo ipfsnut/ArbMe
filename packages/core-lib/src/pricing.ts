@@ -72,7 +72,7 @@ function setCachedPrice(address: string, price: number, source: 'gecko' | 'oncha
 /**
  * Fetch prices from GeckoTerminal (batch)
  */
-async function fetchGeckoPrices(addresses: string[]): Promise<Map<string, number>> {
+async function fetchGeckoPricesBatch(addresses: string[]): Promise<Map<string, number>> {
   const prices = new Map<string, number>();
 
   if (addresses.length === 0) return prices;
@@ -81,9 +81,15 @@ async function fetchGeckoPrices(addresses: string[]): Promise<Map<string, number
     const addressList = addresses.join(',');
     const url = `${GECKO_API}/simple/networks/base/token_price/${addressList}`;
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
+
     const response = await fetch(url, {
       headers: { 'Accept': 'application/json' },
+      signal: controller.signal,
     });
+
+    clearTimeout(timeout);
 
     if (!response.ok) {
       console.warn(`[Pricing] GeckoTerminal returned ${response.status}`);
@@ -101,12 +107,40 @@ async function fetchGeckoPrices(addresses: string[]): Promise<Map<string, number
         }
       }
     }
-
-    console.log(`[Pricing] GeckoTerminal returned ${prices.size}/${addresses.length} prices`);
-  } catch (error) {
-    console.error('[Pricing] GeckoTerminal fetch failed:', error);
+  } catch (error: any) {
+    if (error?.name === 'AbortError') {
+      console.warn(`[Pricing] GeckoTerminal timed out after 10s for ${addresses.length} tokens`);
+    } else {
+      console.error('[Pricing] GeckoTerminal fetch failed:', error);
+    }
   }
 
+  return prices;
+}
+
+const GECKO_BATCH_SIZE = 30;
+
+async function fetchGeckoPrices(addresses: string[]): Promise<Map<string, number>> {
+  const prices = new Map<string, number>();
+
+  if (addresses.length === 0) return prices;
+
+  // Chunk into batches to avoid URL length limits
+  const batches: string[][] = [];
+  for (let i = 0; i < addresses.length; i += GECKO_BATCH_SIZE) {
+    batches.push(addresses.slice(i, i + GECKO_BATCH_SIZE));
+  }
+
+  // Fetch all batches in parallel
+  const results = await Promise.all(batches.map(batch => fetchGeckoPricesBatch(batch)));
+
+  for (const batchPrices of results) {
+    for (const [addr, price] of batchPrices) {
+      prices.set(addr, price);
+    }
+  }
+
+  console.log(`[Pricing] GeckoTerminal returned ${prices.size}/${addresses.length} prices`);
   return prices;
 }
 
