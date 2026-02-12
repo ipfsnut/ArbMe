@@ -1,42 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSwapQuote, CLANKER_HOOK_V2, CLANKER_HOOK_V1, CLANKER_DYNAMIC_FEE, CLANKER_TICK_SPACING } from '@arbme/core-lib'
-import { ethers } from 'ethers'
+import { createPublicClient, http, getAddress, keccak256, encodeAbiParameters, parseAbiParameters, zeroAddress } from 'viem'
+import { base } from 'viem/chains'
 
 export const maxDuration = 60
 
-const ALCHEMY_KEY = process.env.ALCHEMY_API_KEY
-const PROVIDER_URL = ALCHEMY_KEY
-  ? `https://base-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`
-  : 'https://mainnet.base.org'
-
-// V2 Pair ABI
-const V2_PAIR_ABI = [
-  'function getReserves() view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast)',
-  'function token0() view returns (address)',
-  'function token1() view returns (address)',
-]
-
-// V3 Pool ABI
-const V3_POOL_ABI = [
-  'function slot0() view returns (uint160 sqrtPriceX96, int24 tick, uint16 observationIndex, uint16 observationCardinality, uint16 observationCardinalityNext, uint8 feeProtocol, bool unlocked)',
-  'function token0() view returns (address)',
-  'function token1() view returns (address)',
-]
-
-// ERC20 ABI for decimals
-const ERC20_ABI = [
-  'function decimals() view returns (uint8)',
-]
+function getClient() {
+  const key = process.env.ALCHEMY_API_KEY
+  const rpcUrl = key
+    ? `https://base-mainnet.g.alchemy.com/v2/${key}`
+    : 'https://mainnet.base.org'
+  return createPublicClient({ chain: base, transport: http(rpcUrl) })
+}
 
 // V4 StateView address (Base mainnet - verified 2026-02-01)
-const STATE_VIEW = '0xa3c0c9b65bad0b08107aa264b0f3db444b867a71'
+const STATE_VIEW = '0xa3c0c9b65bad0b08107aa264b0f3db444b867a71' as const
 
-// V4 StateView ABI (minimal)
-const STATE_VIEW_ABI = [
-  'function getSlot0(bytes32 poolId) view returns (uint160 sqrtPriceX96, int24 tick, uint24 protocolFee, uint24 lpFee)',
-]
+const NO_HOOK = zeroAddress
 
-const NO_HOOK = ethers.constants.AddressZero
+// ABI fragments
+const erc20Abi = [{ name: 'decimals', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint8' }] }] as const
+const v2PairAbi = [
+  { name: 'getReserves', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ name: 'reserve0', type: 'uint112' }, { name: 'reserve1', type: 'uint112' }, { name: 'blockTimestampLast', type: 'uint32' }] },
+  { name: 'token0', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'address' }] },
+] as const
+const v3PoolAbi = [
+  { name: 'slot0', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ name: 'sqrtPriceX96', type: 'uint160' }, { name: 'tick', type: 'int24' }, { name: 'observationIndex', type: 'uint16' }, { name: 'observationCardinality', type: 'uint16' }, { name: 'observationCardinalityNext', type: 'uint16' }, { name: 'feeProtocol', type: 'uint8' }, { name: 'unlocked', type: 'bool' }] },
+] as const
+const stateViewAbi = [
+  { name: 'getSlot0', type: 'function', stateMutability: 'view', inputs: [{ name: 'poolId', type: 'bytes32' }], outputs: [{ name: 'sqrtPriceX96', type: 'uint160' }, { name: 'tick', type: 'int24' }, { name: 'protocolFee', type: 'uint24' }, { name: 'lpFee', type: 'uint24' }] },
+] as const
 
 // Pool config for auto-detection
 interface PoolCandidate {
@@ -115,15 +108,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const provider = new ethers.providers.JsonRpcProvider(PROVIDER_URL)
+    const client = getClient()
 
     // Get token decimals
-    const tokenInContract = new ethers.Contract(tokenIn, ERC20_ABI, provider)
-    const tokenOutContract = new ethers.Contract(tokenOut, ERC20_ABI, provider)
-
     const [decimalsIn, decimalsOut] = await Promise.all([
-      tokenInContract.decimals(),
-      tokenOutContract.decimals(),
+      client.readContract({ address: getAddress(tokenIn), abi: erc20Abi, functionName: 'decimals' }),
+      client.readContract({ address: getAddress(tokenOut), abi: erc20Abi, functionName: 'decimals' }),
     ])
 
     // Determine which token is token0 (lower address)
@@ -148,31 +138,27 @@ export async function POST(request: NextRequest) {
 
     if (version.toUpperCase() === 'V2') {
       // Fetch V2 reserves
-      const pair = new ethers.Contract(poolAddress, V2_PAIR_ABI, provider)
       const [reserves, pairToken0] = await Promise.all([
-        pair.getReserves(),
-        pair.token0(),
+        client.readContract({ address: getAddress(poolAddress), abi: v2PairAbi, functionName: 'getReserves' }),
+        client.readContract({ address: getAddress(poolAddress), abi: v2PairAbi, functionName: 'token0' }),
       ])
 
       // Ensure reserves are in correct order
-      const isToken0First = pairToken0.toLowerCase() === token0.toLowerCase()
-      quoteParams.reserve0 = isToken0First ? reserves.reserve0.toString() : reserves.reserve1.toString()
-      quoteParams.reserve1 = isToken0First ? reserves.reserve1.toString() : reserves.reserve0.toString()
+      const isToken0First = (pairToken0 as string).toLowerCase() === token0.toLowerCase()
+      quoteParams.reserve0 = isToken0First ? reserves[0].toString() : reserves[1].toString()
+      quoteParams.reserve1 = isToken0First ? reserves[1].toString() : reserves[0].toString()
 
     } else if (version.toUpperCase() === 'V3') {
       // Fetch V3 slot0
-      const pool = new ethers.Contract(poolAddress, V3_POOL_ABI, provider)
-      const slot0 = await pool.slot0()
-      quoteParams.sqrtPriceX96 = slot0.sqrtPriceX96.toString()
+      const slot0 = await client.readContract({ address: getAddress(poolAddress), abi: v3PoolAbi, functionName: 'slot0' })
+      quoteParams.sqrtPriceX96 = slot0[0].toString()
 
     } else if (version.toUpperCase() === 'V4') {
-      const stateView = new ethers.Contract(STATE_VIEW, STATE_VIEW_ABI, provider)
-
       // If poolAddress is already a poolId (bytes32), use it directly with provided params
       if (poolAddress && poolAddress.length === 66) {
         try {
-          const slot0 = await stateView.getSlot0(poolAddress)
-          quoteParams.sqrtPriceX96 = slot0.sqrtPriceX96.toString()
+          const slot0 = await client.readContract({ address: STATE_VIEW, abi: stateViewAbi, functionName: 'getSlot0', args: [poolAddress as `0x${string}`] })
+          quoteParams.sqrtPriceX96 = slot0[0].toString()
           detectedHooks = hooks || NO_HOOK
         } catch (e) {
           console.error('[quote] V4 direct poolId lookup failed:', e)
@@ -185,17 +171,17 @@ export async function POST(request: NextRequest) {
 
         for (const candidate of candidates) {
           try {
-            const poolId = ethers.utils.keccak256(
-              ethers.utils.defaultAbiCoder.encode(
-                ['address', 'address', 'uint24', 'int24', 'address'],
-                [token0, token1, candidate.fee, candidate.tickSpacing, candidate.hooks]
+            const poolId = keccak256(
+              encodeAbiParameters(
+                parseAbiParameters('address, address, uint24, int24, address'),
+                [getAddress(token0), getAddress(token1), candidate.fee, candidate.tickSpacing, getAddress(candidate.hooks)]
               )
             )
 
-            const slot0 = await stateView.getSlot0(poolId)
+            const slot0 = await client.readContract({ address: STATE_VIEW, abi: stateViewAbi, functionName: 'getSlot0', args: [poolId] })
             // Check if pool actually exists (sqrtPriceX96 > 0)
-            if (slot0.sqrtPriceX96.gt(0)) {
-              quoteParams.sqrtPriceX96 = slot0.sqrtPriceX96.toString()
+            if (slot0[0] > 0n) {
+              quoteParams.sqrtPriceX96 = slot0[0].toString()
               quoteParams.fee = candidate.fee
               quoteParams.tickSpacing = candidate.tickSpacing
               detectedHooks = candidate.hooks
