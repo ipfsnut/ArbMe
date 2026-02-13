@@ -3261,18 +3261,45 @@ button.button-primary:hover {
 .app-nav {
   display: flex;
   gap: 0.25rem;
-  margin-bottom: var(--spacing-md);
+  margin-bottom: 0.25rem;
   padding: 0.2rem;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
 }
 
+.app-nav-secondary {
+  margin-bottom: var(--spacing-md);
+  background: transparent;
+  border: none;
+  padding: 0;
+  gap: 0.25rem;
+}
+
+.app-nav-secondary .nav-link {
+  font-size: 0.5625rem;
+  padding: 0.3rem 0.25rem;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+}
+
+.app-nav-secondary .nav-link:hover {
+  color: var(--text-primary);
+  background: rgba(0, 255, 65, 0.05);
+}
+
+.app-nav-secondary .nav-link.active {
+  color: var(--accent);
+  background: var(--accent-glow);
+  border-color: transparent;
+}
+
 .nav-link {
   flex: 1;
   padding: 0.5rem 0.25rem;
   text-align: center;
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   font-weight: 600;
   color: var(--text-secondary);
   text-decoration: none;
@@ -3292,21 +3319,18 @@ button.button-primary:hover {
   background: var(--accent-glow);
 }
 
-.nav-link-sm {
-  font-size: 0.5625rem;
-}
-
 @media (min-width: 480px) {
   .app-nav {
     gap: 0.25rem;
     padding: var(--spacing-xs);
   }
   .nav-link {
-    font-size: 0.6875rem;
+    font-size: 0.75rem;
     padding: 0.5rem 0.5rem;
   }
-  .nav-link-sm {
+  .app-nav-secondary .nav-link {
     font-size: 0.625rem;
+    padding: 0.35rem 0.5rem;
   }
 }
 

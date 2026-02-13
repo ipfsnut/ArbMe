@@ -14,6 +14,7 @@ export function Footer() {
     { label: 'App', href: '/app' },
     { label: 'Traffic', href: '/traffic' },
     { label: 'Treasury', href: '/treasury' },
+    { label: 'ChaosTheory', href: '/chaostheory' },
   ]
 
   const allLinks = [...internalLinks, ...externalLinks.map(l => ({ ...l, href: l.url }))]

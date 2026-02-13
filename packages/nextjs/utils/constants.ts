@@ -57,6 +57,31 @@ export const FEATURED_POOLS: FeaturedPoolConfig[] = [
   },
 ];
 
+// Foundation
+export const CHAOS_FOUNDATION_MULTISIG = '0x3CE26de6FF74e0Baa5F762b67465eEacfE84549F';
+
+// CHAOS Staking Hub + Spokes (update addresses after deployment)
+export const CHAOS_STAKING_ADDRESS = '0x0000000000000000000000000000000000000000';
+
+export interface GaugeConfig {
+  symbol: string;
+  tokenAddress: string;
+  gaugeAddress: string;
+  decimals: number;
+  pool: string;
+  week: number;
+}
+
+export const CHAOS_GAUGES: GaugeConfig[] = [
+  { symbol: 'ARBME',   tokenAddress: ARBME_ADDRESS,   gaugeAddress: '0x0000000000000000000000000000000000000000', decimals: 18, pool: 'CHAOS / ARBME',   week: 1 },
+  { symbol: 'USDC',    tokenAddress: USDC_ADDRESS,    gaugeAddress: '0x0000000000000000000000000000000000000000', decimals: 6,  pool: 'CHAOS / USDC',    week: 2 },
+  { symbol: 'ALPHACLAW', tokenAddress: ALPHACLAW_ADDRESS, gaugeAddress: '0x0000000000000000000000000000000000000000', decimals: 18, pool: 'CHAOS / ALPHACLAW', week: 3 },
+  { symbol: 'MLTL',    tokenAddress: MLTL_ADDRESS,    gaugeAddress: '0x0000000000000000000000000000000000000000', decimals: 18, pool: 'CHAOS / MLTL',    week: 4 },
+  { symbol: 'OSO',     tokenAddress: OSO_ADDRESS,     gaugeAddress: '0x0000000000000000000000000000000000000000', decimals: 18, pool: 'CHAOS / OSO',     week: 5 },
+  { symbol: 'Cnews',   tokenAddress: CNEWS_ADDRESS,   gaugeAddress: '0x0000000000000000000000000000000000000000', decimals: 18, pool: 'CHAOS / Cnews',   week: 6 },
+  { symbol: 'RATCHET', tokenAddress: RATCHET_ADDRESS, gaugeAddress: '0x0000000000000000000000000000000000000000', decimals: 18, pool: 'CHAOS / RATCHET', week: 7 },
+];
+
 // Routes
 export const ROUTES = {
   LANDING: '/',
@@ -70,6 +95,7 @@ export const ROUTES = {
   TREASURY: '/treasury',
   TRADE: '/trade',
   TRAFFIC: '/traffic',
+  CHAOS_THEORY: '/chaostheory',
 } as const;
 
 // Position Managers

@@ -49,21 +49,33 @@ export function AppHeader() {
     ? formatUsd(globalStats.totalTvl)
     : '...'
 
-  const navLinks = [
-    { href: ROUTES.HOME, label: 'Home' },
-    { href: ROUTES.MY_POOLS, label: 'Positions' },
-    { href: ROUTES.TRAFFIC, label: 'Traffic' },
-    { href: ROUTES.STAKE, label: 'Stake $RATCHET', small: true },
+  const primaryNav = [
+    { href: ROUTES.MY_POOLS, label: 'Pools' },
+    { href: ROUTES.TRADE, label: 'Trade' },
     { href: ROUTES.ADD_LIQUIDITY, label: '+ Add' },
   ]
+
+  const secondaryNav = [
+    { href: ROUTES.TRAFFIC, label: 'Traffic' },
+    { href: ROUTES.STAKE, label: 'Stake' },
+    { href: ROUTES.CHAOS_THEORY, label: 'Chaos' },
+    { href: ROUTES.TREASURY, label: 'Treasury' },
+  ]
+
+  const isActive = (href: string) =>
+    pathname === href || (href !== ROUTES.HOME && pathname?.startsWith(href))
 
   return (
     <header className="app-header">
       <div className="app-header-top">
         <div className="app-logo">
-          <img src="/arbie.png" alt="ArbMe" className="logo-image" />
+          <Link href={ROUTES.HOME}>
+            <img src="/arbie.png" alt="ArbMe" className="logo-image" />
+          </Link>
           <div>
-            <h1>ArbMe</h1>
+            <Link href={ROUTES.HOME} style={{ textDecoration: 'none', color: 'inherit' }}>
+              <h1>ArbMe</h1>
+            </Link>
             <p className="text-secondary">Permissionless Arb Routes</p>
           </div>
         </div>
@@ -80,11 +92,22 @@ export function AppHeader() {
       </div>
 
       <nav className="app-nav">
-        {navLinks.map((link) => (
+        {primaryNav.map((link) => (
           <Link
             key={link.href}
             href={link.href}
-            className={`nav-link ${pathname === link.href || (link.href !== ROUTES.HOME && pathname?.startsWith(link.href)) ? 'active' : ''} ${link.small ? 'nav-link-sm' : ''}`}
+            className={`nav-link ${isActive(link.href) ? 'active' : ''}`}
+          >
+            {link.label}
+          </Link>
+        ))}
+      </nav>
+      <nav className="app-nav app-nav-secondary">
+        {secondaryNav.map((link) => (
+          <Link
+            key={link.href}
+            href={link.href}
+            className={`nav-link ${isActive(link.href) ? 'active' : ''}`}
           >
             {link.label}
           </Link>
