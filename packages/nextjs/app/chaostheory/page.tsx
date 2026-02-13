@@ -357,12 +357,6 @@ export default function ChaosTheoryPage() {
       <div className="main-content">
         <BackButton href={ROUTES.HOME} label="Back to Home" />
 
-        {/* Coming Soon Banner */}
-        <div className="coming-soon-banner">
-          <span className="coming-soon-dot" />
-          <span>CHAOS Staking — Coming Soon</span>
-        </div>
-
         {/* Hero */}
         <div className="section-header">
           <h2>ChaosTheory</h2>
@@ -816,35 +810,6 @@ export default function ChaosTheoryPage() {
       <Footer />
 
       <style jsx>{`
-        /* ── Coming Soon Banner ── */
-        .coming-soon-banner {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 0.5rem;
-          padding: 0.625rem 1rem;
-          margin-bottom: 1rem;
-          background: var(--accent-glow);
-          border: 1px solid var(--accent);
-          border-radius: 8px;
-          font-family: ui-monospace, 'SF Mono', Monaco, monospace;
-          font-size: 0.75rem;
-          font-weight: 600;
-          color: var(--accent);
-          letter-spacing: 0.5px;
-        }
-        .coming-soon-dot {
-          width: 6px;
-          height: 6px;
-          border-radius: 50%;
-          background: var(--accent);
-          animation: blink 2s ease-in-out infinite;
-        }
-        @keyframes blink {
-          0%, 100% { opacity: 0.3; }
-          50% { opacity: 1; }
-        }
-
         /* ── About card ── */
         .ct-about {
           background: var(--bg-card);
