@@ -1,0 +1,17 @@
+{
+  "accountAssociation": {
+    "header": "eyJmaWQiOjg1NzMsInR5cGUiOiJhdXRoIiwia2V5IjoiMHgxOEE4NWFkMzQxYjJENkEyYmQ2N2ZiYjEwNEI0ODI3QjkyMmEyQTNjIn0",
+    "payload": "eyJkb21haW4iOiJhcmJtZS1hcGkuZHlsYW4tMjU5LndvcmtlcnMuZGV2In0",
+    "signature": "rQ56J0+lbK+gA2hghyDTtflVV0Efqm9/JyqKUn82YLxsvi+ZQLVeXIVErnryST81H8CDl36B/QSyUaJJ8JI59Bs="
+  },
+  "miniapp": {
+    "version": "1",
+    "name": "ArbMe",
+    "iconUrl": "https://arbme-api.dylan-259.workers.dev/icon",
+    "homeUrl": "https://arbme-api.dylan-259.workers.dev/app",
+    "subtitle": "Decentralized Arbitrage Protocol",
+    "description": "An ERC20 token that pairs with other tokens to create arb routes. LP to earn fees, arb to profit.",
+    "primaryCategory": "finance",
+    "tags": ["defi", "arbitrage", "liquidity", "base"]
+  }
+}

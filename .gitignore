@@ -36,7 +36,8 @@ temp/
 # Claude Code session data
 .claude/
 
-# Bot extraction (temporary)
+# Legacy bot (pre-monorepo scripts)
+bot/
 bot-removal/
 
 # Contracts (active dev)

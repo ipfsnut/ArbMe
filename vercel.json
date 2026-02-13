@@ -1,0 +1,16 @@
+{
+  "buildCommand": "npm run build --workspace=@arbme/core-lib && cd packages/nextjs && npx next build",
+  "outputDirectory": "packages/nextjs/.next",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "crons": [
+    {
+      "path": "/api/collect/prices",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/bot/spread-report",
+      "schedule": "5 * * * *"
+    }
+  ]
+}
