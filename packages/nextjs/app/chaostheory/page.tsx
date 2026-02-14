@@ -6,7 +6,7 @@ import { AppHeader } from '@/components/AppHeader'
 import { Footer } from '@/components/Footer'
 import { BackButton } from '@/components/BackButton'
 import { PositionCard } from '@/components/PositionCard'
-import { ROUTES, CHAOS_FOUNDATION_MULTISIG, CHAOS_GAUGES, CHAOS_STAKING_ADDRESS } from '@/utils/constants'
+import { ROUTES, CHAOS_FOUNDATION_MULTISIG, CHAOS_GAUGES, CHAOS_STAKING_ADDRESS, RATCHET_CAMPAIGN_ADDRESS } from '@/utils/constants'
 import { useSendTransaction } from 'wagmi'
 import { formatUnits } from 'viem'
 import type { Position } from '@/utils/types'
@@ -124,6 +124,16 @@ interface AdminGaugeInfo {
   rewardsDuration: number
 }
 
+interface CampaignInfo {
+  active: boolean
+  totalClaimed: number
+  maxClaims: number
+  userEligible: boolean
+  userClaimed: boolean
+  userExcluded: boolean
+  userStaking: boolean
+}
+
 export default function ChaosTheoryPage() {
   const wallet = useWallet()
   const isFarcaster = useIsFarcaster()
@@ -150,6 +160,10 @@ export default function ChaosTheoryPage() {
   const [rewardAmounts, setRewardAmounts] = useState<Record<number, string>>({})
   const [adminActionLoading, setAdminActionLoading] = useState<string | null>(null)
   const [adminError, setAdminError] = useState<string | null>(null)
+
+  // Campaign state
+  const [campaignData, setCampaignData] = useState<CampaignInfo | null>(null)
+  const [campaignLoading, setCampaignLoading] = useState(false)
 
   // -- Data fetching --
 
@@ -204,9 +218,29 @@ export default function ChaosTheoryPage() {
     }
   }, [isMultisig, wallet])
 
+  const fetchCampaignData = useCallback(async () => {
+    if (RATCHET_CAMPAIGN_ADDRESS === '0x0000000000000000000000000000000000000000') return
+    setCampaignLoading(true)
+    try {
+      const url = wallet
+        ? `/api/ratchet-campaign/info?wallet=${wallet}`
+        : '/api/ratchet-campaign/info'
+      const res = await fetch(url)
+      if (res.ok) {
+        const data = await res.json()
+        setCampaignData(data)
+      }
+    } catch {
+      // Silently handle
+    } finally {
+      setCampaignLoading(false)
+    }
+  }, [wallet])
+
   useEffect(() => { fetchPositions() }, [])
   useEffect(() => { fetchStakingData() }, [fetchStakingData])
   useEffect(() => { fetchAdminInfo() }, [fetchAdminInfo])
+  useEffect(() => { fetchCampaignData() }, [fetchCampaignData])
 
   // -- Transaction helpers --
 
@@ -284,6 +318,20 @@ export default function ChaosTheoryPage() {
     try { await executeAction('/api/chaos-staking/exit'); await waitAndRefresh() }
     catch (e: any) { setActionError(e.message) }
     finally { setActionLoading(null) }
+  }
+
+  // Campaign claim
+  const handleCampaignClaim = async () => {
+    setCampaignLoading(true)
+    try {
+      await executeAction('/api/ratchet-campaign/claim')
+      await new Promise(r => setTimeout(r, isSafe ? 2000 : 4000))
+      await fetchCampaignData()
+    } catch (e: any) {
+      setActionError(e.message)
+    } finally {
+      setCampaignLoading(false)
+    }
   }
 
   // Admin actions
@@ -401,6 +449,31 @@ export default function ChaosTheoryPage() {
             <span className="stat-value">{posLoading ? '...' : formatUsd(totalTvl)}</span>
           </div>
         </div>
+
+        {/* ═══════ RATCHET CAMPAIGN BANNER ═══════ */}
+        {campaignData && campaignData.active && wallet && !campaignData.userExcluded && (
+          <div className={`rc-banner ${campaignData.userClaimed ? 'rc-claimed' : campaignData.userEligible ? 'rc-eligible' : ''}`}>
+            <div className="rc-banner-top">
+              <span className="rc-banner-title">RATCHET First-Staker Campaign</span>
+              <span className="rc-banner-progress">{campaignData.totalClaimed} / {campaignData.maxClaims} claimed</span>
+            </div>
+            <div className="rc-progress-bar">
+              <div className="rc-progress-fill" style={{ width: `${(campaignData.totalClaimed / campaignData.maxClaims) * 100}%` }} />
+            </div>
+            {campaignData.userClaimed ? (
+              <div className="rc-banner-msg">You claimed 1M RATCHET!</div>
+            ) : campaignData.userEligible ? (
+              <div className="rc-banner-row">
+                <span className="rc-banner-msg">You&apos;re eligible for 1M RATCHET!</span>
+                <button className="btn btn-primary btn-sm" onClick={handleCampaignClaim} disabled={campaignLoading}>
+                  {campaignLoading ? 'Claiming...' : 'Claim'}
+                </button>
+              </div>
+            ) : !campaignData.userStaking ? (
+              <div className="rc-banner-msg rc-banner-hint">Stake CHAOS above to become eligible</div>
+            ) : null}
+          </div>
+        )}
 
         {/* ═══════ CHAOS STAKING HUB ═══════ */}
         {!isDeployed ? (
@@ -1444,6 +1517,71 @@ export default function ChaosTheoryPage() {
           font-size: 0.6875rem;
           min-width: auto;
           white-space: nowrap;
+        }
+
+        /* ── RATCHET Campaign Banner ── */
+        .rc-banner {
+          background: var(--bg-card);
+          border: 1px solid var(--border);
+          border-radius: 12px;
+          padding: 0.875rem 1rem;
+          margin-bottom: 1rem;
+        }
+        .rc-eligible {
+          border-color: #22c55e;
+          background: rgba(34, 197, 94, 0.05);
+        }
+        .rc-claimed {
+          border-color: var(--text-muted);
+          opacity: 0.8;
+        }
+        .rc-banner-top {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 0.5rem;
+        }
+        .rc-banner-title {
+          font-size: 0.75rem;
+          font-weight: 600;
+          color: var(--text-primary);
+        }
+        .rc-banner-progress {
+          font-family: ui-monospace, 'SF Mono', Monaco, monospace;
+          font-size: 0.625rem;
+          color: var(--text-muted);
+        }
+        .rc-progress-bar {
+          height: 4px;
+          background: var(--bg-secondary);
+          border-radius: 2px;
+          overflow: hidden;
+          margin-bottom: 0.625rem;
+        }
+        .rc-progress-fill {
+          height: 100%;
+          background: #22c55e;
+          border-radius: 2px;
+          transition: width 0.3s;
+        }
+        .rc-banner-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 0.75rem;
+        }
+        .rc-banner-msg {
+          font-size: 0.8125rem;
+          font-weight: 600;
+          color: var(--text-primary);
+        }
+        .rc-claimed .rc-banner-msg {
+          color: var(--text-muted);
+        }
+        .rc-banner-hint {
+          font-weight: 400;
+          font-size: 0.75rem;
+          color: var(--text-secondary);
         }
       `}</style>
     </div>

@@ -63,6 +63,9 @@ export const CHAOS_FOUNDATION_MULTISIG = '0x3CE26de6FF74e0Baa5F762b67465eEacfE84
 // CHAOS Staking Hub + Spokes (update addresses after deployment)
 export const CHAOS_STAKING_ADDRESS: string = '0x70e6c917A8AC437E629B67E84C0C0678eD54460d';
 
+// RATCHET First-Staker Campaign (update after deployment)
+export const RATCHET_CAMPAIGN_ADDRESS: string = '0x0000000000000000000000000000000000000000';
+
 export interface GaugeConfig {
   symbol: string;
   tokenAddress: string;
