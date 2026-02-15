@@ -1079,11 +1079,6 @@ export default function ChaosTheoryPage() {
           cursor: pointer;
         }
 
-        /* ── Sections ── */
-        .ct-section {
-          margin-bottom: 1.5rem;
-        }
-
         .ct-section-desc {
           font-size: 0.75rem;
           color: var(--text-muted);
