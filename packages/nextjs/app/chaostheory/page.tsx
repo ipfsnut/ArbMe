@@ -856,7 +856,7 @@ export default function ChaosTheoryPage() {
 
       <Footer />
 
-      <style jsx>{`
+      <style jsx global>{`
         /* ── About card ── */
         .ct-about {
           background: var(--bg-card);
