@@ -13,8 +13,19 @@ import { StepIndicator } from '@/components/StepIndicator'
 import { ROUTES, ARBME_ADDRESS, RATCHET_ADDRESS, CHAOS_ADDRESS, ALPHACLAW_ADDRESS, ABC_ADDRESS, PAGE_ADDRESS, CLANKER_ADDRESS, CLAWD_ADDRESS, USDC_ADDRESS, WETH_ADDRESS, OSO_ADDRESS, CNEWS_ADDRESS, V2_ROUTER, V3_POSITION_MANAGER, V4_POSITION_MANAGER, V3_FEE_TIERS, V4_FEE_TIERS } from '@/utils/constants'
 // SDK imported dynamically to avoid module-level crashes on mobile
 import { useSendTransaction } from 'wagmi'
+import { parseUnits } from 'viem'
 
 const API_BASE = '/api'
+
+function formatBalance(bal: string): string {
+  const num = parseFloat(bal)
+  if (isNaN(num)) return '0'
+  if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(2)}M`
+  if (num >= 1_000) return `${(num / 1_000).toFixed(2)}K`
+  if (num >= 1) return num.toFixed(4)
+  if (num > 0) return num.toPrecision(4)
+  return '0'
+}
 
 // Format a number without scientific notation
 function formatDecimal(num: number): string {
@@ -78,6 +89,7 @@ interface FlowState {
   token1ApprovalError: string | null
   txStatus: TxStatus
   txError: string | null
+  txHash: string | null
 }
 
 const COMMON_TOKENS = [
@@ -158,6 +170,7 @@ function AddLiquidityPage() {
     token1ApprovalError: null,
     txStatus: 'idle',
     txError: null,
+    txHash: null,
   })
 
   const [loadingPrices, setLoadingPrices] = useState(false)
@@ -286,7 +299,7 @@ function AddLiquidityPage() {
     fetchUsdPrices()
   }, [state.step, state.token0Info?.address, state.token1Info?.address])
 
-  // Fetch balances when wallet connects and on step 3 (deposit step)
+  // Fetch balances when wallet connects and token info loads
   useEffect(() => {
     async function fetchBalances() {
       if (!wallet || !state.token0Info || !state.token1Info) return
@@ -323,10 +336,8 @@ function AddLiquidityPage() {
       }
     }
 
-    if (state.step === 3) {
-      fetchBalances()
-    }
-  }, [wallet, state.token0Info?.address, state.token1Info?.address, state.step])
+    fetchBalances()
+  }, [wallet, state.token0Info?.address, state.token1Info?.address])
 
   // Reset approval state when tokens/version/fee change
   useEffect(() => {
@@ -360,8 +371,8 @@ function AddLiquidityPage() {
 
       try {
         const spender = SPENDERS[state.version]
-        const amount0Wei = BigInt(Math.floor(parseFloat(state.amount0) * Math.pow(10, state.token0Info.decimals))).toString()
-        const amount1Wei = BigInt(Math.floor(parseFloat(state.amount1) * Math.pow(10, state.token1Info.decimals))).toString()
+        const amount0Wei = parseUnits(state.amount0, state.token0Info.decimals).toString()
+        const amount1Wei = parseUnits(state.amount1, state.token1Info.decimals).toString()
 
         const res = await fetch(`${API_BASE}/check-approvals`, {
           method: 'POST',
@@ -779,10 +790,12 @@ function AddLiquidityPage() {
         }
 
         const mintData = await mintRes.json()
+        let lastHash: string | null = null
         if (mintData.transactions && mintData.transactions.length > 0) {
           const mintTx = mintData.transactions[0]
           console.log('[addLiquidity] Sending mint tx:', mintTx.description)
           const mintHash = await sendTransaction(mintTx)
+          lastHash = mintHash
           if (isSafe) {
             console.log('[addLiquidity] Mint proposed to Safe')
           } else {
@@ -794,6 +807,7 @@ function AddLiquidityPage() {
             console.log('[addLiquidity] Mint confirmed!')
           }
         }
+        updateState({ txStatus: 'success', txHash: lastHash })
       } else {
         // For existing pools or V2/V3, use standard flow
         const res = await fetch(`${API_BASE}/build-create-pool`, {
@@ -810,25 +824,26 @@ function AddLiquidityPage() {
         const { transactions } = await res.json()
 
         // Execute transactions sequentially, waiting for each to confirm
+        let lastHash: string | null = null
         for (let i = 0; i < transactions.length; i++) {
           const tx = transactions[i]
           console.log('[addLiquidity] Sending tx:', tx.description)
-          const txHash = await sendTransaction(tx)
+          const hash = await sendTransaction(tx)
+          lastHash = hash
 
           if (isSafe) {
             console.log('[addLiquidity] Proposed to Safe:', tx.description)
           } else {
             console.log('[addLiquidity] Waiting for confirmation...')
-            const success = await waitForReceipt(txHash)
+            const success = await waitForReceipt(hash)
             if (!success) {
               throw new Error(`Transaction failed on-chain: ${tx.description}`)
             }
             console.log('[addLiquidity] Confirmed!')
           }
         }
+        updateState({ txStatus: 'success', txHash: lastHash })
       }
-
-      updateState({ txStatus: 'success' })
     } catch (err: any) {
       console.error('[addLiquidity] Error:', err)
       updateState({ txError: err.message || 'Transaction failed', txStatus: 'error' })
@@ -861,6 +876,9 @@ function AddLiquidityPage() {
   const hasValidUsdPrices = state.token0UsdPrice && parseFloat(state.token0UsdPrice) > 0 && state.token1UsdPrice && parseFloat(state.token1UsdPrice) > 0
   const isStep2Valid = state.poolExists ? true : hasValidUsdPrices // Existing pools skip price setting
   const isStep3Valid = state.amount0 && state.amount1 && parseFloat(state.amount0) > 0 && parseFloat(state.amount1) > 0
+  const insufficientBalance0 = isStep3Valid && state.token0Info?.balance && parseFloat(state.amount0) > parseFloat(state.token0Info.balance)
+  const insufficientBalance1 = isStep3Valid && state.token1Info?.balance && parseFloat(state.amount1) > parseFloat(state.token1Info.balance)
+  const hasInsufficientBalance = insufficientBalance0 || insufficientBalance1
   const allApproved = state.token0ApprovalStatus === 'confirmed' && state.token1ApprovalStatus === 'confirmed'
   const isApproving = state.token0ApprovalStatus === 'signing' || state.token0ApprovalStatus === 'confirming' ||
                       state.token1ApprovalStatus === 'signing' || state.token1ApprovalStatus === 'confirming'
@@ -896,8 +914,7 @@ function AddLiquidityPage() {
         <div className="create-section">
           <h3 className="section-title">Protocol Version</h3>
           <div className="version-selector">
-            {/* TODO: Re-enable V2/V3 after testing */}
-            {(['V4'] as Version[]).map((v) => (
+            {(['V2', 'V3', 'V4'] as Version[]).map((v) => (
               <button
                 key={v}
                 className={`version-btn ${state.version === v ? 'selected' : ''}`}
@@ -941,6 +958,9 @@ function AddLiquidityPage() {
             {state.token0Info && (
               <div className="token-selected-info">
                 <span className="token-symbol">{state.token0Info.symbol}</span>
+                {state.token0Info.balance && (
+                  <span className="token-balance-hint">Balance: {formatBalance(state.token0Info.balance)}</span>
+                )}
               </div>
             )}
           </div>
@@ -969,6 +989,9 @@ function AddLiquidityPage() {
             {state.token1Info && (
               <div className="token-selected-info">
                 <span className="token-symbol">{state.token1Info.symbol}</span>
+                {state.token1Info.balance && (
+                  <span className="token-balance-hint">Balance: {formatBalance(state.token1Info.balance)}</span>
+                )}
               </div>
             )}
           </div>
@@ -1191,6 +1214,18 @@ function AddLiquidityPage() {
                   ? `Your liquidity transaction for the ${state.token0Info?.symbol}/${state.token1Info?.symbol} pool has been proposed to the Safe for signing.`
                   : `Your liquidity has been successfully added to the ${state.token0Info?.symbol}/${state.token1Info?.symbol} pool.`}
               </p>
+              {state.txHash && (
+                <div className="tx-success">
+                  <a
+                    href={`https://basescan.org/tx/${state.txHash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="tx-link"
+                  >
+                    View on Basescan
+                  </a>
+                </div>
+              )}
               <div className="success-actions">
                 <Link href={ROUTES.MY_POOLS} className="button-primary" style={{ textAlign: 'center', textDecoration: 'none' }}>
                   View My Positions
@@ -1347,6 +1382,16 @@ function AddLiquidityPage() {
             </div>
           )}
 
+          {/* Insufficient Balance Warning */}
+          {hasInsufficientBalance && (
+            <div className="tx-warning">
+              Insufficient balance
+              {insufficientBalance0 && ` for ${state.token0Info?.symbol}`}
+              {insufficientBalance0 && insufficientBalance1 && ' and'}
+              {insufficientBalance1 && ` for ${state.token1Info?.symbol}`}
+            </div>
+          )}
+
           {/* Error Display */}
           {state.txError && (
             <div className="tx-error" style={{ marginBottom: '1rem' }}>
@@ -1366,13 +1411,15 @@ function AddLiquidityPage() {
             <button
               className="btn-next"
               onClick={handleCreatePool}
-              disabled={!isStep3Valid || !allApproved || state.txStatus === 'creating'}
+              disabled={!isStep3Valid || !allApproved || state.txStatus === 'creating' || !!hasInsufficientBalance}
             >
               {state.txStatus === 'creating' ? (
                 <>
                   <span className="loading-spinner small" style={{ marginRight: '0.5rem' }} />
                   Creating...
                 </>
+              ) : hasInsufficientBalance ? (
+                'Insufficient Balance'
               ) : state.poolExists ? (
                 'Add Liquidity'
               ) : (
