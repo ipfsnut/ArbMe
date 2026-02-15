@@ -52,7 +52,7 @@ interface PoolWithMetrics extends Pool {
 // Token addresses (lowercase for comparison)
 const TRACKED_TOKENS = {
   ARBME: '0xc647421c5dc78d1c3960faa7a33f9aefdf4b7b07',
-  RATCHET: '0x392bc5deea227043d69af0e67badbcbbaed511b07',
+  RATCHET: '0x392bc5deea227043d69af0e67badcbbaed511b07',
   USDC: '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913',
   WETH: '0x4200000000000000000000000000000000000006',
 };

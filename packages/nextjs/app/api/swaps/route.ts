@@ -1,45 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getRecentSwaps, SwapEvent } from '@/lib/swap-store'
+import { KNOWN_TOKENS } from '@arbme/core-lib'
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// Token Metadata (for enriching swap data)
-// ═══════════════════════════════════════════════════════════════════════════════
-
-const TOKEN_INFO: Record<string, { symbol: string; decimals: number; name: string }> = {
-  '0xc647421c5dc78d1c3960faa7a33f9aefdf4b7b07': {
-    symbol: 'ARBME',
-    decimals: 18,
-    name: 'Arbitrage Mesh',
-  },
-  '0x392bc5deea227043d69af0e67badbcbbaed511b07': {
-    symbol: 'RATCHET',
-    decimals: 18,
-    name: 'Ratchet',
-  },
-  '0x5c0872b790bb73e2b3a9778db6e7704095624b07': {
-    symbol: 'ABC',
-    decimals: 18,
-    name: 'ABC Token',
-  },
-  '0x4200000000000000000000000000000000000006': {
-    symbol: 'WETH',
-    decimals: 18,
-    name: 'Wrapped Ether',
-  },
-  '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913': {
-    symbol: 'USDC',
-    decimals: 6,
-    name: 'USD Coin',
-  },
-}
+// Derive TOKEN_INFO from canonical KNOWN_TOKENS
+const TOKEN_INFO: Record<string, { symbol: string; decimals: number }> = Object.fromEntries(
+  Object.entries(KNOWN_TOKENS).map(([addr, t]) => [addr, { symbol: t.symbol, decimals: t.decimals }])
+)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types
 // ═══════════════════════════════════════════════════════════════════════════════
 
 interface EnrichedSwap extends SwapEvent {
-  tokenInInfo?: { symbol: string; decimals: number; name: string }
-  tokenOutInfo?: { symbol: string; decimals: number; name: string }
+  tokenInInfo?: { symbol: string; decimals: number }
+  tokenOutInfo?: { symbol: string; decimals: number }
   formattedAmountIn?: string
   formattedAmountOut?: string
   explorerUrl: string
