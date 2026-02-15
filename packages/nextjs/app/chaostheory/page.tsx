@@ -147,10 +147,10 @@ function CollapsibleSection({ title, description, children, defaultOpen = false 
   const [open, setOpen] = useState(defaultOpen)
   return (
     <div className="ct-section">
-      <button className="ct-collapse-toggle" onClick={() => setOpen(!open)}>
+      <div className="ct-collapse-toggle" onClick={() => setOpen(!open)}>
         <h2 className="ct-collapse-title">{title}</h2>
         <span className={`ct-collapse-arrow ${open ? 'ct-collapse-open' : ''}`}>&#9662;</span>
-      </button>
+      </div>
       {description && open && <p className="ct-section-desc">{description}</p>}
       {open && children}
     </div>
@@ -895,19 +895,10 @@ export default function ChaosTheoryPage() {
           align-items: center;
           justify-content: space-between;
           width: 100%;
-          background: none !important;
-          border: none;
           border-bottom: 1px solid var(--border);
-          border-radius: 0;
           padding: 0 0 0.5rem;
           margin-bottom: 0.75rem;
-          min-height: 0;
-          min-width: 0;
           cursor: pointer;
-          color: inherit;
-        }
-        .ct-collapse-toggle:hover {
-          background: none !important;
         }
         .ct-collapse-title {
           font-size: 0.85rem;
