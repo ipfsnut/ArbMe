@@ -61,11 +61,11 @@ function formatCalcAmount(num: number): string {
   return num.toFixed(2)
 }
 
-// Parse input to wei
+// Parse whole number input to wei (no decimals — avoids floating-point precision bugs)
 function parseToWei(value: string, decimals: number = 18): string {
-  const num = parseFloat(value)
-  if (isNaN(num) || num <= 0) return '0'
-  return BigInt(Math.floor(num * Math.pow(10, decimals))).toString()
+  const whole = parseInt(value, 10)
+  if (isNaN(whole) || whole <= 0) return '0'
+  return (BigInt(whole) * 10n ** BigInt(decimals)).toString()
 }
 
 export default function StakePage() {
@@ -274,15 +274,15 @@ export default function StakePage() {
 
   const setMaxStake = () => {
     if (data) {
-      const balance = formatUnits(BigInt(data.balance), 18)
-      setStakeAmount(balance)
+      const whole = (BigInt(data.balance) / 10n ** 18n).toString()
+      setStakeAmount(whole)
     }
   }
 
   const setMaxWithdraw = () => {
     if (data) {
-      const staked = formatUnits(BigInt(data.staked), 18)
-      setWithdrawAmount(staked)
+      const whole = (BigInt(data.staked) / 10n ** 18n).toString()
+      setWithdrawAmount(whole)
     }
   }
 
@@ -413,11 +413,11 @@ export default function StakePage() {
                   <input
                     type="number"
                     className="amount-input"
-                    placeholder="0.00"
+                    placeholder="0"
                     value={stakeAmount}
-                    onChange={(e) => setStakeAmount(e.target.value)}
+                    onChange={(e) => setStakeAmount(e.target.value.replace(/\./g, ''))}
                     min="0"
-                    step="any"
+                    step="1"
                   />
                   <div className="input-token">RATCHET</div>
                 </div>
@@ -457,11 +457,11 @@ export default function StakePage() {
                   <input
                     type="number"
                     className="amount-input"
-                    placeholder="0.00"
+                    placeholder="0"
                     value={withdrawAmount}
-                    onChange={(e) => setWithdrawAmount(e.target.value)}
+                    onChange={(e) => setWithdrawAmount(e.target.value.replace(/\./g, ''))}
                     min="0"
-                    step="any"
+                    step="1"
                   />
                   <div className="input-token">RATCHET</div>
                 </div>
