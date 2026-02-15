@@ -77,14 +77,6 @@ export const KNOWN_TOKENS: Record<string, TokenMetadata> = {
     symbol: 'OPENCLAW', decimals: 18,
     address: '0xf3bb567d4c79cb32d92b9db151255cdd3b91f04a',
   },
-  '0xc3a366c03a0fc57d96065e3adb27dd0036d83b80': {
-    symbol: 'WOLF', decimals: 18,
-    address: '0xc3a366c03a0fc57d96065e3adb27dd0036d83b80',
-  },
-  '0x1966a17d806a79f742e6e228ecc9421f401a8a32': {
-    symbol: 'EDGE', decimals: 18,
-    address: '0x1966a17d806a79f742e6e228ecc9421f401a8a32',
-  },
   '0xc78fabc2cb5b9cf59e0af3da8e3bc46d47753a4e': {
     symbol: 'OSO', decimals: 18,
     address: '0xc78fabc2cb5b9cf59e0af3da8e3bc46d47753a4e',

@@ -151,8 +151,12 @@ function CollapsibleSection({ title, description, children, defaultOpen = false 
         <h2 className="ct-collapse-title">{title}</h2>
         <span className={`ct-collapse-arrow ${open ? 'ct-collapse-open' : ''}`}>&#9662;</span>
       </div>
-      {description && open && <p className="ct-section-desc">{description}</p>}
-      {open && children}
+      {open && (
+        <>
+          {description && <p className="ct-section-desc">{description}</p>}
+          <div className="ct-collapse-body">{children}</div>
+        </>
+      )}
     </div>
   )
 }
@@ -890,26 +894,35 @@ export default function ChaosTheoryPage() {
         }
 
         /* ── Collapsible sections ── */
+        .ct-section {
+          background: var(--bg-card);
+          border: 1px solid var(--border);
+          border-radius: 12px;
+          margin-bottom: 1rem;
+          overflow: hidden;
+        }
         .ct-collapse-toggle {
           display: flex;
           align-items: center;
           justify-content: space-between;
           width: 100%;
-          border-bottom: 1px solid var(--border);
-          padding: 0 0 0.5rem;
-          margin-bottom: 0.75rem;
+          padding: 0.75rem 1rem;
           cursor: pointer;
+          transition: background 0.15s;
+        }
+        .ct-collapse-toggle:hover {
+          background: var(--bg-secondary);
         }
         .ct-collapse-title {
-          font-size: 0.85rem;
+          font-size: 0.75rem;
           font-weight: 600;
           text-transform: uppercase;
           letter-spacing: 0.08em;
-          color: var(--text-muted);
+          color: var(--text-secondary);
           margin: 0;
         }
         .ct-collapse-arrow {
-          font-size: 0.75rem;
+          font-size: 0.625rem;
           color: var(--text-muted);
           transition: transform 0.2s;
         }
@@ -1075,7 +1088,11 @@ export default function ChaosTheoryPage() {
           font-size: 0.75rem;
           color: var(--text-muted);
           line-height: 1.5;
-          margin: -0.5rem 0 0.75rem;
+          margin: 0;
+          padding: 0 1rem 0.75rem;
+        }
+        .ct-collapse-body {
+          padding: 0 1rem 1rem;
         }
 
         .ct-code {
