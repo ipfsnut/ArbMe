@@ -165,6 +165,16 @@ export default function ChaosTheoryPage() {
   const [campaignData, setCampaignData] = useState<CampaignInfo | null>(null)
   const [campaignLoading, setCampaignLoading] = useState(false)
 
+  // Collapsible sections — start with all collapsed
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set())
+  const toggleSection = (id: string) => {
+    setOpenSections(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
   // -- Data fetching --
 
   const fetchPositions = async () => {
@@ -616,9 +626,11 @@ export default function ChaosTheoryPage() {
         {/* ═══════ ADMIN PANEL (Multisig Only) ═══════ */}
         {isMultisig && (
           <div className="ct-section">
-            <div className="section-header">
+            <button className="ct-accordion-btn" onClick={() => toggleSection('admin')}>
               <h2>Foundation Admin</h2>
-            </div>
+              <span className={`ct-chevron ${openSections.has('admin') ? 'ct-chevron-open' : ''}`} />
+            </button>
+            {openSections.has('admin') && <>
             <p className="ct-section-desc">
               Manage reward distribution. Approve reward tokens to gauge contracts, then call
               notifyRewardAmount to start 180-day streams. Balance rewarding stakers vs growing
@@ -727,14 +739,17 @@ export default function ChaosTheoryPage() {
                 })}
               </div>
             )}
+            </>}
           </div>
         )}
 
         {/* ═══════ REWARD GAUGES ═══════ */}
         <div className="ct-section">
-          <div className="section-header">
+          <button className="ct-accordion-btn" onClick={() => toggleSection('gauges')}>
             <h2>Reward Gauges</h2>
-          </div>
+            <span className={`ct-chevron ${openSections.has('gauges') ? 'ct-chevron-open' : ''}`} />
+          </button>
+          {openSections.has('gauges') && <>
           <p className="ct-section-desc">
             Each gauge streams a different pair asset to $CHAOS stakers over 180 days.
             LP fees from 7 CHAOS pairs fund the gauges on a weekly rotation.
@@ -776,13 +791,16 @@ export default function ChaosTheoryPage() {
               </div>
             ))}
           </div>
+          </>}
         </div>
 
         {/* ═══════ ROTATION SCHEDULE ═══════ */}
         <div className="ct-section">
-          <div className="section-header">
+          <button className="ct-accordion-btn" onClick={() => toggleSection('rotation')}>
             <h2>7-Week Rotation</h2>
-          </div>
+            <span className={`ct-chevron ${openSections.has('rotation') ? 'ct-chevron-open' : ''}`} />
+          </button>
+          {openSections.has('rotation') && <>
           <p className="ct-section-desc">
             LP fees are collected from one pair each week. The collected tokens
             fund a 180-day reward stream via <code className="ct-code">notifyRewardAmount</code>.
@@ -811,6 +829,7 @@ export default function ChaosTheoryPage() {
               </div>
             ))}
           </div>
+          </>}
         </div>
 
         {/* Multisig */}
@@ -823,9 +842,11 @@ export default function ChaosTheoryPage() {
 
         {/* Services */}
         <div className="ct-section">
-          <div className="section-header">
+          <button className="ct-accordion-btn" onClick={() => toggleSection('services')}>
             <h2>Services</h2>
-          </div>
+            <span className={`ct-chevron ${openSections.has('services') ? 'ct-chevron-open' : ''}`} />
+          </button>
+          {openSections.has('services') && <>
           <div className="ct-services-list">
             {SERVICES.map((svc) => (
               <div key={svc.name} className="ct-service-card">
@@ -844,14 +865,19 @@ export default function ChaosTheoryPage() {
           <a href={MOLTLAUNCH_URL} target="_blank" rel="noopener noreferrer" className="ct-hire-btn">
             Hire ChaosTheory on MoltLaunch
           </a>
+          </>}
         </div>
 
         {/* Foundation Positions */}
         <div className="ct-section">
-          <div className="section-header">
+          <button className="ct-accordion-btn" onClick={() => toggleSection('positions')}>
             <h2>Foundation Positions</h2>
+            <span className={`ct-chevron ${openSections.has('positions') ? 'ct-chevron-open' : ''}`} />
+          </button>
+          {openSections.has('positions') && <>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.5rem' }}>
             <button className="btn btn-sm btn-secondary" onClick={fetchPositions} disabled={posLoading}
-              style={{ minWidth: 'auto', padding: '0.25rem 0.5rem', flex: 'none' }}>
+              style={{ minWidth: 'auto', padding: '0.25rem 0.5rem' }}>
               {posLoading ? '...' : '\u21BB'}
             </button>
           </div>
@@ -873,13 +899,16 @@ export default function ChaosTheoryPage() {
           {lastUpdated && (
             <div className="ct-updated">Last updated: {lastUpdated.toLocaleTimeString()}</div>
           )}
+          </>}
         </div>
 
         {/* Ecosystem Tokens */}
         <div className="ct-section">
-          <div className="section-header">
+          <button className="ct-accordion-btn" onClick={() => toggleSection('tokens')}>
             <h2>Ecosystem Tokens</h2>
-          </div>
+            <span className={`ct-chevron ${openSections.has('tokens') ? 'ct-chevron-open' : ''}`} />
+          </button>
+          {openSections.has('tokens') && <>
           <div className="ct-tokens-list">
             {ECOSYSTEM_TOKENS.map((token) => (
               <div key={token.symbol} className="ct-token-row">
@@ -888,6 +917,7 @@ export default function ChaosTheoryPage() {
               </div>
             ))}
           </div>
+          </>}
         </div>
 
         {/* Contract footer */}
@@ -1089,14 +1119,54 @@ export default function ChaosTheoryPage() {
 
         /* ── Sections ── */
         .ct-section {
-          margin-bottom: 1.5rem;
+          margin-bottom: 0.5rem;
+        }
+
+        /* ── Accordion ── */
+        .ct-accordion-btn {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          width: 100%;
+          padding: 0.625rem 0;
+          background: none;
+          border: none;
+          border-bottom: 1px solid var(--border);
+          cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
+        }
+        .ct-accordion-btn h2 {
+          margin: 0;
+          font-size: 0.8125rem;
+          font-weight: 600;
+          color: var(--text-primary);
+          letter-spacing: 0.2px;
+        }
+        .ct-accordion-btn:hover h2 {
+          color: var(--accent);
+        }
+        .ct-chevron {
+          display: inline-block;
+          width: 6px;
+          height: 6px;
+          border-right: 1.5px solid var(--text-muted);
+          border-bottom: 1.5px solid var(--text-muted);
+          transform: rotate(-45deg);
+          transition: transform 0.2s ease;
+          flex-shrink: 0;
+        }
+        .ct-chevron-open {
+          transform: rotate(45deg);
+        }
+        .ct-accordion-btn:hover .ct-chevron {
+          border-color: var(--accent);
         }
 
         .ct-section-desc {
           font-size: 0.75rem;
           color: var(--text-muted);
           line-height: 1.5;
-          margin: -0.5rem 0 0.75rem;
+          margin: 0.5rem 0 0.75rem;
         }
 
         .ct-code {
