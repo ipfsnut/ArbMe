@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, type ReactNode } from 'react'
 import { useWallet, useIsFarcaster, useIsSafe } from '@/hooks/useWallet'
 import { AppHeader } from '@/components/AppHeader'
 import { Footer } from '@/components/Footer'
@@ -19,25 +19,39 @@ const ABC_ALPHA_URL = 'https://warpcast.com/abc-alpha'
 
 const SERVICES = [
   {
-    name: 'Pool Health Check',
-    type: 'code',
-    description: 'Scan your token\'s pools. Get a report on spreads, fee tiers, routing gaps, and specific issues to fix.',
+    name: 'Token Analysis',
+    type: 'audit',
+    description: 'Scan your token\'s pools. Report on spreads, fees, routing, and fixes.',
+    turnaround: '24h',
+    price: '0.0010 ETH',
+  },
+  {
+    name: 'Safe Setup',
+    type: 'defi',
+    description: 'Gnosis Safe on Base with Uniswap + ArbMe. Ownership transferred to you.',
     turnaround: '24h',
     price: '0.0050 ETH',
   },
   {
+    name: 'Staking Contract Deployment',
+    type: 'defi',
+    description: 'Production staking contract for your ERC-20 on Base. Tested RATCHET template.',
+    turnaround: '48h',
+    price: '0.0500 ETH',
+  },
+  {
     name: 'New Token Volume Package',
-    type: 'code',
-    description: 'Full launch infrastructure: 3 pools (CHAOS/USDC/MLTL), preseeded liquidity, staking contract, Gnosis Safe.',
+    type: 'defi',
+    description: 'Multi-pool flywheel with CHAOS/MLTL pairs, staking contract, and Safe.',
     turnaround: '72h',
-    price: '0.2500 ETH',
+    price: '0.1000 ETH',
   },
   {
     name: 'LP Strategy Consult',
-    type: 'general',
-    description: 'Deep strategic analysis for your token\'s liquidity architecture. Written strategy doc from 40+ pool deployments.',
+    type: 'strategy',
+    description: 'Liquidity strategy doc plus LP paired against your token.',
     turnaround: '48h',
-    price: '1.00 ETH',
+    price: '1.0000 ETH',
   },
 ]
 
@@ -122,6 +136,25 @@ interface AdminGaugeInfo {
   rewardRate: string
   periodFinish: number
   rewardsDuration: number
+}
+
+function CollapsibleSection({ title, description, children, defaultOpen = false }: {
+  title: string
+  description?: string
+  children: ReactNode
+  defaultOpen?: boolean
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <div className="ct-section">
+      <button className="ct-collapse-toggle" onClick={() => setOpen(!open)}>
+        <h2 className="ct-collapse-title">{title}</h2>
+        <span className={`ct-collapse-arrow ${open ? 'ct-collapse-open' : ''}`}>&#9662;</span>
+      </button>
+      {description && open && <p className="ct-section-desc">{description}</p>}
+      {open && children}
+    </div>
+  )
 }
 
 export default function ChaosTheoryPage() {
@@ -402,6 +435,31 @@ export default function ChaosTheoryPage() {
           </div>
         </div>
 
+        {/* Services */}
+        <div className="ct-section">
+          <div className="section-header">
+            <h2>Services</h2>
+          </div>
+          <div className="ct-services-list">
+            {SERVICES.map((svc) => (
+              <div key={svc.name} className="ct-service-card">
+                <div className="ct-service-top">
+                  <span className="ct-service-name">{svc.name}</span>
+                  <span className="ct-service-type">{svc.type}</span>
+                </div>
+                <p className="ct-service-desc">{svc.description}</p>
+                <div className="ct-service-meta">
+                  <span>{svc.turnaround}</span>
+                  <span className="ct-service-price">{svc.price}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <a href={MOLTLAUNCH_URL} target="_blank" rel="noopener noreferrer" className="ct-hire-btn">
+            Hire ChaosTheory on MoltLaunch
+          </a>
+        </div>
+
         {/* ═══════ CHAOS STAKING HUB ═══════ */}
         {!isDeployed ? (
           <div className="empty-state">
@@ -658,14 +716,10 @@ export default function ChaosTheoryPage() {
         )}
 
         {/* ═══════ REWARD GAUGES ═══════ */}
-        <div className="ct-section">
-          <div className="section-header">
-            <h2>Reward Gauges</h2>
-          </div>
-          <p className="ct-section-desc">
-            Each gauge streams a different pair asset to $CHAOS stakers over 180 days.
-            LP fees from 7 CHAOS pairs fund the gauges on a weekly rotation.
-          </p>
+        <CollapsibleSection
+          title="Reward Gauges"
+          description="Each gauge streams a different pair asset to $CHAOS stakers over 180 days. LP fees from 7 CHAOS pairs fund the gauges on a weekly rotation."
+        >
           <div className="rg-grid">
             {gauges.map((g) => (
               <div key={g.symbol} className={`rg-card ${g.status === 'live' ? 'rg-live' : ''}`}>
@@ -703,18 +757,13 @@ export default function ChaosTheoryPage() {
               </div>
             ))}
           </div>
-        </div>
+        </CollapsibleSection>
 
         {/* ═══════ ROTATION SCHEDULE ═══════ */}
-        <div className="ct-section">
-          <div className="section-header">
-            <h2>7-Week Rotation</h2>
-          </div>
-          <p className="ct-section-desc">
-            LP fees are collected from one pair each week. The collected tokens
-            fund a 180-day reward stream via <code className="ct-code">notifyRewardAmount</code>.
-            CHAOS from LP fees is reinvested, not distributed.
-          </p>
+        <CollapsibleSection
+          title="7-Week Rotation"
+          description="LP fees are collected from one pair each week. The collected tokens fund a 180-day reward stream. CHAOS from LP fees is reinvested, not distributed."
+        >
           <div className="rs-timeline">
             {gauges.map((g, i) => (
               <div key={g.symbol} className={`rs-row ${g.status === 'live' ? 'rs-active' : ''}`}>
@@ -738,7 +787,7 @@ export default function ChaosTheoryPage() {
               </div>
             ))}
           </div>
-        </div>
+        </CollapsibleSection>
 
         {/* Multisig */}
         <div className="ct-address-card">
@@ -748,37 +797,11 @@ export default function ChaosTheoryPage() {
           </a>
         </div>
 
-        {/* Services */}
-        <div className="ct-section">
-          <div className="section-header">
-            <h2>Services</h2>
-          </div>
-          <div className="ct-services-list">
-            {SERVICES.map((svc) => (
-              <div key={svc.name} className="ct-service-card">
-                <div className="ct-service-top">
-                  <span className="ct-service-name">{svc.name}</span>
-                  <span className="ct-service-type">{svc.type}</span>
-                </div>
-                <p className="ct-service-desc">{svc.description}</p>
-                <div className="ct-service-meta">
-                  <span>{svc.turnaround}</span>
-                  <span className="ct-service-price">{svc.price}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-          <a href={MOLTLAUNCH_URL} target="_blank" rel="noopener noreferrer" className="ct-hire-btn">
-            Hire ChaosTheory on MoltLaunch
-          </a>
-        </div>
-
         {/* Foundation Positions */}
-        <div className="ct-section">
-          <div className="section-header">
-            <h2>Foundation Positions</h2>
+        <CollapsibleSection title="Foundation Positions">
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.5rem' }}>
             <button className="btn btn-sm btn-secondary" onClick={fetchPositions} disabled={posLoading}
-              style={{ minWidth: 'auto', padding: '0.25rem 0.5rem', flex: 'none' }}>
+              style={{ minWidth: 'auto', padding: '0.25rem 0.5rem' }}>
               {posLoading ? '...' : '\u21BB'}
             </button>
           </div>
@@ -800,13 +823,10 @@ export default function ChaosTheoryPage() {
           {lastUpdated && (
             <div className="ct-updated">Last updated: {lastUpdated.toLocaleTimeString()}</div>
           )}
-        </div>
+        </CollapsibleSection>
 
         {/* Ecosystem Tokens */}
-        <div className="ct-section">
-          <div className="section-header">
-            <h2>Ecosystem Tokens</h2>
-          </div>
+        <CollapsibleSection title="Ecosystem Tokens">
           <div className="ct-tokens-list">
             {ECOSYSTEM_TOKENS.map((token) => (
               <div key={token.symbol} className="ct-token-row">
@@ -815,7 +835,7 @@ export default function ChaosTheoryPage() {
               </div>
             ))}
           </div>
-        </div>
+        </CollapsibleSection>
 
         {/* Contract footer */}
         <div className="contract-info">
@@ -867,6 +887,40 @@ export default function ChaosTheoryPage() {
         .ct-link-pill:hover {
           color: var(--accent);
           border-color: var(--accent);
+        }
+
+        /* ── Collapsible sections ── */
+        .ct-collapse-toggle {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          width: 100%;
+          background: none;
+          border: none;
+          border-bottom: 1px solid var(--border);
+          padding: 0 0 0.5rem;
+          margin-bottom: 0.75rem;
+          cursor: pointer;
+        }
+        .ct-collapse-title {
+          font-size: 0.85rem;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          color: var(--text-muted);
+          margin: 0;
+        }
+        .ct-collapse-arrow {
+          font-size: 0.75rem;
+          color: var(--text-muted);
+          transition: transform 0.2s;
+        }
+        .ct-collapse-open {
+          transform: rotate(180deg);
+        }
+        .ct-collapse-toggle:hover .ct-collapse-title,
+        .ct-collapse-toggle:hover .ct-collapse-arrow {
+          color: var(--accent);
         }
 
         /* ── Staking (reuses global .staking-*, .input-*, .btn) ── */
