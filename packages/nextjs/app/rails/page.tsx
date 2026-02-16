@@ -46,16 +46,9 @@ const LINKS = {
   warpcast: 'https://warpcast.com/abc-alpha',
 }
 
-/* ── Whitepaper plain text for Claude prompt ── */
+const CLAUDE_PROMPT = `Read the $CHAOS Rails whitepaper at https://arbme.epicdylan.com/rails and help me understand it. I may ask about specific sections, the math, or how the system works.`
 
-const WHITEPAPER_PROMPT = `I'm reading the $CHAOS Rails whitepaper (v3.0) and want to discuss it with you. Here's the full text. Help me understand it — I may ask questions about specific sections, the math, or how the system works.
-
----
-
-$CHAOS RAILS — Whitepaper v3.0
-
-Abstract
-
+/*
 $CHAOS Rails is infrastructure for moving price information across Ethereum. It sits on the boundary between token economies, routing arbitrage signals between trading pairs and converting that activity into permanent buy-side support through Flaunch's Progressive Bid Wall mechanism.
 
 This paper describes the system in terms of its degrees of freedom: what is mechanically fixed, what operators and participants can control, and what emerges from the interaction between the two. The entire architecture reduces to three controllable variables — volume, time at price, and circulating supply — operating against a set of immutable protocol constraints. Everything else is emergent.
@@ -199,7 +192,8 @@ Service requests through MoltLaunch escrow.
 
 Second multisig. Project onboarding. Machine-readable infrastructure. Network intelligence.
 
-Links: abc-alpha.epicdylan.com | arbme.epicdylan.com/chaostheory | flaunch.gg | moltlaunch.com/agent/0x3d9d | warpcast.com/abc-alpha`
+Links: abc-alpha.epicdylan.com | arbme.epicdylan.com/chaostheory | flaunch.gg | moltlaunch.com/agent/0x3d9d | warpcast.com/abc-alpha
+*/
 
 export default function RailsPage() {
   const [activeId, setActiveId] = useState('abstract')
@@ -242,7 +236,7 @@ export default function RailsPage() {
 
   const handleOpenInClaude = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(WHITEPAPER_PROMPT)
+      await navigator.clipboard.writeText(CLAUDE_PROMPT)
       setCopyToast(true)
       setTimeout(() => setCopyToast(false), 4000)
       window.open('https://claude.ai/new', '_blank')
@@ -274,7 +268,7 @@ export default function RailsPage() {
         </div>
         {copyToast && (
           <div className="rails-toast">
-            Whitepaper copied to clipboard — paste into Claude to start discussing
+            Prompt copied — paste into Claude to discuss the whitepaper
           </div>
         )}
       </div>
