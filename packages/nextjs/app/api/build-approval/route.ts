@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { buildApproveTransaction, buildPermit2ApproveTransaction, PERMIT2, V4_POSITION_MANAGER } from '@arbme/core-lib'
+import { buildApproveTransaction, buildPermit2ApproveTransaction, PERMIT2, V4_POSITION_MANAGER, V4_UNIVERSAL_ROUTER } from '@arbme/core-lib'
 
 export const maxDuration = 60
 
@@ -7,7 +7,7 @@ const MAX_UINT256 = '11579208923731619542357098500868790785326998466564056403945
 
 export async function POST(request: NextRequest) {
   try {
-    const { token, spender, amount, unlimited, approvalType, version } = await request.json()
+    const { token, spender, amount, unlimited, approvalType, version, v4Spender } = await request.json()
 
     if (!token) {
       return NextResponse.json(
@@ -26,11 +26,15 @@ export async function POST(request: NextRequest) {
 
     // V4 approval flow: two types of approvals needed
     // 1. ERC20 approve token -> Permit2 (approvalType = 'erc20')
-    // 2. Permit2.approve token -> V4_POSITION_MANAGER (approvalType = 'permit2')
+    // 2. Permit2.approve token -> V4 spender (approvalType = 'permit2')
+    // v4Spender can be 'universal-router' (for swaps) or defaults to Position Manager (for LP)
     if (version?.toLowerCase() === 'v4') {
+      const permit2Target = v4Spender === 'universal-router' ? V4_UNIVERSAL_ROUTER : V4_POSITION_MANAGER
+      const targetName = v4Spender === 'universal-router' ? 'Universal Router' : 'Position Manager'
+
       if (approvalType === 'permit2') {
-        // Build Permit2.approve(token, V4_POSITION_MANAGER, amount, expiration)
-        const transaction = buildPermit2ApproveTransaction(token, V4_POSITION_MANAGER)
+        // Build Permit2.approve(token, permit2Target, amount, expiration)
+        const transaction = buildPermit2ApproveTransaction(token as `0x${string}`, permit2Target)
         return NextResponse.json({
           success: true,
           version: 'V4',
@@ -40,11 +44,11 @@ export async function POST(request: NextRequest) {
             data: transaction.data,
             value: transaction.value,
           },
-          description: 'Grant V4 Position Manager permission to use Permit2',
+          description: `Grant V4 ${targetName} permission to use Permit2`,
         })
       } else {
         // Default: ERC20 approve token -> Permit2
-        const transaction = buildApproveTransaction(token, PERMIT2)
+        const transaction = buildApproveTransaction(token as `0x${string}`, PERMIT2)
         return NextResponse.json({
           success: true,
           version: 'V4',
@@ -75,7 +79,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Build approval transaction (always unlimited for simplicity)
-    const transaction = buildApproveTransaction(token, spender)
+    const transaction = buildApproveTransaction(token as `0x${string}`, spender as `0x${string}`)
 
     return NextResponse.json({
       success: true,

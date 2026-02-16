@@ -35,14 +35,29 @@ const SYMBOL_TO_ADDRESS: Record<string, string> = {
   'flETH': '0x000000000d564d5be76f7f0d28fe52605afc7cf8',
 }
 
-function dexToVersion(dex: string): 'V2' | 'V3' | 'V4' {
-  if (dex.includes('v4') || dex.includes('V4')) return 'V4'
-  if (dex.includes('v3') || dex.includes('V3')) return 'V3'
-  return 'V2'
+function dexToVersion(dex: string): 'V2' | 'V3' | 'V4' | null {
+  const lower = dex.toLowerCase()
+  // Only support Uniswap pools — Balancer, Aerodrome, etc. need their own routers
+  if (lower.includes('balancer') || lower.includes('aerodrome') || lower.includes('curve')) return null
+  if (lower.includes('v4')) return 'V4'
+  if (lower.includes('v3')) return 'V3'
+  if (lower.includes('v2') || lower.includes('uniswap')) return 'V2'
+  return null // Unknown DEX — don't try to swap
+}
+
+// Standard fee → tick spacing mapping (matches core-lib FEE_TO_TICK_SPACING)
+const FEE_TO_TICK: Record<number, number> = {
+  100: 1, 500: 10, 3000: 60, 10000: 200,
+  30000: 600, 50000: 1000, 100000: 2000, 150000: 3000,
+  200000: 4000, 250000: 5000, 500000: 10000,
+  8388608: 200, // Clanker dynamic fee
 }
 
 function buildTradeHref(pool: Pool): string | null {
   const version = dexToVersion(pool.dex)
+
+  // Non-Uniswap pools can't be swapped in-app
+  if (!version) return null
 
   // Try to resolve token addresses from pool data or symbol mapping
   const parts = pool.pair.split('/').map(s => s.trim())
@@ -54,12 +69,8 @@ function buildTradeHref(pool: Pool): string | null {
   if (!t0 || !t1) return null
 
   const fee = pool.fee || 3000
-  // Derive tick spacing from fee for V4
-  let ts = 60
-  if (fee <= 500) ts = 10
-  else if (fee <= 3000) ts = 60
-  else if (fee <= 10000) ts = 200
-  else ts = 200
+  // Derive tick spacing from fee using canonical mapping
+  const ts = FEE_TO_TICK[fee] || 60
 
   const params = new URLSearchParams({
     t0,
@@ -153,7 +164,7 @@ export default function TradeIndexPage() {
           <div className="trade-pool-list">
             {pools.map((pool) => {
               const tradeHref = buildTradeHref(pool)
-              const version = dexToVersion(pool.dex)
+              const version = dexToVersion(pool.dex) || pool.dex
               const changeClass = pool.priceChange24h >= 0 ? 'positive' : 'negative'
               const changeSign = pool.priceChange24h >= 0 ? '+' : ''
 

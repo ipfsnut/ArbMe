@@ -76,7 +76,10 @@ export default function TradePage() {
 
   // Approval state
   const [needsApproval, setNeedsApproval] = useState(false)
+  const [needsErc20Approval, setNeedsErc20Approval] = useState(false)
+  const [needsPermit2Approval, setNeedsPermit2Approval] = useState(false)
   const [approvalLoading, setApprovalLoading] = useState(false)
+  const [approvalStep, setApprovalStep] = useState<'erc20' | 'permit2' | null>(null)
 
   // Balance state
   const [balanceIn, setBalanceIn] = useState<string | null>(null) // formatted (human-readable)
@@ -247,6 +250,9 @@ export default function TradePage() {
   useEffect(() => {
     if (!wallet || !tokenIn || amountInWei === '0' || !swapQuote) {
       setNeedsApproval(false)
+      setNeedsErc20Approval(false)
+      setNeedsPermit2Approval(false)
+      setApprovalStep(null)
       return
     }
 
@@ -264,23 +270,59 @@ export default function TradePage() {
             spender: approvalSpender,
             amount0Required: amountInWei,
             amount1Required: '0',
+            version,
+            // For V4 swaps, check Permit2 allowance for Universal Router (not Position Manager)
+            ...(version === 'V4' && { v4Spender: 'universal-router' }),
           }),
         })
 
-        if (!res.ok) return
+        if (!res.ok) {
+          console.error('[TradePage] Approval check failed:', res.status)
+          // If check fails, assume approval is needed to be safe
+          if (!cancelled) {
+            setNeedsApproval(true)
+            if (version === 'V4') {
+              setNeedsErc20Approval(true)
+              setApprovalStep('erc20')
+            }
+          }
+          return
+        }
         const data = await res.json()
 
         if (!cancelled) {
-          setNeedsApproval(data.token0?.needsApproval || false)
+          if (version === 'V4') {
+            // V4: two-step approval (ERC20 → Permit2, then Permit2 → Universal Router)
+            const erc20 = data.token0?.needsErc20Approval || false
+            const permit2 = data.token0?.needsPermit2Approval || false
+            setNeedsErc20Approval(erc20)
+            setNeedsPermit2Approval(permit2)
+            setNeedsApproval(erc20 || permit2)
+            setApprovalStep(erc20 ? 'erc20' : permit2 ? 'permit2' : null)
+          } else {
+            // V2/V3: single ERC20 approval
+            setNeedsApproval(data.token0?.needsApproval || false)
+            setNeedsErc20Approval(false)
+            setNeedsPermit2Approval(false)
+            setApprovalStep(null)
+          }
         }
       } catch (err) {
         console.error('[TradePage] Approval check error:', err)
+        // If check fails, assume approval needed
+        if (!cancelled) {
+          setNeedsApproval(true)
+          if (version === 'V4') {
+            setNeedsErc20Approval(true)
+            setApprovalStep('erc20')
+          }
+        }
       }
     }
 
     checkAllowance()
     return () => { cancelled = true }
-  }, [wallet, tokenIn, amountInWei, swapQuote, approvalSpender])
+  }, [wallet, tokenIn, amountInWei, swapQuote, approvalSpender, version])
 
   const handleApprove = async () => {
     if (!tokenIn || !wallet) return
@@ -289,26 +331,78 @@ export default function TradePage() {
     setError(null)
 
     try {
-      const res = await fetch(`${API_BASE}/build-approval`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token: tokenIn.address,
-          spender: approvalSpender,
-          unlimited: true,
-        }),
-      })
+      if (version === 'V4') {
+        // V4: two-step approval flow
+        // Step 1: ERC20 approve token → Permit2 (if needed)
+        if (needsErc20Approval) {
+          const res = await fetch(`${API_BASE}/build-approval`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              token: tokenIn.address,
+              version: 'V4',
+              approvalType: 'erc20',
+              v4Spender: 'universal-router',
+            }),
+          })
 
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || 'Failed to build approval')
+          if (!res.ok) {
+            const data = await res.json()
+            throw new Error(data.error || 'Failed to build ERC20 approval')
+          }
+
+          const { transaction } = await res.json()
+          await sendTransaction(transaction)
+          setNeedsErc20Approval(false)
+          setApprovalStep('permit2')
+        }
+
+        // Step 2: Permit2.approve token → Universal Router (if needed)
+        if (needsPermit2Approval || approvalStep === 'permit2') {
+          const res = await fetch(`${API_BASE}/build-approval`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              token: tokenIn.address,
+              version: 'V4',
+              approvalType: 'permit2',
+              v4Spender: 'universal-router',
+            }),
+          })
+
+          if (!res.ok) {
+            const data = await res.json()
+            throw new Error(data.error || 'Failed to build Permit2 approval')
+          }
+
+          const { transaction } = await res.json()
+          await sendTransaction(transaction)
+          setNeedsPermit2Approval(false)
+        }
+
+        setNeedsApproval(false)
+        setApprovalStep(null)
+      } else {
+        // V2/V3: single ERC20 approval to router
+        const res = await fetch(`${API_BASE}/build-approval`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            token: tokenIn.address,
+            spender: approvalSpender,
+            unlimited: true,
+          }),
+        })
+
+        if (!res.ok) {
+          const data = await res.json()
+          throw new Error(data.error || 'Failed to build approval')
+        }
+
+        const { transaction } = await res.json()
+        await sendTransaction(transaction)
+        setNeedsApproval(false)
       }
-
-      const { transaction } = await res.json()
-      await sendTransaction(transaction)
-
-      // Re-check allowance after approval
-      setNeedsApproval(false)
     } catch (err: any) {
       console.error('[TradePage] Approval error:', err)
       setError(err.message || 'Approval failed')
@@ -696,6 +790,10 @@ export default function TradePage() {
               >
                 {approvalLoading ? (
                   <><span className="loading-spinner small" /> Approving {tokenIn?.symbol}...</>
+                ) : version === 'V4' && approvalStep === 'permit2' ? (
+                  `Approve ${tokenIn?.symbol} for Swap (Step 2/2)`
+                ) : version === 'V4' && needsErc20Approval && needsPermit2Approval ? (
+                  `Approve ${tokenIn?.symbol} (Step 1/2)`
                 ) : (
                   `Approve ${tokenIn?.symbol}`
                 )}
