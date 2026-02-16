@@ -23,7 +23,7 @@ const SERVICES = [
     type: 'audit',
     description: 'Scan your token\'s pools. Report on spreads, fees, routing, and fixes.',
     turnaround: '24h',
-    price: '0.0010 ETH',
+    price: '0.0050 ETH',
   },
   {
     name: 'Safe Setup',
@@ -35,23 +35,23 @@ const SERVICES = [
   {
     name: 'Staking Contract Deployment',
     type: 'defi',
-    description: 'Production staking contract for your ERC-20 on Base. Tested RATCHET template.',
+    description: 'Custom staking contract for your ERC20 token on any EVM chain. Tested templates available.',
     turnaround: '48h',
     price: '0.0500 ETH',
   },
   {
     name: 'New Token Volume Package',
     type: 'defi',
-    description: 'Multi-pool flywheel with CHAOS/MLTL pairs, staking contract, and Safe.',
+    description: 'Starter volume package. Pool spread analysis, pair recommendations, and routing integration with the ArbMe network.',
     turnaround: '72h',
-    price: '0.1000 ETH',
+    price: '0.0100 ETH',
   },
   {
     name: 'LP Strategy Consult',
     type: 'strategy',
-    description: 'Liquidity strategy doc plus LP paired against your token.',
+    description: 'Liquidity strategy for your token on Base. Pool analysis, fee tier recommendations, and routing through ArbMe ecosystem pairs.',
     turnaround: '48h',
-    price: '1.0000 ETH',
+    price: '0.1000 ETH',
   },
 ]
 
