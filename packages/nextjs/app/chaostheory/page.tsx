@@ -6,6 +6,7 @@ import { AppHeader } from '@/components/AppHeader'
 import { Footer } from '@/components/Footer'
 import { BackButton } from '@/components/BackButton'
 import { PositionCard } from '@/components/PositionCard'
+import Link from 'next/link'
 import { ROUTES, CHAOS_FOUNDATION_MULTISIG, CHAOS_GAUGES, CHAOS_STAKING_ADDRESS } from '@/utils/constants'
 import { useSendTransaction } from 'wagmi'
 import { formatUnits } from 'viem'
@@ -418,6 +419,9 @@ export default function ChaosTheoryPage() {
             <a href={BASESCAN_TOKEN_URL} target="_blank" rel="noopener noreferrer" className="ct-link-pill">
               Basescan
             </a>
+            <Link href={ROUTES.RAILS} className="ct-link-pill">
+              Whitepaper
+            </Link>
           </div>
         </div>
 

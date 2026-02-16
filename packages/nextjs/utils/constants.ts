@@ -94,6 +94,7 @@ export const ROUTES = {
   TRADE: '/trade',
   TRAFFIC: '/traffic',
   CHAOS_THEORY: '/chaostheory',
+  RAILS: '/rails',
 } as const;
 
 // Position Managers
