@@ -49,11 +49,11 @@ const LINKS = {
 const CLAUDE_PROMPT = `Read the $CHAOS Rails whitepaper at https://arbme.epicdylan.com/rails and help me understand it. I may ask about specific sections, the math, or how the system works.`
 
 /*
-$CHAOS Rails is infrastructure for moving price information across Ethereum. It sits on the boundary between token economies, routing arbitrage signals between trading pairs and converting that activity into permanent buy-side support through Flaunch's Progressive Bid Wall mechanism.
+$CHAOS Rails is a liquidity management architecture on Base. It creates trading pairs between $CHAOS and other tokens — each pair is a surface where price information gets expressed, compared, and reconciled through trading activity. When two surfaces disagree about the price of CHAOS, arbitrage corrects them. That correction is a trade. That trade generates fees. Those fees accumulate as structural support for the network. The more surfaces, the more information flows through the system, and the more value the network captures from that flow.
 
-This paper describes the system in terms of its degrees of freedom: what is mechanically fixed, what operators and participants can control, and what emerges from the interaction between the two. The entire architecture reduces to three controllable variables — volume, time at price, and circulating supply — operating against a set of immutable protocol constraints. Everything else is emergent.
+This paper describes the system in terms of its degrees of freedom: what is mechanically fixed, what participants can control, and what emerges from the interaction between the two. The entire architecture reduces to three controllable variables — volume, time at price, and circulating supply — operating against a set of immutable protocol constraints. Everything else is emergent. Seven pairs create twenty-one potential arbitrage gradients. The math scales combinatorially with each new surface added.
 
-The math is predicated on Ethereum valuing information. Every arbitrage trade is a correction of a price discrepancy — information moving from where it exists to where it doesn't. $CHAOS Rails creates the surfaces across which that information flows, and captures value from the flow. It isn't much yet. But the premise is that as participants learn to navigate their relationships to these systems, the network develops its own intelligence about where value should be.
+The system is live and early. One multisig, seven pairs, small liquidity. You can participate now by staking $CHAOS to the Chaos Rails Foundation safe — every staker tightens circulating supply, which is one of the three control variables that makes the architecture work. Higher-risk operator portfolios are coming online soon. The thesis is that as participants learn to navigate their relationships to the system — operators learning pair selection, stakers choosing portfolios, bots discovering routes — the network develops its own intelligence about where value should flow. It grows when people join in.
 
 1. Information on the Boundary
 
@@ -255,7 +255,7 @@ export default function RailsPage() {
       {/* ── Hero ── */}
       <div className="rails-hero">
         <h1 className="rails-title">CHAOS Rails</h1>
-        <p className="rails-subtitle">Whitepaper v3.0</p>
+        <p className="rails-subtitle">Whitepaper v3.1</p>
         <p className="rails-byline">Built by abc-alpha &middot; February 2026</p>
         <div className="rails-hero-links">
           <Link href={ROUTES.CHAOS_THEORY} className="ct-link-pill">ChaosTheory App</Link>
@@ -319,23 +319,29 @@ export default function RailsPage() {
             <h2 className="rails-h2">Abstract</h2>
             <div className="rails-abstract">
               <p>
-                $CHAOS Rails is infrastructure for moving price information across Ethereum. It sits on the boundary
-                between token economies, routing arbitrage signals between trading pairs and converting that activity
-                into permanent buy-side support through Flaunch&apos;s Progressive Bid Wall mechanism.
+                $CHAOS Rails is a liquidity management architecture on Base. It creates trading pairs between $CHAOS
+                and other tokens &mdash; each pair is a surface where price information gets expressed, compared, and
+                reconciled through trading activity. When two surfaces disagree about the price of CHAOS, arbitrage
+                corrects them. That correction is a trade. That trade generates fees. Those fees accumulate as
+                structural support for the network. The more surfaces, the more information flows through the system,
+                and the more value the network captures from that flow.
               </p>
               <p>
                 This paper describes the system in terms of its degrees of freedom: what is mechanically fixed, what
-                operators and participants can control, and what emerges from the interaction between the two. The
-                entire architecture reduces to three controllable variables &mdash; <strong>volume</strong>,{' '}
+                participants can control, and what emerges from the interaction between the two. The entire architecture
+                reduces to three controllable variables &mdash; <strong>volume</strong>,{' '}
                 <strong>time at price</strong>, and <strong>circulating supply</strong> &mdash; operating against a set
-                of immutable protocol constraints. Everything else is emergent.
+                of immutable protocol constraints. Everything else is emergent. Seven pairs create twenty-one potential
+                arbitrage gradients. The math scales combinatorially with each new surface added.
               </p>
               <p>
-                The math is predicated on Ethereum valuing information. Every arbitrage trade is a correction of a
-                price discrepancy &mdash; information moving from where it exists to where it doesn&apos;t. $CHAOS Rails
-                creates the surfaces across which that information flows, and captures value from the flow. It
-                isn&apos;t much yet. But the premise is that as participants learn to navigate their relationships to
-                these systems, the network develops its own intelligence about where value should be.
+                The system is live and early. One multisig, seven pairs, small liquidity. You can participate now by
+                staking $CHAOS to the Chaos Rails Foundation safe &mdash; every staker tightens circulating supply,
+                which is one of the three control variables that makes the architecture work. Higher-risk operator
+                portfolios are coming online soon. The thesis is that as participants learn to navigate their
+                relationships to the system &mdash; operators learning pair selection, stakers choosing portfolios,
+                bots discovering routes &mdash; the network develops its own intelligence about where value should
+                flow. It grows when people join in.
               </p>
             </div>
           </section>
