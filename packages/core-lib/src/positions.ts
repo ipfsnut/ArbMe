@@ -4,7 +4,7 @@
 
 import { createPublicClient, http, Address, formatUnits, keccak256 } from 'viem';
 import { base } from 'viem/chains';
-import { getTokenMetadata, calculateUsdValue } from './tokens.js';
+import { getTokenMetadataBatch } from './tokens.js';
 import { getTokenPrices, getTokenPricesOnChain } from './pricing.js';
 
 // Contract addresses
@@ -350,7 +350,7 @@ async function fetchV2Positions(client: any, wallet: Address): Promise<RawPositi
 }
 
 /**
- * Fetch V3 NFT positions
+ * Fetch V3 NFT positions via multicall (2 round-trips instead of N)
  */
 async function fetchV3Positions(client: any, wallet: Address): Promise<RawPosition[]> {
   const positions: RawPosition[] = [];
@@ -367,71 +367,86 @@ async function fetchV3Positions(client: any, wallet: Address): Promise<RawPositi
     const count = Number(balance);
     console.log(`[Positions] User has ${count} V3 positions`);
 
-    // Enumerate positions in parallel batches
-    const BATCH_SIZE = 3;
-    const indices = Array.from({ length: count }, (_, i) => i);
+    if (count === 0) return positions;
 
-    for (let b = 0; b < indices.length; b += BATCH_SIZE) {
-      const batch = indices.slice(b, b + BATCH_SIZE);
-      const batchResults = await Promise.all(batch.map(async (i) => {
-        try {
-          const tokenId = await withRetry(() => client.readContract({
-            address: V3_POSITION_MANAGER as Address,
-            abi: V3_NFT_ABI,
-            functionName: 'tokenOfOwnerByIndex',
-            args: [wallet, BigInt(i)],
-          }), `V3 tokenOfOwnerByIndex(${i})`) as bigint;
+    // Multicall A: Get all token IDs in one call
+    const indexCalls = Array.from({ length: count }, (_, i) => ({
+      address: V3_POSITION_MANAGER as Address,
+      abi: V3_NFT_ABI,
+      functionName: 'tokenOfOwnerByIndex' as const,
+      args: [wallet, BigInt(i)] as const,
+    }));
 
-          const position = await withRetry(() => client.readContract({
-            address: V3_POSITION_MANAGER as Address,
-            abi: V3_NFT_ABI,
-            functionName: 'positions',
-            args: [tokenId],
-          }), `V3 positions(${tokenId})`) as readonly [bigint, string, string, string, number, number, number, bigint, bigint, bigint, bigint, bigint];
+    const indexResults = await withRetry(
+      () => client.multicall({ contracts: indexCalls, allowFailure: true }),
+      'V3 tokenOfOwnerByIndex multicall'
+    ) as { status: string; result?: bigint }[];
 
-          const [
-            nonce,
-            operator,
-            token0,
-            token1,
-            fee,
-            tickLower,
-            tickUpper,
-            liquidity,
-            feeGrowthInside0LastX128,
-            feeGrowthInside1LastX128,
-            tokensOwed0,
-            tokensOwed1,
-          ] = position;
+    const tokenIds: bigint[] = [];
+    for (const r of indexResults) {
+      if (r.status === 'success' && r.result !== undefined) {
+        tokenIds.push(r.result);
+      }
+    }
 
-          if (liquidity > 0n) {
-            return {
-              id: `v3-${tokenId}`,
-              version: 'V3' as const,
-              pair: `Token Pair`,
-              poolAddress: V3_POSITION_MANAGER,
-              token0Address: token0 as string,
-              token1Address: token1 as string,
-              liquidity: `${formatUnits(liquidity, 0)} liquidity`,
-              liquidityUsd: 0,
-              feesEarned: `${formatUnits(tokensOwed0, 18)} / ${formatUnits(tokensOwed1, 18)}`,
-              feesEarnedUsd: 0,
-              priceRangeLow: `Tick ${tickLower}`,
-              priceRangeHigh: `Tick ${tickUpper}`,
-              inRange: undefined,
-              tokenId: tokenId.toString(),
-              fee: Number(fee),
-              v3TokensOwed0: tokensOwed0 as bigint,
-              v3TokensOwed1: tokensOwed1 as bigint,
-            } as RawPosition;
-          }
-          return null;
-        } catch (error) {
-          console.error(`[Positions] Error fetching V3 position ${i}:`, error);
-          return null;
-        }
-      }));
-      positions.push(...batchResults.filter((p): p is RawPosition => p !== null));
+    console.log(`[Positions] Resolved ${tokenIds.length}/${count} V3 token IDs`);
+
+    if (tokenIds.length === 0) return positions;
+
+    // Multicall B: Get all position data in one call
+    const positionCalls = tokenIds.map((tokenId) => ({
+      address: V3_POSITION_MANAGER as Address,
+      abi: V3_NFT_ABI,
+      functionName: 'positions' as const,
+      args: [tokenId] as const,
+    }));
+
+    const positionResults = await withRetry(
+      () => client.multicall({ contracts: positionCalls, allowFailure: true }),
+      'V3 positions multicall'
+    ) as { status: string; result?: readonly [bigint, string, string, string, number, number, number, bigint, bigint, bigint, bigint, bigint] }[];
+
+    for (let i = 0; i < positionResults.length; i++) {
+      const r = positionResults[i];
+      if (r.status !== 'success' || !r.result) continue;
+
+      const tokenId = tokenIds[i];
+      const [
+        nonce,
+        operator,
+        token0,
+        token1,
+        fee,
+        tickLower,
+        tickUpper,
+        liquidity,
+        feeGrowthInside0LastX128,
+        feeGrowthInside1LastX128,
+        tokensOwed0,
+        tokensOwed1,
+      ] = r.result;
+
+      if (liquidity > 0n) {
+        positions.push({
+          id: `v3-${tokenId}`,
+          version: 'V3',
+          pair: `Token Pair`,
+          poolAddress: V3_POSITION_MANAGER,
+          token0Address: token0 as string,
+          token1Address: token1 as string,
+          liquidity: `${formatUnits(liquidity, 0)} liquidity`,
+          liquidityUsd: 0,
+          feesEarned: `${formatUnits(tokensOwed0, 18)} / ${formatUnits(tokensOwed1, 18)}`,
+          feesEarnedUsd: 0,
+          priceRangeLow: `Tick ${tickLower}`,
+          priceRangeHigh: `Tick ${tickUpper}`,
+          inRange: undefined,
+          tokenId: tokenId.toString(),
+          fee: Number(fee),
+          v3TokensOwed0: tokensOwed0 as bigint,
+          v3TokensOwed1: tokensOwed1 as bigint,
+        });
+      }
     }
   } catch (error) {
     console.error('[Positions] Error fetching V3 positions:', error);
@@ -524,61 +539,69 @@ async function fetchV4Positions(client: any, wallet: Address, alchemyKey?: strin
       return { tickLower, tickUpper };
     };
 
-    // Fetch details for each owned position in parallel batches
-    const V4_BATCH_SIZE = 3;
-    for (let b = 0; b < ownedTokenIds.length; b += V4_BATCH_SIZE) {
-      const batch = ownedTokenIds.slice(b, b + V4_BATCH_SIZE);
-      const batchResults = await Promise.all(batch.map(async (tokenIdStr) => {
-        try {
-          const tokenId = BigInt(tokenIdStr);
+    // Multicall: interleave getPoolAndPositionInfo + getPositionLiquidity for all positions
+    const v4Calls = ownedTokenIds.flatMap((tokenIdStr) => {
+      const tokenId = BigInt(tokenIdStr);
+      return [
+        {
+          address: V4_POSITION_MANAGER as Address,
+          abi: V4_NFT_ABI,
+          functionName: 'getPoolAndPositionInfo' as const,
+          args: [tokenId] as const,
+        },
+        {
+          address: V4_POSITION_MANAGER as Address,
+          abi: V4_NFT_ABI,
+          functionName: 'getPositionLiquidity' as const,
+          args: [tokenId] as const,
+        },
+      ];
+    });
 
-          const [positionInfo, liquidity] = await Promise.all([
-            withRetry(() => client.readContract({
-              address: V4_POSITION_MANAGER as Address,
-              abi: V4_NFT_ABI,
-              functionName: 'getPoolAndPositionInfo',
-              args: [tokenId],
-            }), `V4 getPoolAndPositionInfo(${tokenId})`) as Promise<readonly [any, bigint]>,
-            withRetry(() => client.readContract({
-              address: V4_POSITION_MANAGER as Address,
-              abi: V4_NFT_ABI,
-              functionName: 'getPositionLiquidity',
-              args: [tokenId],
-            }), `V4 getPositionLiquidity(${tokenId})`) as Promise<bigint>,
-          ]);
+    console.log(`[Positions] Multicall: fetching ${ownedTokenIds.length} V4 positions (${v4Calls.length} calls)...`);
 
-          const [poolKey, packedInfo] = positionInfo;
-          const { currency0, currency1, fee, tickSpacing, hooks } = poolKey as any;
-          const { tickLower, tickUpper } = extractTicks(packedInfo);
+    const v4Results = await withRetry(
+      () => client.multicall({ contracts: v4Calls, allowFailure: true }),
+      'V4 position multicall'
+    ) as { status: string; result?: any }[];
 
-          if (liquidity > 0n) {
-            return {
-              id: `v4-${tokenId}`,
-              version: 'V4' as const,
-              pair: `Token Pair`,
-              poolAddress: V4_POSITION_MANAGER,
-              token0Address: currency0 as string,
-              token1Address: currency1 as string,
-              liquidity: `${formatUnits(liquidity, 0)} liquidity`,
-              liquidityUsd: 0,
-              feesEarned: 'N/A',
-              feesEarnedUsd: 0,
-              priceRangeLow: `Tick ${tickLower}`,
-              priceRangeHigh: `Tick ${tickUpper}`,
-              inRange: undefined,
-              tokenId: tokenId.toString(),
-              fee: Number(fee),
-              tickSpacing: Number(tickSpacing),
-              hooks: hooks as string,
-            } as RawPosition;
-          }
-          return null;
-        } catch (error) {
-          console.error(`[Positions] Error fetching V4 position ${tokenIdStr}:`, error);
-          return null;
-        }
-      }));
-      positions.push(...batchResults.filter((p): p is RawPosition => p !== null));
+    // Process results in pairs
+    for (let i = 0; i < ownedTokenIds.length; i++) {
+      const infoResult = v4Results[i * 2];
+      const liqResult = v4Results[i * 2 + 1];
+
+      if (infoResult.status !== 'success' || liqResult.status !== 'success' || !infoResult.result || liqResult.result === undefined) {
+        console.warn(`[Positions] V4 multicall failed for token ${ownedTokenIds[i]}`);
+        continue;
+      }
+
+      const tokenId = BigInt(ownedTokenIds[i]);
+      const [poolKey, packedInfo] = infoResult.result as readonly [any, bigint];
+      const liquidity = liqResult.result as bigint;
+      const { currency0, currency1, fee, tickSpacing, hooks } = poolKey as any;
+      const { tickLower, tickUpper } = extractTicks(packedInfo);
+
+      if (liquidity > 0n) {
+        positions.push({
+          id: `v4-${tokenId}`,
+          version: 'V4',
+          pair: `Token Pair`,
+          poolAddress: V4_POSITION_MANAGER,
+          token0Address: currency0 as string,
+          token1Address: currency1 as string,
+          liquidity: `${formatUnits(liquidity, 0)} liquidity`,
+          liquidityUsd: 0,
+          feesEarned: 'N/A',
+          feesEarnedUsd: 0,
+          priceRangeLow: `Tick ${tickLower}`,
+          priceRangeHigh: `Tick ${tickUpper}`,
+          inRange: undefined,
+          tokenId: tokenId.toString(),
+          fee: Number(fee),
+          tickSpacing: Number(tickSpacing),
+          hooks: hooks as string,
+        });
+      }
     }
   } catch (error) {
     console.error('[Positions] Error fetching V4 positions:', error);
@@ -671,27 +694,19 @@ async function enrichPositionsWithMetadata(
     tokenAddresses.add(position.token1Address.toLowerCase());
   }
 
-  console.log(`[Positions] Fetching metadata for ${tokenAddresses.size} tokens...`);
+  console.log(`[Positions] Fetching metadata for ${tokenAddresses.size} tokens (batch multicall)...`);
 
-  // Fetch token metadata in parallel (one failure shouldn't kill all)
-  const metadataPromises = Array.from(tokenAddresses).map((address) =>
-    getTokenMetadata(address, alchemyKey)
-  );
-  const metadataSettled = await Promise.allSettled(metadataPromises);
+  // Batch fetch all token metadata via single multicall
+  const batchMetadata = await getTokenMetadataBatch(Array.from(tokenAddresses), alchemyKey);
 
-  // Build metadata map — use fallback for failed fetches
+  // Build metadata map
   const metadataMap = new Map<string, { symbol: string; decimals: number }>();
-  const tokenAddressArray = Array.from(tokenAddresses);
-  for (let i = 0; i < metadataSettled.length; i++) {
-    const result = metadataSettled[i];
-    if (result.status === 'fulfilled') {
-      metadataMap.set(result.value.address.toLowerCase(), {
-        symbol: result.value.symbol,
-        decimals: result.value.decimals,
-      });
+  for (const address of tokenAddresses) {
+    const meta = batchMetadata.get(address);
+    if (meta) {
+      metadataMap.set(address, { symbol: meta.symbol, decimals: meta.decimals });
     } else {
-      console.warn(`[Positions] Metadata fetch failed for ${tokenAddressArray[i]}, using fallback:`, result.reason);
-      metadataMap.set(tokenAddressArray[i], { symbol: '???', decimals: 18 });
+      metadataMap.set(address, { symbol: '???', decimals: 18 });
     }
   }
 

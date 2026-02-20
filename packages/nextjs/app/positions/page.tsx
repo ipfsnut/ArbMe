@@ -25,14 +25,11 @@ export default function PositionsPage() {
   const [collectAllStatus, setCollectAllStatus] = useState<CollectAllStatus>('idle')
   const [collectProgress, setCollectProgress] = useState({ current: 0, total: 0, succeeded: 0, failed: 0 })
 
-  // Show all positions by default
-  const baseDisplayed = positions
-
-  // Farcaster: paginate to avoid webview memory issues
-  const PAGE_SIZE = 3
+  // Paginate for all users — Farcaster webview is memory-constrained, desktop just avoids DOM bloat
+  const PAGE_SIZE = isFarcaster ? 3 : 20
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
-  const displayedPositions = isFarcaster ? baseDisplayed.slice(0, visibleCount) : baseDisplayed
-  const hasMore = isFarcaster && visibleCount < baseDisplayed.length
+  const displayedPositions = positions.slice(0, visibleCount)
+  const hasMore = visibleCount < positions.length
 
   // Total TVL across all positions
   const totalTvl = useMemo(() =>
@@ -237,7 +234,7 @@ export default function PositionsPage() {
                 onClick={() => setVisibleCount(v => v + PAGE_SIZE)}
                 style={{ marginTop: '1rem' }}
               >
-                Load More ({baseDisplayed.length - visibleCount} remaining)
+                Load More ({positions.length - visibleCount} remaining)
               </button>
             )}
           </>

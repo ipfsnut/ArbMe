@@ -202,6 +202,100 @@ export async function getTokenMetadata(
 }
 
 /**
+ * Batch fetch token metadata for multiple addresses via multicall.
+ * Checks KNOWN_TOKENS and cache first, only hits RPC for unknowns.
+ */
+export async function getTokenMetadataBatch(
+  tokenAddresses: string[],
+  alchemyKey?: string
+): Promise<Map<string, TokenMetadata>> {
+  const result = new Map<string, TokenMetadata>();
+  const unknowns: { address: string; normalized: string }[] = [];
+
+  for (const addr of tokenAddresses) {
+    const normalized = addr.toLowerCase();
+    if (result.has(normalized)) continue;
+
+    // Check known tokens
+    if (KNOWN_TOKENS[normalized]) {
+      result.set(normalized, KNOWN_TOKENS[normalized]);
+      continue;
+    }
+
+    // Check cache
+    if (tokenCache.has(normalized)) {
+      result.set(normalized, tokenCache.get(normalized)!);
+      continue;
+    }
+
+    unknowns.push({ address: addr, normalized });
+  }
+
+  if (unknowns.length === 0) return result;
+
+  const rpcUrl = alchemyKey
+    ? `https://base-mainnet.g.alchemy.com/v2/${alchemyKey}`
+    : 'https://mainnet.base.org';
+
+  const client = createPublicClient({
+    chain: base,
+    transport: http(rpcUrl),
+  });
+
+  try {
+    // Build interleaved multicall: [symbol(addr0), decimals(addr0), symbol(addr1), decimals(addr1), ...]
+    const calls = unknowns.flatMap(({ address }) => [
+      {
+        address: address as Address,
+        abi: ERC20_ABI,
+        functionName: 'symbol' as const,
+      },
+      {
+        address: address as Address,
+        abi: ERC20_ABI,
+        functionName: 'decimals' as const,
+      },
+    ]);
+
+    const multicallResults = await client.multicall({
+      contracts: calls,
+      allowFailure: true,
+    });
+
+    // Process results in pairs
+    for (let i = 0; i < unknowns.length; i++) {
+      const symbolResult = multicallResults[i * 2];
+      const decimalsResult = multicallResults[i * 2 + 1];
+      const { address, normalized } = unknowns[i];
+
+      const metadata: TokenMetadata = {
+        symbol: symbolResult.status === 'success' ? (symbolResult.result as string) : 'UNKNOWN',
+        decimals: decimalsResult.status === 'success' ? Number(decimalsResult.result) : 18,
+        address,
+      };
+
+      tokenCache.set(normalized, metadata);
+      result.set(normalized, metadata);
+    }
+  } catch (error) {
+    console.error(`[Tokens] Batch multicall failed, falling back to individual fetches:`, error);
+    // Fallback to individual calls
+    const fallbackResults = await Promise.allSettled(
+      unknowns.map(({ address }) => getTokenMetadata(address, alchemyKey))
+    );
+    for (let i = 0; i < unknowns.length; i++) {
+      const r = fallbackResults[i];
+      const metadata = r.status === 'fulfilled'
+        ? r.value
+        : { symbol: 'UNKNOWN', decimals: 18, address: unknowns[i].address };
+      result.set(unknowns[i].normalized, metadata);
+    }
+  }
+
+  return result;
+}
+
+/**
  * Format token amount with proper decimals
  */
 export function formatTokenAmount(amount: bigint, decimals: number): string {
