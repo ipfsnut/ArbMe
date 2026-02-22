@@ -35,10 +35,13 @@ export default function PositionDetailPage() {
   const [collectStatus, setCollectStatus] = useState<TxStatus>('idle')
   const [removePercentage, setRemovePercentage] = useState(0)
   const [removeStatus, setRemoveStatus] = useState<TxStatus>('idle')
+  const [transferStatus, setTransferStatus] = useState<TxStatus>('idle')
   const [txError, setTxError] = useState<string | null>(null)
 
   // Modal states
   const [showRemoveModal, setShowRemoveModal] = useState(false)
+  const [showSendModal, setShowSendModal] = useState(false)
+  const [recipientAddress, setRecipientAddress] = useState('')
 
   const sendTransaction = async (tx: { to: string; data: string; value: string }) => {
     if (!wallet) throw new Error('No wallet connected')
@@ -167,6 +170,53 @@ export default function PositionDetailPage() {
       setRemoveStatus('error')
     }
   }
+
+  const handleTransferPosition = async () => {
+    if (!position || !wallet || !recipientAddress) return
+
+    try {
+      setTransferStatus('building')
+      setTxError(null)
+
+      // Parse version and tokenId from position id (e.g. "v3-12345")
+      const [versionStr, tokenIdStr] = position.id.split('-')
+      const version = versionStr.toUpperCase() as 'V3' | 'V4'
+
+      const res = await fetch(`${API_BASE}/transfer-position`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from: wallet,
+          to: recipientAddress,
+          tokenId: tokenIdStr,
+          version,
+        }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Failed to build transaction')
+      }
+
+      const { transaction } = await res.json()
+
+      setTransferStatus('pending')
+      await sendTransaction(transaction)
+      setTransferStatus('success')
+
+      // Invalidate cache and redirect to positions list
+      setTimeout(async () => {
+        await invalidate()
+        router.push(ROUTES.MY_POOLS)
+      }, 3000)
+    } catch (err: any) {
+      console.error('[transferPosition] Error:', err)
+      setTxError(err.message || 'Transaction failed')
+      setTransferStatus('error')
+    }
+  }
+
+  const isValidAddress = (addr: string) => /^0x[a-fA-F0-9]{40}$/.test(addr)
 
   const formatUsd = (value: number | undefined) => {
     if (value === undefined || value === null) return '$0.00'
@@ -302,6 +352,15 @@ export default function PositionDetailPage() {
                 >
                   Add More Liquidity
                 </Link>
+
+                {position.version !== 'V2' && (
+                  <button
+                    className="btn btn-secondary full-width"
+                    onClick={() => setShowSendModal(true)}
+                  >
+                    Send Position
+                  </button>
+                )}
               </div>
             )}
 
@@ -410,6 +469,88 @@ export default function PositionDetailPage() {
                   {removeStatus === 'idle' && (
                     removePercentage === 100 ? 'Remove All & Close Position' : `Remove ${removePercentage}%`
                   )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Send Position Modal */}
+      {showSendModal && position && (
+        <div className="modal-overlay visible">
+          <div className="modal">
+            <div className="modal-header">
+              <span className="modal-title">Send Position</span>
+              <button
+                className="modal-close"
+                onClick={() => {
+                  setShowSendModal(false)
+                  setRecipientAddress('')
+                  setTransferStatus('idle')
+                  setTxError(null)
+                }}
+                disabled={transferStatus === 'pending'}
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="remove-liquidity-form">
+                <p style={{ margin: '0 0 0.75rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                  Transfer this {position.pair} {position.version} position NFT to another address. This is irreversible.
+                </p>
+
+                <div className="input-group">
+                  <span className="input-label">Recipient Address</span>
+                  <input
+                    type="text"
+                    className="text-input"
+                    placeholder="0x..."
+                    value={recipientAddress}
+                    onChange={(e) => setRecipientAddress(e.target.value.trim())}
+                    disabled={transferStatus === 'pending' || transferStatus === 'building'}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-secondary)',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.9rem',
+                      fontFamily: 'monospace',
+                    }}
+                  />
+                  {recipientAddress && !isValidAddress(recipientAddress) && (
+                    <span style={{ color: 'var(--error)', fontSize: '0.8rem', marginTop: '0.25rem' }}>
+                      Enter a valid Ethereum address
+                    </span>
+                  )}
+                  {recipientAddress.toLowerCase() === wallet?.toLowerCase() && (
+                    <span style={{ color: 'var(--warning, #f59e0b)', fontSize: '0.8rem', marginTop: '0.25rem' }}>
+                      This is your own address
+                    </span>
+                  )}
+                </div>
+
+                {txError && (
+                  <div className="tx-error">{txError}</div>
+                )}
+
+                <button
+                  className="btn btn-primary full-width"
+                  onClick={handleTransferPosition}
+                  disabled={!isValidAddress(recipientAddress) || transferStatus === 'pending' || transferStatus === 'building'}
+                >
+                  {transferStatus === 'building' && 'Building...'}
+                  {transferStatus === 'pending' && (
+                    <>
+                      <span className="loading-spinner small" /> Sending...
+                    </>
+                  )}
+                  {transferStatus === 'success' && (isSafe ? 'Proposed to Safe' : 'Sent!')}
+                  {transferStatus === 'error' && 'Failed - Try Again'}
+                  {transferStatus === 'idle' && 'Confirm Send'}
                 </button>
               </div>
             </div>
