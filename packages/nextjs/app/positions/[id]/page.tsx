@@ -5,11 +5,11 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useWallet, useIsFarcaster, useIsSafe } from '@/hooks/useWallet'
 import { usePositions } from '@/hooks/usePositions'
+import { usePosition } from '@/hooks/usePosition'
 import { AppHeader } from '@/components/AppHeader'
 import { Footer } from '@/components/Footer'
 import { BackButton } from '@/components/BackButton'
 import { ROUTES } from '@/utils/constants'
-import type { Position } from '@/utils/types'
 import { useSendTransaction } from 'wagmi'
 
 const API_BASE = '/api'
@@ -25,11 +25,21 @@ export default function PositionDetailPage() {
   const { sendTransactionAsync } = useSendTransaction()
   const positionId = params.id as string
 
-  const { positions, loading, error, invalidate } = usePositions(wallet)
-  const position = useMemo(
-    () => positions.find(p => p.id === positionId) ?? null,
-    [positions, positionId],
+  // Desktop: load all positions, find one (uses existing cache, fast if already loaded)
+  const desktop = usePositions(isFarcaster ? null : wallet)
+  const desktopPosition = useMemo(
+    () => desktop.positions.find(p => p.id === positionId) ?? null,
+    [desktop.positions, positionId],
   )
+
+  // Farcaster: load single position directly (much faster, no all-position fetch)
+  const fc = usePosition(isFarcaster ? positionId : null, isFarcaster ? wallet : null)
+
+  // Unified interface
+  const position = isFarcaster ? fc.position : desktopPosition
+  const loading = isFarcaster ? fc.loading : desktop.loading
+  const error = isFarcaster ? fc.error : desktop.error
+  const invalidate = isFarcaster ? fc.invalidate : desktop.invalidate
 
   // Transaction states
   const [collectStatus, setCollectStatus] = useState<TxStatus>('idle')
@@ -91,7 +101,6 @@ export default function PositionDetailPage() {
         body: JSON.stringify({
           positionId: position.id,
           recipient: wallet,
-          // V4 needs token addresses for the TAKE_PAIR action
           currency0: position.token0?.address,
           currency1: position.token1?.address,
         }),
@@ -108,7 +117,6 @@ export default function PositionDetailPage() {
       await sendTransaction(transaction)
       setCollectStatus('success')
 
-      // Invalidate cache and refresh position data
       setTimeout(async () => {
         await invalidate()
         setCollectStatus('idle')
@@ -135,7 +143,6 @@ export default function PositionDetailPage() {
           liquidityPercentage: removePercentage,
           currentLiquidity: position.liquidity,
           recipient: wallet,
-          // V4 needs token addresses for TAKE_PAIR action
           currency0: position.token0?.address,
           currency1: position.token1?.address,
         }),
@@ -152,14 +159,12 @@ export default function PositionDetailPage() {
       await sendTransaction(transaction)
       setRemoveStatus('success')
 
-      // Invalidate cache, refresh, and close modal
       setTimeout(async () => {
         await invalidate()
         setRemoveStatus('idle')
         setShowRemoveModal(false)
         setRemovePercentage(0)
 
-        // If 100% removed, go back to list
         if (removePercentage === 100) {
           router.push(ROUTES.MY_POOLS)
         }
@@ -178,7 +183,6 @@ export default function PositionDetailPage() {
       setTransferStatus('building')
       setTxError(null)
 
-      // Parse version and tokenId from position id (e.g. "v3-12345")
       const [versionStr, tokenIdStr] = position.id.split('-')
       const version = versionStr.toUpperCase() as 'V3' | 'V4'
 
@@ -204,7 +208,6 @@ export default function PositionDetailPage() {
       await sendTransaction(transaction)
       setTransferStatus('success')
 
-      // Invalidate cache and redirect to positions list
       setTimeout(async () => {
         await invalidate()
         router.push(ROUTES.MY_POOLS)

@@ -2,7 +2,7 @@
  * API service for fetching data from Next.js API routes
  */
 
-import type { PoolsResponse, Position } from '../utils/types';
+import type { PoolsResponse, Position, PositionSummary } from '../utils/types';
 
 const API_BASE = '/api';
 
@@ -18,25 +18,39 @@ export async function fetchPools(): Promise<PoolsResponse> {
 }
 
 /**
- * Fetch user's LP positions
+ * Fetch position summaries (fast discovery, no USD enrichment)
  */
-export async function fetchPositions(wallet: string): Promise<Position[]> {
-  const res = await fetch(`${API_BASE}/positions?wallet=${wallet}`);
+export async function fetchPositionSummaries(wallet: string): Promise<PositionSummary[]> {
+  const res = await fetch(`${API_BASE}/positions?wallet=${encodeURIComponent(wallet)}`);
   if (!res.ok) {
     throw new Error(`Failed to fetch positions: ${res.statusText}`);
   }
-  return res.json();
+  const data = await res.json();
+  return data.summaries || [];
 }
 
 /**
- * Fetch single position details
+ * Fetch user's LP positions (fully enriched — backward compat)
+ */
+export async function fetchPositions(wallet: string): Promise<Position[]> {
+  const res = await fetch(`${API_BASE}/positions?wallet=${encodeURIComponent(wallet)}&mode=full`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch positions: ${res.statusText}`);
+  }
+  const data = await res.json();
+  return data.positions || [];
+}
+
+/**
+ * Fetch single enriched position
  */
 export async function fetchPosition(id: string, wallet: string): Promise<Position> {
-  const res = await fetch(`${API_BASE}/position/${id}?wallet=${wallet}`);
+  const res = await fetch(`${API_BASE}/positions/${encodeURIComponent(id)}?wallet=${encodeURIComponent(wallet)}`);
   if (!res.ok) {
     throw new Error(`Failed to fetch position: ${res.statusText}`);
   }
-  return res.json();
+  const data = await res.json();
+  return data.position;
 }
 
 /**

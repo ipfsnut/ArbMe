@@ -203,8 +203,27 @@ export interface Position {
   hooks?: string; // Hooks address for V4 positions
 }
 
-// Internal position type used during fetching (before enrichment)
-interface RawPosition {
+/**
+ * Lightweight position summary — fast to produce, no USD values.
+ * Returned by discoverUserPositions() for instant list rendering.
+ */
+export interface PositionSummary {
+  id: string;                  // "v3-12345", "v4-67890"
+  version: 'V2' | 'V3' | 'V4';
+  pair: string;                // "ARBME / WETH" (resolved via getTokenMetadataBatch)
+  poolAddress: string;
+  token0: { symbol: string; address: string; decimals: number };
+  token1: { symbol: string; address: string; decimals: number };
+  tokenId?: string;
+  fee?: number;
+  tickSpacing?: number;
+  hooks?: string;
+  liquidityRaw: string;        // Display string: "123456 liquidity" or "0.04% of pool"
+}
+
+// Position type used during fetching (before enrichment)
+// Exported so API layer can cache raw positions for per-position enrichment
+export interface RawPosition {
   id: string;
   version: 'V2' | 'V3' | 'V4';
   pair: string;
@@ -233,12 +252,14 @@ interface RawPosition {
 }
 
 /**
- * Fetch all positions for a wallet address
+ * Discover all positions for a wallet (fast — no USD enrichment).
+ * Returns lightweight summaries for instant list rendering, plus raw positions
+ * that the API layer can cache for per-position enrichment.
  */
-export async function fetchUserPositions(
+export async function discoverUserPositions(
   walletAddress: string,
   alchemyKey?: string
-): Promise<Position[]> {
+): Promise<{ summaries: PositionSummary[]; rawPositions: RawPosition[] }> {
   const rpcUrl = alchemyKey
     ? `https://base-mainnet.g.alchemy.com/v2/${alchemyKey}`
     : 'https://mainnet.base.org';
@@ -250,7 +271,7 @@ export async function fetchUserPositions(
 
   const rawPositions: RawPosition[] = [];
 
-  console.log(`[Positions] Fetching positions for wallet: ${walletAddress}`);
+  console.log(`[Positions] Discovering positions for wallet: ${walletAddress}`);
 
   // Fetch V2, V3, V4 independently — one failing doesn't kill the others
   const results = await Promise.allSettled([
@@ -270,10 +291,321 @@ export async function fetchUserPositions(
     }
   }
 
-  // Enrich with token metadata and prices, converting to final Position type
-  const positions = await enrichPositionsWithMetadata(rawPositions, alchemyKey);
+  // Batch fetch token metadata for pair names (single multicall, fast)
+  const tokenAddresses = new Set<string>();
+  for (const raw of rawPositions) {
+    tokenAddresses.add(raw.token0Address.toLowerCase());
+    tokenAddresses.add(raw.token1Address.toLowerCase());
+  }
 
-  // Sort by TVL descending (highest value first), positions without USD go to end
+  const batchMetadata = tokenAddresses.size > 0
+    ? await getTokenMetadataBatch(Array.from(tokenAddresses), alchemyKey)
+    : new Map<string, { symbol: string; decimals: number; name?: string }>();
+
+  // Map raw positions to summaries
+  const summaries: PositionSummary[] = rawPositions.map((raw) => {
+    const t0 = raw.token0Address.toLowerCase();
+    const t1 = raw.token1Address.toLowerCase();
+    const meta0 = batchMetadata.get(t0);
+    const meta1 = batchMetadata.get(t1);
+    const symbol0 = meta0?.symbol || '???';
+    const symbol1 = meta1?.symbol || '???';
+
+    return {
+      id: raw.id,
+      version: raw.version,
+      pair: `${symbol0} / ${symbol1}`,
+      poolAddress: raw.poolAddress,
+      token0: { symbol: symbol0, address: raw.token0Address, decimals: meta0?.decimals ?? 18 },
+      token1: { symbol: symbol1, address: raw.token1Address, decimals: meta1?.decimals ?? 18 },
+      tokenId: raw.tokenId,
+      fee: raw.fee,
+      tickSpacing: raw.tickSpacing,
+      hooks: raw.hooks,
+      liquidityRaw: raw.liquidity,
+    };
+  });
+
+  console.log(`[Positions] Discovery complete: ${summaries.length} positions found`);
+
+  return { summaries, rawPositions };
+}
+
+/**
+ * Enrich a single raw position with USD values, fees, and price range.
+ * Designed for per-position lazy enrichment after discovery.
+ */
+export async function enrichSinglePosition(
+  raw: RawPosition,
+  alchemyKey?: string
+): Promise<Position> {
+  const rpcUrl = alchemyKey
+    ? `https://base-mainnet.g.alchemy.com/v2/${alchemyKey}`
+    : 'https://mainnet.base.org';
+
+  const client = createPublicClient({
+    chain: base,
+    transport: http(rpcUrl, { timeout: 15_000 }),
+  });
+
+  // Get token metadata
+  const tokenAddresses = [raw.token0Address.toLowerCase(), raw.token1Address.toLowerCase()];
+  const batchMetadata = await getTokenMetadataBatch(tokenAddresses, alchemyKey);
+
+  const meta0 = batchMetadata.get(tokenAddresses[0]);
+  const meta1 = batchMetadata.get(tokenAddresses[1]);
+  const d0 = meta0?.decimals ?? 18;
+  const d1 = meta1?.decimals ?? 18;
+
+  // Get token prices (just 2 tokens — fast)
+  const tokensWithDecimals = tokenAddresses.map(address => ({
+    address,
+    decimals: batchMetadata.get(address)?.decimals || 18,
+  }));
+
+  let priceMap = new Map<string, number>();
+  try {
+    priceMap = await getTokenPricesOnChain(tokensWithDecimals, alchemyKey);
+  } catch {
+    // Try GeckoTerminal fallback
+    try {
+      priceMap = await getTokenPrices(tokenAddresses);
+    } catch {
+      // Will show $0 values
+    }
+  }
+
+  const price0 = priceMap.get(tokenAddresses[0]) || 0;
+  const price1 = priceMap.get(tokenAddresses[1]) || 0;
+
+  let token0Amount = 0;
+  let token1Amount = 0;
+  let liquidityUsd = 0;
+  let feesEarnedUsd = raw.feesEarnedUsd;
+  let feesEarned = raw.feesEarned;
+  let inRange = raw.inRange;
+  let priceRange: { min: number; max: number } | undefined;
+
+  // V2: calculate from reserves
+  if (raw.version === 'V2' && raw.v2Balance && raw.v2TotalSupply && raw.v2Reserve0 && raw.v2Reserve1) {
+    const userAmount0Wei = (raw.v2Balance * raw.v2Reserve0) / raw.v2TotalSupply;
+    const userAmount1Wei = (raw.v2Balance * raw.v2Reserve1) / raw.v2TotalSupply;
+    token0Amount = Number(userAmount0Wei) / Math.pow(10, d0);
+    token1Amount = Number(userAmount1Wei) / Math.pow(10, d1);
+    liquidityUsd = token0Amount * price0 + token1Amount * price1;
+  }
+
+  // V3/V4: need pool slot0 for price range calculations
+  if ((raw.version === 'V3' || raw.version === 'V4') && raw.fee !== undefined) {
+    const tickLower = extractTickFromString(raw.priceRangeLow);
+    const tickUpper = extractTickFromString(raw.priceRangeHigh);
+
+    if (tickLower !== null && tickUpper !== null &&
+        tickLower >= -887272 && tickLower <= 887272 &&
+        tickUpper >= -887272 && tickUpper <= 887272) {
+
+      let sqrtPriceX96: bigint | null = null;
+      let currentTick: number | null = null;
+
+      // Fetch pool slot0
+      try {
+        if (raw.version === 'V3') {
+          // V3: factory → pool address → slot0
+          const factoryResult = await client.readContract({
+            address: V3_FACTORY as Address,
+            abi: V3_FACTORY_ABI,
+            functionName: 'getPool',
+            args: [raw.token0Address as Address, raw.token1Address as Address, raw.fee],
+          });
+          if (factoryResult && factoryResult !== '0x0000000000000000000000000000000000000000') {
+            const slot0 = await client.readContract({
+              address: factoryResult as Address,
+              abi: V3_POOL_ABI,
+              functionName: 'slot0',
+            }) as readonly [bigint, number, ...unknown[]];
+            sqrtPriceX96 = slot0[0];
+            currentTick = Number(slot0[1]);
+          }
+        } else if (raw.version === 'V4' && raw.tickSpacing !== undefined && raw.hooks) {
+          // V4: poolId → StateView.getSlot0
+          const poolId = calculateV4PoolId(raw.token0Address, raw.token1Address, raw.fee, raw.tickSpacing, raw.hooks);
+          const slot0 = await client.readContract({
+            address: V4_STATE_VIEW as Address,
+            abi: V4_STATE_VIEW_ABI,
+            functionName: 'getSlot0',
+            args: [poolId],
+          }) as readonly [bigint, number, ...unknown[]];
+          sqrtPriceX96 = slot0[0];
+          currentTick = Number(slot0[1]);
+        }
+      } catch (error) {
+        console.warn(`[Positions] slot0 fetch failed for ${raw.id}, falling back to derived price:`, error);
+      }
+
+      // Fallback: derive from USD prices
+      if (sqrtPriceX96 === null && price0 > 0 && price1 > 0) {
+        const derivedPrice = price0 / price1;
+        if (isFinite(derivedPrice) && derivedPrice > 0) {
+          currentTick = Math.round(Math.log(derivedPrice) / Math.log(1.0001));
+          if (isFinite(currentTick) && currentTick >= -887272 && currentTick <= 887272) {
+            sqrtPriceX96 = tickToSqrtPriceX96(currentTick);
+          }
+        }
+      }
+
+      if (sqrtPriceX96 !== null && currentTick !== null) {
+        try {
+          const liquidity = BigInt(raw.liquidity.replace(/[^\d]/g, ''));
+          const sqrtPriceLower = tickToSqrtPriceX96(tickLower);
+          const sqrtPriceUpper = tickToSqrtPriceX96(tickUpper);
+
+          const { amount0, amount1 } = calculateAmountsFromLiquidity(
+            sqrtPriceX96, sqrtPriceLower, sqrtPriceUpper, liquidity
+          );
+
+          token0Amount = Number(amount0) / Math.pow(10, d0);
+          token1Amount = Number(amount1) / Math.pow(10, d1);
+          liquidityUsd = token0Amount * price0 + token1Amount * price1;
+          inRange = currentTick >= tickLower && currentTick <= tickUpper;
+          priceRange = {
+            min: Math.pow(1.0001, tickLower),
+            max: Math.pow(1.0001, tickUpper),
+          };
+        } catch (error) {
+          console.error(`[Positions] Error calculating amounts for ${raw.id}:`, error);
+        }
+      }
+
+      // V3 fees from tokensOwed
+      if (raw.version === 'V3' && raw.v3TokensOwed0 !== undefined && raw.v3TokensOwed1 !== undefined) {
+        const fees0 = Number(raw.v3TokensOwed0) / Math.pow(10, d0);
+        const fees1 = Number(raw.v3TokensOwed1) / Math.pow(10, d1);
+        feesEarnedUsd = fees0 * price0 + fees1 * price1;
+        feesEarned = `${fees0.toFixed(6)} / ${fees1.toFixed(6)}`;
+      }
+
+      // V4 fees from fee growth
+      if (raw.version === 'V4' && raw.tokenId && raw.tickSpacing !== undefined && raw.hooks) {
+        try {
+          const poolId = calculateV4PoolId(raw.token0Address, raw.token1Address, raw.fee, raw.tickSpacing, raw.hooks);
+          const positionId = calculateV4PositionId(V4_POSITION_MANAGER, tickLower, tickUpper, raw.tokenId);
+
+          const [feeGrowthResult, posInfoResult] = await client.multicall({
+            contracts: [
+              {
+                address: V4_STATE_VIEW as Address,
+                abi: V4_STATE_VIEW_ABI,
+                functionName: 'getFeeGrowthInside' as const,
+                args: [poolId, tickLower, tickUpper] as const,
+              },
+              {
+                address: V4_STATE_VIEW as Address,
+                abi: V4_STATE_VIEW_ABI,
+                functionName: 'getPositionInfo' as const,
+                args: [poolId, positionId] as const,
+              },
+            ],
+            allowFailure: true,
+          });
+
+          if (feeGrowthResult.status === 'success' && posInfoResult.status === 'success') {
+            const [feeGrowthInside0, feeGrowthInside1] = feeGrowthResult.result as [bigint, bigint];
+            const [posLiquidity, feeGrowthInside0Last, feeGrowthInside1Last] = posInfoResult.result as [bigint, bigint, bigint];
+
+            const liquidity = BigInt(raw.liquidity.replace(/[^\d]/g, ''));
+            const actualLiquidity = posLiquidity > 0n ? posLiquidity : liquidity;
+
+            const Q128 = BigInt(2) ** BigInt(128);
+            const feeGrowthDelta0 = feeGrowthInside0 >= feeGrowthInside0Last ? feeGrowthInside0 - feeGrowthInside0Last : 0n;
+            const feeGrowthDelta1 = feeGrowthInside1 >= feeGrowthInside1Last ? feeGrowthInside1 - feeGrowthInside1Last : 0n;
+
+            const fees0Raw = (feeGrowthDelta0 * actualLiquidity) / Q128;
+            const fees1Raw = (feeGrowthDelta1 * actualLiquidity) / Q128;
+
+            const fees0 = Number(fees0Raw) / Math.pow(10, d0);
+            const fees1 = Number(fees1Raw) / Math.pow(10, d1);
+            feesEarnedUsd = fees0 * price0 + fees1 * price1;
+            feesEarned = `${fees0.toFixed(6)} / ${fees1.toFixed(6)}`;
+          }
+        } catch (error) {
+          console.warn(`[Positions] V4 fee fetch failed for ${raw.id}:`, error);
+        }
+      }
+    }
+  }
+
+  return {
+    id: raw.id,
+    version: raw.version,
+    pair: meta0 && meta1 ? `${meta0.symbol} / ${meta1.symbol}` : raw.pair,
+    poolAddress: raw.poolAddress,
+    token0: {
+      symbol: meta0?.symbol || '???',
+      address: raw.token0Address,
+      amount: token0Amount,
+    },
+    token1: {
+      symbol: meta1?.symbol || '???',
+      address: raw.token1Address,
+      amount: token1Amount,
+    },
+    liquidity: raw.liquidity,
+    liquidityUsd,
+    feesEarned,
+    feesEarnedUsd,
+    inRange,
+    priceRange,
+    tokenId: raw.tokenId,
+    fee: raw.fee,
+    tickSpacing: raw.tickSpacing,
+    hooks: raw.hooks,
+  };
+}
+
+/**
+ * Convert a PositionSummary to a Position with zero USD values.
+ * Used by frontend for skeleton rendering before enrichment completes.
+ */
+export function summaryToPosition(summary: PositionSummary): Position {
+  return {
+    id: summary.id,
+    version: summary.version,
+    pair: summary.pair,
+    poolAddress: summary.poolAddress,
+    token0: { symbol: summary.token0.symbol, address: summary.token0.address, amount: 0 },
+    token1: { symbol: summary.token1.symbol, address: summary.token1.address, amount: 0 },
+    liquidity: summary.liquidityRaw,
+    liquidityUsd: 0,
+    feesEarned: 'N/A',
+    feesEarnedUsd: 0,
+    tokenId: summary.tokenId,
+    fee: summary.fee,
+    tickSpacing: summary.tickSpacing,
+    hooks: summary.hooks,
+  };
+}
+
+/**
+ * Fetch all positions for a wallet address (backward-compatible).
+ * Discovers + enriches all positions. Use discoverUserPositions() + enrichSinglePosition()
+ * for progressive loading instead.
+ */
+export async function fetchUserPositions(
+  walletAddress: string,
+  alchemyKey?: string
+): Promise<Position[]> {
+  const { rawPositions } = await discoverUserPositions(walletAddress, alchemyKey);
+
+  // Enrich all with Promise.allSettled for resilience
+  const results = await Promise.allSettled(
+    rawPositions.map(raw => enrichSinglePosition(raw, alchemyKey))
+  );
+
+  const positions = results
+    .filter((r): r is PromiseFulfilledResult<Position> => r.status === 'fulfilled')
+    .map(r => r.value);
+
+  // Sort by TVL descending
   positions.sort((a, b) => b.liquidityUsd - a.liquidityUsd);
 
   return positions;

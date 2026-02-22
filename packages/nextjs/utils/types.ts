@@ -86,6 +86,20 @@ export interface Position {
   hooks?: string; // Hooks address for V4 positions
 }
 
+export interface PositionSummary {
+  id: string;
+  version: 'V2' | 'V3' | 'V4';
+  pair: string;
+  poolAddress: string;
+  token0: { symbol: string; address: string; decimals: number };
+  token1: { symbol: string; address: string; decimals: number };
+  tokenId?: string;
+  fee?: number;
+  tickSpacing?: number;
+  hooks?: string;
+  liquidityRaw: string;
+}
+
 export interface AppState {
   wallet: string | null;
   pools: Pool[];

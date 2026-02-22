@@ -1,16 +1,21 @@
+import createMDX from '@next/mdx';
+import rehypePrettyCode from 'rehype-pretty-code';
+import rehypeSlug from 'rehype-slug';
+import rehypeAutolinkHeadings from 'rehype-autolink-headings';
+import remarkGfm from 'remark-gfm';
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // output: 'standalone', // Only needed for Railway/Docker — Vercel handles its own bundling
+  pageExtensions: ['mdx', 'ts', 'tsx'],
   transpilePackages: ['@arbme/core-lib'],
   serverExternalPackages: ['@farcaster/miniapp-sdk'],
   webpack: (config, { isServer }) => {
-    // Fix for WalletConnect/RainbowKit module resolution issues
     config.resolve.fallback = {
       ...config.resolve.fallback,
       'pino-pretty': false,
       '@react-native-async-storage/async-storage': false,
+      'stream': false,
     };
-    // Exclude browser-only packages from server bundle
     if (isServer) {
       config.externals = config.externals || [];
       config.externals.push('@farcaster/miniapp-sdk');
@@ -29,7 +34,6 @@ const nextConfig = {
         ],
       },
       {
-        // Safe fetches manifest.json cross-origin before loading the iframe
         source: '/manifest.json',
         headers: [
           { key: 'Access-Control-Allow-Origin', value: '*' },
@@ -37,8 +41,19 @@ const nextConfig = {
           { key: 'Access-Control-Allow-Headers', value: 'X-Requested-With, content-type, Authorization' },
         ],
       },
-    ]
+    ];
   },
-}
+};
 
-module.exports = nextConfig
+const withMDX = createMDX({
+  options: {
+    remarkPlugins: [remarkGfm],
+    rehypePlugins: [
+      rehypeSlug,
+      [rehypeAutolinkHeadings, { behavior: 'wrap' }],
+      [rehypePrettyCode, { theme: 'github-dark-dimmed' }],
+    ],
+  },
+});
+
+export default withMDX(nextConfig);

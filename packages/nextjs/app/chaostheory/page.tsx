@@ -195,7 +195,7 @@ export default function ChaosTheoryPage() {
     setPosLoading(true)
     setPosError(null)
     try {
-      const res = await fetch(`/api/positions?wallet=${CHAOS_FOUNDATION_MULTISIG}`)
+      const res = await fetch(`/api/positions?wallet=${CHAOS_FOUNDATION_MULTISIG}&mode=full`)
       if (!res.ok) throw new Error(`Failed to fetch positions (${res.status})`)
       const data = await res.json()
       setPositions(data.positions || [])

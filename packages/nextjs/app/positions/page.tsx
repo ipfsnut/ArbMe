@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import { useWallet, useIsFarcaster, useIsSafe } from '@/hooks/useWallet'
 import { usePositions } from '@/hooks/usePositions'
+import { usePositionList } from '@/hooks/usePositionList'
 import { useSendTransaction } from 'wagmi'
 import { AppHeader } from '@/components/AppHeader'
 import { Footer } from '@/components/Footer'
@@ -19,32 +20,80 @@ export default function PositionsPage() {
   const isFarcaster = useIsFarcaster()
   const isSafe = useIsSafe()
   const { sendTransactionAsync } = useSendTransaction()
-  const { positions, loading, refreshing, error, lastRefresh, refresh, invalidate } = usePositions(wallet)
+
+  // ── Desktop: old monolithic hook ──────────────────────────────────────────
+  const desktop = usePositions(isFarcaster ? null : wallet)
+
+  // ── Farcaster: progressive loading hook ───────────────────────────────────
+  const fc = usePositionList(isFarcaster ? wallet : null)
+
+  // ── Unified interface ─────────────────────────────────────────────────────
+  const positions = isFarcaster ? [] as Position[] : desktop.positions
+  const summaries = isFarcaster ? fc.summaries : []
+  const enrichedMap = isFarcaster ? fc.enrichedMap : new Map<string, Position>()
+  const loading = isFarcaster ? fc.loading : desktop.loading
+  const refreshing = isFarcaster ? fc.refreshing : desktop.refreshing
+  const error = isFarcaster ? fc.error : desktop.error
+  const lastRefresh = isFarcaster ? fc.lastRefresh : desktop.lastRefresh
+  const refresh = isFarcaster ? fc.refresh : desktop.refresh
+  const invalidate = isFarcaster ? fc.refresh : desktop.invalidate
+
+  // Item count for display
+  const itemCount = isFarcaster ? summaries.length : positions.length
 
   // Collect All state
   const [collectAllStatus, setCollectAllStatus] = useState<CollectAllStatus>('idle')
   const [collectProgress, setCollectProgress] = useState({ current: 0, total: 0, succeeded: 0, failed: 0 })
 
-  // Paginate for all users — Farcaster webview is memory-constrained, desktop just avoids DOM bloat
+  // Pagination
   const PAGE_SIZE = isFarcaster ? 3 : 20
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  const hasMore = visibleCount < itemCount
+
+  // Farcaster: trigger enrichment for visible positions
+  const visibleSummaries = summaries.slice(0, visibleCount)
+  const visibleIds = useMemo(
+    () => visibleSummaries.map(s => s.id),
+    [visibleSummaries.length, visibleCount, summaries]
+  )
+  useEffect(() => {
+    if (isFarcaster && visibleIds.length > 0) {
+      fc.enrichBatch(visibleIds)
+    }
+  }, [isFarcaster, visibleIds, fc.enrichBatch])
+
+  // Desktop: displayed positions
   const displayedPositions = positions.slice(0, visibleCount)
-  const hasMore = visibleCount < positions.length
 
-  // Total TVL across all positions
-  const totalTvl = useMemo(() =>
-    positions.reduce((sum, p) => sum + (p.liquidityUsd || 0), 0),
-    [positions]
-  )
+  // TVL calculation
+  const { totalTvl, pricedCount } = useMemo(() => {
+    if (isFarcaster) {
+      let tvl = 0
+      let priced = 0
+      for (const pos of enrichedMap.values()) {
+        tvl += pos.liquidityUsd || 0
+        if (pos.liquidityUsd > 0) priced++
+      }
+      return { totalTvl: tvl, pricedCount: priced }
+    } else {
+      const tvl = positions.reduce((sum, p) => sum + (p.liquidityUsd || 0), 0)
+      const priced = positions.filter(p => p.liquidityUsd > 0).length
+      return { totalTvl: tvl, pricedCount: priced }
+    }
+  }, [isFarcaster, positions, enrichedMap])
 
-  // Positions eligible for fee collection (V3/V4 with uncollected fees)
-  const collectablePositions = useMemo(() =>
-    positions.filter(p =>
-      p.feesEarnedUsd > 0 &&
-      p.version !== 'V2'
-    ),
-    [positions]
-  )
+  // Collectable positions
+  const collectablePositions = useMemo(() => {
+    if (isFarcaster) {
+      const result: Position[] = []
+      for (const pos of enrichedMap.values()) {
+        if (pos.feesEarnedUsd > 0 && pos.version !== 'V2') result.push(pos)
+      }
+      return result
+    } else {
+      return positions.filter(p => p.feesEarnedUsd > 0 && p.version !== 'V2')
+    }
+  }, [isFarcaster, positions, enrichedMap])
 
   const totalFees = useMemo(() =>
     collectablePositions.reduce((sum, p) => sum + (p.feesEarnedUsd || 0), 0),
@@ -117,7 +166,6 @@ export default function PositionsPage() {
 
     setCollectAllStatus(progress.failed === progress.total ? 'error' : 'done')
 
-    // Refresh positions after collecting
     setTimeout(async () => {
       await invalidate()
       setCollectAllStatus('idle')
@@ -141,7 +189,7 @@ export default function PositionsPage() {
         <div className="section-header">
           <h2>
             My Positions
-            <span className="count">({positions.length})</span>
+            <span className="count">({itemCount})</span>
           </h2>
           <div className="header-actions">
             <span className="cache-age" style={{ fontSize: '0.75rem', color: 'var(--text-muted, #888)', marginRight: '0.5rem' }}>
@@ -161,11 +209,18 @@ export default function PositionsPage() {
           </div>
         </div>
 
-        {positions.length > 0 && totalTvl > 0 && (
+        {itemCount > 0 && totalTvl > 0 && (
           <div className="tvl-banner">
             <div className="tvl-banner-info">
               <span className="tvl-banner-label">Total Value</span>
-              <span className="tvl-banner-amount">{formatUsd(totalTvl)}</span>
+              <span className="tvl-banner-amount">
+                {formatUsd(totalTvl)}
+                {isFarcaster && pricedCount < summaries.length && (
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted, #888)', marginLeft: '0.5rem' }}>
+                    ({pricedCount}/{summaries.length} priced)
+                  </span>
+                )}
+              </span>
             </div>
           </div>
         )}
@@ -190,7 +245,7 @@ export default function PositionsPage() {
           </div>
         )}
 
-        {error && positions.length > 0 && (
+        {error && itemCount > 0 && (
           <div className="error-banner-inline" onClick={refresh} role="button" tabIndex={0}>
             Prices may be stale — tap to retry
           </div>
@@ -206,12 +261,12 @@ export default function PositionsPage() {
             <div className="loading-spinner" />
             <p>Loading positions...</p>
           </div>
-        ) : error && positions.length === 0 ? (
+        ) : error && itemCount === 0 ? (
           <div className="error-state">
             <p>{error}</p>
             <button onClick={() => window.location.reload()}>Retry</button>
           </div>
-        ) : displayedPositions.length === 0 ? (
+        ) : itemCount === 0 ? (
           <div className="empty-state">
             <p>No positions found</p>
             <p className="hint">Add liquidity to a pool to get started</p>
@@ -223,9 +278,23 @@ export default function PositionsPage() {
         ) : (
           <>
             <div className="positions-grid">
-              {displayedPositions.map((position) => (
-                <PositionCard key={position.id} position={position} />
-              ))}
+              {isFarcaster ? (
+                /* Farcaster: progressive enrichment with summaries */
+                visibleSummaries.map((summary) => (
+                  <PositionCard
+                    key={summary.id}
+                    summary={summary}
+                    enriched={enrichedMap.get(summary.id)}
+                    enriching={!enrichedMap.has(summary.id)}
+                    onRefresh={() => fc.refreshPosition(summary.id)}
+                  />
+                ))
+              ) : (
+                /* Desktop: fully enriched positions */
+                displayedPositions.map((position) => (
+                  <PositionCard key={position.id} position={position} />
+                ))
+              )}
             </div>
 
             {hasMore && (
@@ -234,7 +303,7 @@ export default function PositionsPage() {
                 onClick={() => setVisibleCount(v => v + PAGE_SIZE)}
                 style={{ marginTop: '1rem' }}
               >
-                Load More ({positions.length - visibleCount} remaining)
+                Load More ({itemCount - visibleCount} remaining)
               </button>
             )}
           </>

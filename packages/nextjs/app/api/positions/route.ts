@@ -1,87 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { fetchUserPositions } from '@arbme/core-lib'
-import type { Position } from '@arbme/core-lib'
+import { discoverUserPositions, fetchUserPositions } from '@arbme/core-lib'
+import { getDiscoveryCache, setDiscoveryCache, invalidateDiscoveryCache } from './_cache'
 
 export const maxDuration = 60
 
 const ALCHEMY_KEY = process.env.ALCHEMY_API_KEY
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Position Cache — quality-aware: good results cached long, bad results short
-// ═══════════════════════════════════════════════════════════════════════════════
-
-interface CacheEntry {
-  positions: Position[]
-  lastUpdated: string // ISO timestamp
-  timestamp: number
-  quality: 'good' | 'partial' // good = most positions have prices
-}
-
-const MAX_CACHE_ENTRIES = 500
-const GOOD_CACHE_TTL = 60 * 60_000    // 1 hour — results with prices
-const PARTIAL_CACHE_TTL = 5 * 60_000  // 5 minutes — results missing prices (prevents re-fetch storms)
-
-const cache = new Map<string, CacheEntry>()
-
-function assessQuality(positions: Position[]): 'good' | 'partial' {
-  if (positions.length === 0) return 'good'
-  const priced = positions.filter(p => p.liquidityUsd > 0).length
-  return priced >= positions.length * 0.5 ? 'good' : 'partial'
-}
-
-function getCached(wallet: string): CacheEntry | null {
-  const key = wallet.toLowerCase()
-  const entry = cache.get(key)
-  if (!entry) return null
-
-  const age = Date.now() - entry.timestamp
-  const ttl = entry.quality === 'good' ? GOOD_CACHE_TTL : PARTIAL_CACHE_TTL
-
-  if (age > ttl) {
-    cache.delete(key)
-    return null
-  }
-
-  // LRU: move to end
-  cache.delete(key)
-  cache.set(key, entry)
-  return entry
-}
-
-function setCache(wallet: string, positions: Position[]): CacheEntry {
-  const key = wallet.toLowerCase()
-  const quality = assessQuality(positions)
-  const entry: CacheEntry = {
-    positions,
-    lastUpdated: new Date().toISOString(),
-    timestamp: Date.now(),
-    quality,
-  }
-
-  if (quality === 'partial') {
-    console.log(`[positions] Caching ${positions.length} positions as PARTIAL (short TTL) — pricing incomplete`)
-  }
-
-  // Evict oldest entry if at capacity
-  if (cache.size >= MAX_CACHE_ENTRIES && !cache.has(key)) {
-    const oldest = cache.keys().next().value
-    if (oldest) cache.delete(oldest)
-  }
-  cache.set(key, entry)
-  return entry
-}
-
-function invalidateCache(wallet: string) {
-  cache.delete(wallet.toLowerCase())
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
 
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
     const wallet = searchParams.get('wallet')
     const refresh = searchParams.get('refresh') === 'true'
+    const mode = searchParams.get('mode') // 'full' returns enriched Position[] (backward compat)
 
     if (!wallet) {
       return NextResponse.json(
@@ -90,7 +20,6 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Validate wallet address format
     if (!/^0x[a-fA-F0-9]{40}$/.test(wallet)) {
       return NextResponse.json(
         { error: 'Invalid wallet address format' },
@@ -98,42 +27,69 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Bust cache on explicit refresh
-    if (refresh) {
-      invalidateCache(wallet)
-    }
-
-    // Check cache
-    const cached = getCached(wallet)
-    if (cached) {
-      return NextResponse.json({
-        wallet,
-        positions: cached.positions,
-        count: cached.positions.length,
-        cached: true,
-        lastUpdated: cached.lastUpdated,
-      })
-    }
-
-    // Cache miss — fetch fresh with timeout safety net
-    const FETCH_TIMEOUT_MS = 50_000
-    let positions: Position[]
-    try {
-      positions = await Promise.race([
+    // Backward compat: mode=full returns enriched positions (for MCP server etc.)
+    if (mode === 'full') {
+      if (refresh) invalidateDiscoveryCache(wallet)
+      const FETCH_TIMEOUT_MS = 50_000
+      const positions = await Promise.race([
         fetchUserPositions(wallet, ALCHEMY_KEY),
         new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error('Position fetch timed out')), FETCH_TIMEOUT_MS)
         ),
       ])
+      return NextResponse.json({
+        wallet,
+        positions,
+        count: positions.length,
+        cached: false,
+        lastUpdated: new Date().toISOString(),
+      })
+    }
+
+    // Default: return summaries (fast discovery)
+    if (refresh) {
+      invalidateDiscoveryCache(wallet)
+    }
+
+    const cached = getDiscoveryCache(wallet)
+    if (cached) {
+      return NextResponse.json({
+        wallet,
+        summaries: cached.summaries,
+        count: cached.summaries.length,
+        cached: true,
+        lastUpdated: cached.lastUpdated,
+      })
+    }
+
+    // Cache miss — discover positions
+    const DISCOVER_TIMEOUT_MS = 20_000
+    try {
+      const result = await Promise.race([
+        discoverUserPositions(wallet, ALCHEMY_KEY),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Discovery timed out')), DISCOVER_TIMEOUT_MS)
+        ),
+      ])
+
+      const entry = setDiscoveryCache(wallet, result.summaries, result.rawPositions)
+
+      return NextResponse.json({
+        wallet,
+        summaries: result.summaries,
+        count: result.summaries.length,
+        cached: false,
+        lastUpdated: entry.lastUpdated,
+      })
     } catch (fetchErr: any) {
-      // On ANY failure, return stale cache if available (not just timeout)
-      const stale = cache.get(wallet.toLowerCase())
+      // Return stale cache if available
+      const stale = getDiscoveryCache(wallet)
       if (stale) {
-        console.warn(`[positions] Fetch failed (${fetchErr.message}), returning stale cache (${stale.positions.length} positions)`)
+        console.warn(`[positions] Discovery failed (${fetchErr.message}), returning stale cache`)
         return NextResponse.json({
           wallet,
-          positions: stale.positions,
-          count: stale.positions.length,
+          summaries: stale.summaries,
+          count: stale.summaries.length,
           cached: true,
           stale: true,
           lastUpdated: stale.lastUpdated,
@@ -141,15 +97,6 @@ export async function GET(request: NextRequest) {
       }
       throw fetchErr
     }
-    const entry = setCache(wallet, positions)
-
-    return NextResponse.json({
-      wallet,
-      positions,
-      count: positions.length,
-      cached: false,
-      lastUpdated: entry.lastUpdated,
-    })
   } catch (error: any) {
     console.error('[positions] Error:', error)
     return NextResponse.json(
