@@ -34,7 +34,7 @@ const GECKO_API = 'https://api.geckoterminal.com/api/v2';
 const WETH_ADDRESS = '0x4200000000000000000000000000000000000006';
 
 // Cache TTL in milliseconds
-const CACHE_TTL = 30_000; // 30 seconds
+const CACHE_TTL = 5 * 60_000; // 5 minutes — stale prices beat $0 prices
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Price Cache

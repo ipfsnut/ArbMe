@@ -145,11 +145,11 @@ export function usePositions(wallet: string | null): UsePositionsResult {
         setLastRefresh(cached.lastRefresh)
         setLoading(false)
 
-        // If cache has good pricing data, stop here
-        const priced = cached.positions.filter(p => p.liquidityUsd > 0).length
-        if (priced >= cached.positions.length * 0.5) return
+        // If cache is fresh (within TTL), accept it as-is — even with $0 prices.
+        // $0 means pricing API was unavailable, not that data is wrong.
+        if (cached.isFresh) return
 
-        // Pricing looks incomplete — refresh in background
+        // Stale cache — refresh in background
         setRefreshing(true)
       }
 
@@ -167,6 +167,7 @@ export function usePositions(wallet: string | null): UsePositionsResult {
       } finally {
         if (!cancelled) {
           setLoading(false)
+          setRefreshing(false)
         }
       }
     }

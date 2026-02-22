@@ -337,7 +337,8 @@ export async function discoverUserPositions(
  */
 export async function enrichSinglePosition(
   raw: RawPosition,
-  alchemyKey?: string
+  alchemyKey?: string,
+  options?: { priceMap?: Map<string, number>; metadata?: Map<string, { symbol: string; decimals: number; name?: string }> }
 ): Promise<Position> {
   const rpcUrl = alchemyKey
     ? `https://base-mainnet.g.alchemy.com/v2/${alchemyKey}`
@@ -348,30 +349,33 @@ export async function enrichSinglePosition(
     transport: http(rpcUrl, { timeout: 15_000 }),
   });
 
-  // Get token metadata
+  // Get token metadata (use pre-fetched if available)
   const tokenAddresses = [raw.token0Address.toLowerCase(), raw.token1Address.toLowerCase()];
-  const batchMetadata = await getTokenMetadataBatch(tokenAddresses, alchemyKey);
+  const batchMetadata = options?.metadata ?? await getTokenMetadataBatch(tokenAddresses, alchemyKey);
 
   const meta0 = batchMetadata.get(tokenAddresses[0]);
   const meta1 = batchMetadata.get(tokenAddresses[1]);
   const d0 = meta0?.decimals ?? 18;
   const d1 = meta1?.decimals ?? 18;
 
-  // Get token prices (just 2 tokens — fast)
-  const tokensWithDecimals = tokenAddresses.map(address => ({
-    address,
-    decimals: batchMetadata.get(address)?.decimals || 18,
-  }));
-
-  let priceMap = new Map<string, number>();
-  try {
-    priceMap = await getTokenPricesOnChain(tokensWithDecimals, alchemyKey);
-  } catch {
-    // Try GeckoTerminal fallback
+  // Get token prices — use pre-fetched map if provided, otherwise fetch
+  let priceMap: Map<string, number>;
+  if (options?.priceMap) {
+    priceMap = options.priceMap;
+  } else {
+    priceMap = new Map<string, number>();
     try {
-      priceMap = await getTokenPrices(tokenAddresses);
+      const tokensWithDecimals = tokenAddresses.map(address => ({
+        address,
+        decimals: batchMetadata.get(address)?.decimals || 18,
+      }));
+      priceMap = await getTokenPricesOnChain(tokensWithDecimals, alchemyKey);
     } catch {
-      // Will show $0 values
+      try {
+        priceMap = await getTokenPrices(tokenAddresses);
+      } catch {
+        // Will show $0 values
+      }
     }
   }
 
@@ -596,9 +600,27 @@ export async function fetchUserPositions(
 ): Promise<Position[]> {
   const { rawPositions } = await discoverUserPositions(walletAddress, alchemyKey);
 
-  // Enrich all with Promise.allSettled for resilience
+  if (rawPositions.length === 0) return [];
+
+  // Collect all unique token addresses across all positions
+  const allTokenAddresses = new Set<string>();
+  for (const raw of rawPositions) {
+    allTokenAddresses.add(raw.token0Address.toLowerCase());
+    allTokenAddresses.add(raw.token1Address.toLowerCase());
+  }
+  const tokenList = Array.from(allTokenAddresses);
+
+  // Single batch: fetch all metadata + all prices upfront
+  const [metadata, priceMap] = await Promise.all([
+    getTokenMetadataBatch(tokenList, alchemyKey),
+    getTokenPrices(tokenList, alchemyKey).catch(() => new Map<string, number>()),
+  ]);
+
+  console.log(`[Positions] Pre-fetched ${metadata.size} metadata, ${priceMap.size} prices for ${rawPositions.length} positions`);
+
+  // Enrich all with shared price data — no more per-position price fetches
   const results = await Promise.allSettled(
-    rawPositions.map(raw => enrichSinglePosition(raw, alchemyKey))
+    rawPositions.map(raw => enrichSinglePosition(raw, alchemyKey, { priceMap, metadata }))
   );
 
   const positions = results
