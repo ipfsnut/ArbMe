@@ -12,7 +12,7 @@ export default function BlogLayout({ children }: { children: React.ReactNode }) 
             </Link>
             <div className="blog-nav-links">
               <Link href="/blog">Blog</Link>
-              <Link href="/pools" className="blog-nav-cta">
+              <Link href="/positions" className="blog-nav-cta">
                 Launch App
               </Link>
             </div>
