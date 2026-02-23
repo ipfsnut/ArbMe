@@ -72,7 +72,7 @@ export interface GaugeConfig {
 
 export const CHAOS_GAUGES: GaugeConfig[] = [
   { symbol: 'ARBME',   tokenAddress: ARBME_ADDRESS,   gaugeAddress: '0x37547710faE12B4be7458b5E87C3106a85CfD72F', decimals: 18, pool: 'CHAOS / ARBME',   week: 1 },
-  { symbol: 'USDC',    tokenAddress: USDC_ADDRESS,    gaugeAddress: '0x0000000000000000000000000000000000000000', decimals: 6,  pool: 'CHAOS / USDC',    week: 2 },
+  { symbol: 'USDC',    tokenAddress: USDC_ADDRESS,    gaugeAddress: '0x8d3074Bdf9412D77269F59Cc506E318E5da27914', decimals: 6,  pool: 'CHAOS / USDC',    week: 2 },
   { symbol: 'ALPHACLAW', tokenAddress: ALPHACLAW_ADDRESS, gaugeAddress: '0x0000000000000000000000000000000000000000', decimals: 18, pool: 'CHAOS / ALPHACLAW', week: 3 },
   { symbol: 'MLTL',    tokenAddress: MLTL_ADDRESS,    gaugeAddress: '0x0000000000000000000000000000000000000000', decimals: 18, pool: 'CHAOS / MLTL',    week: 4 },
   { symbol: 'OSO',     tokenAddress: OSO_ADDRESS,     gaugeAddress: '0x0000000000000000000000000000000000000000', decimals: 18, pool: 'CHAOS / OSO',     week: 5 },
