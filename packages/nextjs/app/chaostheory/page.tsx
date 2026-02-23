@@ -188,6 +188,7 @@ export default function ChaosTheoryPage() {
   const [rewardAmounts, setRewardAmounts] = useState<Record<number, string>>({})
   const [adminActionLoading, setAdminActionLoading] = useState<string | null>(null)
   const [adminError, setAdminError] = useState<string | null>(null)
+  const [pendingGaugeAddresses, setPendingGaugeAddresses] = useState<Record<number, string>>({})
 
   // -- Data fetching --
 
@@ -248,7 +249,7 @@ export default function ChaosTheoryPage() {
 
   // -- Transaction helpers --
 
-  const sendTx = async (tx: { to: string; data: string; value: string }): Promise<string> => {
+  const sendTx = async (tx: { to: string | null; data: string; value: string }): Promise<string> => {
     if (isFarcaster) {
       const farcasterSdk = (await import('@farcaster/miniapp-sdk')).default
       const provider = await farcasterSdk.wallet.getEthereumProvider()
@@ -257,7 +258,7 @@ export default function ChaosTheoryPage() {
         method: 'eth_sendTransaction',
         params: [{
           from: wallet as `0x${string}`,
-          to: tx.to as `0x${string}`,
+          ...(tx.to ? { to: tx.to as `0x${string}` } : {}),
           data: tx.data as `0x${string}`,
           value: tx.value !== '0' ? `0x${BigInt(tx.value).toString(16)}` as `0x${string}` : '0x0',
         }],
@@ -265,7 +266,7 @@ export default function ChaosTheoryPage() {
       return txHash as string
     } else {
       return await sendTransactionAsync({
-        to: tx.to as `0x${string}`,
+        ...(tx.to ? { to: tx.to as `0x${string}` } : {}),
         data: tx.data as `0x${string}`,
         value: tx.value !== '0' ? BigInt(tx.value) : 0n,
       })
@@ -365,6 +366,51 @@ export default function ChaosTheoryPage() {
       const { transaction } = await res.json()
       await sendTx(transaction)
       setRewardAmounts(prev => ({ ...prev, [gaugeIndex]: '' }))
+      await new Promise(r => setTimeout(r, isSafe ? 2000 : 4000))
+      await fetchAdminInfo()
+    } catch (e: any) { setAdminError(e.message) }
+    finally { setAdminActionLoading(null) }
+  }
+
+  const handleDeployGauge = async (gaugeIndex: number) => {
+    setAdminActionLoading(`deploy-${gaugeIndex}`); setAdminError(null)
+    try {
+      const res = await fetch('/api/chaos-staking/admin/deploy-gauge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gaugeIndex }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Failed to build deploy tx')
+      }
+      const { transaction } = await res.json()
+      await sendTx(transaction)
+      setAdminError(`${CHAOS_GAUGES[gaugeIndex].symbol} gauge deploy tx submitted. After confirmation, enter the deployed address below and click Register.`)
+    } catch (e: any) { setAdminError(e.message) }
+    finally { setAdminActionLoading(null) }
+  }
+
+  const handleRegisterGauge = async (gaugeIndex: number) => {
+    const gaugeAddress = pendingGaugeAddresses[gaugeIndex]?.trim()
+    if (!gaugeAddress || !/^0x[0-9a-fA-F]{40}$/.test(gaugeAddress)) {
+      setAdminError('Enter a valid gauge contract address')
+      return
+    }
+    setAdminActionLoading(`register-${gaugeIndex}`); setAdminError(null)
+    try {
+      const res = await fetch('/api/chaos-staking/admin/register-gauge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gaugeAddress }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Failed to build register tx')
+      }
+      const { transaction } = await res.json()
+      await sendTx(transaction)
+      setPendingGaugeAddresses(prev => ({ ...prev, [gaugeIndex]: '' }))
       await new Promise(r => setTimeout(r, isSafe ? 2000 : 4000))
       await fetchAdminInfo()
     } catch (e: any) { setAdminError(e.message) }
@@ -679,7 +725,7 @@ export default function ChaosTheoryPage() {
                         )}
                       </div>
 
-                      {ag.deployed && (
+                      {ag.deployed ? (
                         <div className="admin-gauge-actions">
                           {!hasAllowance && (
                             <button
@@ -713,6 +759,35 @@ export default function ChaosTheoryPage() {
                               </button>
                             </div>
                           )}
+                        </div>
+                      ) : (
+                        <div className="admin-gauge-actions">
+                          <button
+                            className="btn btn-primary btn-sm"
+                            onClick={() => handleDeployGauge(idx)}
+                            disabled={!!adminActionLoading}
+                          >
+                            {adminActionLoading === `deploy-${idx}` ? 'Deploying...' : `Deploy ${ag.symbol} Gauge`}
+                          </button>
+                          <div className="admin-notify-row" style={{ marginTop: 'var(--spacing-sm)' }}>
+                            <div className="input-wrapper">
+                              <input
+                                type="text"
+                                className="amount-input"
+                                placeholder="0x... deployed gauge address"
+                                value={pendingGaugeAddresses[idx] || ''}
+                                onChange={e => setPendingGaugeAddresses(prev => ({ ...prev, [idx]: e.target.value }))}
+                                style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}
+                              />
+                            </div>
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => handleRegisterGauge(idx)}
+                              disabled={!!adminActionLoading || !pendingGaugeAddresses[idx]}
+                            >
+                              {adminActionLoading === `register-${idx}` ? 'Registering...' : 'Register'}
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>
