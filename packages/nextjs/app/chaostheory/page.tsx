@@ -249,7 +249,7 @@ export default function ChaosTheoryPage() {
 
   // -- Transaction helpers --
 
-  const sendTx = async (tx: { to: string | null; data: string; value: string }): Promise<string> => {
+  const sendTx = async (tx: { to: string; data: string; value: string }): Promise<string> => {
     if (isFarcaster) {
       const farcasterSdk = (await import('@farcaster/miniapp-sdk')).default
       const provider = await farcasterSdk.wallet.getEthereumProvider()
@@ -258,7 +258,7 @@ export default function ChaosTheoryPage() {
         method: 'eth_sendTransaction',
         params: [{
           from: wallet as `0x${string}`,
-          ...(tx.to ? { to: tx.to as `0x${string}` } : {}),
+          to: tx.to as `0x${string}`,
           data: tx.data as `0x${string}`,
           value: tx.value !== '0' ? `0x${BigInt(tx.value).toString(16)}` as `0x${string}` : '0x0',
         }],
@@ -266,7 +266,7 @@ export default function ChaosTheoryPage() {
       return txHash as string
     } else {
       return await sendTransactionAsync({
-        ...(tx.to ? { to: tx.to as `0x${string}` } : {}),
+        to: tx.to as `0x${string}`,
         data: tx.data as `0x${string}`,
         value: tx.value !== '0' ? BigInt(tx.value) : 0n,
       })
