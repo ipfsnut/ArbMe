@@ -3986,13 +3986,13 @@ button.button-primary:hover {
 
 @media (min-width: 480px) {
   .buy-tokens-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
 @media (min-width: 768px) {
   .buy-tokens-grid {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
@@ -4013,6 +4013,22 @@ button.button-primary:hover {
   height: 48px;
   border-radius: 50%;
   object-fit: cover;
+  margin-bottom: var(--spacing-xs);
+}
+
+.buy-token-logo-text {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--accent-glow);
+  border: 1px solid var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--accent);
   margin-bottom: var(--spacing-xs);
 }
 

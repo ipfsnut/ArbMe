@@ -2,7 +2,7 @@
  * Farcaster action handlers (Buy, Tip, etc.)
  */
 
-import { ARBME_ADDRESS, RATCHET_ADDRESS, ABC_ADDRESS, USDC_ADDRESS } from '../utils/constants';
+import { ARBME_ADDRESS, RATCHET_ADDRESS, CHAOS_ADDRESS, ABC_ADDRESS, USDC_ADDRESS } from '../utils/constants';
 
 async function getSDK() {
   return (await import('@farcaster/miniapp-sdk')).default;
@@ -30,6 +30,31 @@ export async function buyArbme(): Promise<void> {
     const result = await sdk.actions.swapToken({
       sellToken: USDC_BASE,
       buyToken: arbmeToken,
+    });
+
+    if (result.success) {
+      console.log('[Actions] Swap completed:', result.swap.transactions);
+    } else {
+      console.log('[Actions] Swap cancelled or failed:', result.reason);
+    }
+  } catch (error) {
+    console.error('[Actions] Error opening buy widget:', error);
+  }
+}
+
+/**
+ * Launch Farcaster's swap widget to buy $CHAOS
+ */
+export async function buyChaos(): Promise<void> {
+  try {
+    console.log('[Actions] Opening buy widget for CHAOS...');
+
+    const chaosToken = `eip155:8453/erc20:${CHAOS_ADDRESS}`;
+
+    const sdk = await getSDK();
+    const result = await sdk.actions.swapToken({
+      sellToken: USDC_BASE,
+      buyToken: chaosToken,
     });
 
     if (result.success) {
