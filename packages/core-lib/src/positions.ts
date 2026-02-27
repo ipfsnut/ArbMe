@@ -687,6 +687,7 @@ async function fetchV2Positions(client: any, wallet: Address): Promise<RawPositi
           liquidityUsd: 0, // Will be calculated in enrichment
           feesEarned: 'N/A',
           feesEarnedUsd: 0,
+          fee: 3000, // V2 pools are always 0.3%
           // Store V2 data for USD calculation
           v2Balance: balance,
           v2TotalSupply: totalSupply as bigint,
