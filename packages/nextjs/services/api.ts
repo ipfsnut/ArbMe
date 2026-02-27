@@ -2,17 +2,39 @@
  * API service for fetching data from Next.js API routes
  */
 
-import type { PoolsResponse, Position, PositionSummary } from '../utils/types';
+import type { PoolsResponse, TokenPoolsResponse, PricesResponse, Position, PositionSummary } from '../utils/types';
 
 const API_BASE = '/api';
 
 /**
- * Fetch all ARBME pools
+ * Fetch all pools (legacy — used by MCP server backward compat)
  */
 export async function fetchPools(): Promise<PoolsResponse> {
   const res = await fetch(`${API_BASE}/pools`);
   if (!res.ok) {
     throw new Error(`Failed to fetch pools: ${res.statusText}`);
+  }
+  return res.json();
+}
+
+/**
+ * Fetch pools for a specific token tab
+ */
+export async function fetchPoolsByToken(token: 'arbme' | 'chaos' | 'ratchet'): Promise<TokenPoolsResponse> {
+  const res = await fetch(`${API_BASE}/pools/${token}`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch ${token} pools: ${res.statusText}`);
+  }
+  return res.json();
+}
+
+/**
+ * Fetch lightweight price data for the header stats banner
+ */
+export async function fetchTokenPricesOnly(): Promise<PricesResponse> {
+  const res = await fetch(`${API_BASE}/pools/prices`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch prices: ${res.statusText}`);
   }
   return res.json();
 }

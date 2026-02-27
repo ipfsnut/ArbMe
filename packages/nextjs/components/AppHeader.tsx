@@ -7,30 +7,32 @@ import { useAppState } from '@/store/AppContext'
 import { WalletConnectButton } from '@/components/WalletProvider'
 import { formatUsd, formatPrice } from '@/utils/format'
 import { ROUTES } from '@/utils/constants'
-import { fetchPools } from '@/services/api'
+import { fetchTokenPricesOnly } from '@/services/api'
 
 export function AppHeader() {
   const pathname = usePathname()
   const { state, setState } = useAppState()
   const { globalStats } = state
 
-  // Fetch prices if not already loaded (e.g. user navigated directly to a non-home page)
+  // Fetch prices from lightweight endpoint (no full pool data)
   useEffect(() => {
     if (globalStats) return
-    fetchPools()
+    fetchTokenPricesOnly()
       .then((data) => {
         setState({
-          pools: data.pools,
           globalStats: {
             arbmePrice: data.arbmePrice,
+            chaosPrice: data.chaosPrice,
             ratchetPrice: data.ratchetPrice,
-            abcPrice: data.abcPrice,
-            clawdPrice: data.clawdPrice,
             totalTvl: data.totalTvl,
             arbmeTvl: data.arbmeTvl,
+            chaosTvl: data.chaosTvl,
             ratchetTvl: data.ratchetTvl,
-            abcTvl: data.abcTvl,
-            clawdTvl: data.clawdTvl,
+            // Legacy fields
+            abcPrice: '0',
+            clawdPrice: '0',
+            abcTvl: 0,
+            clawdTvl: 0,
           },
           loading: false,
         })
@@ -41,23 +43,23 @@ export function AppHeader() {
   }, [globalStats])
 
   const arbmePriceDisplay = globalStats ? formatPrice(globalStats.arbmePrice) : '...'
+  const chaosPriceDisplay = globalStats ? formatPrice(globalStats.chaosPrice) : '...'
   const ratchetPriceDisplay = globalStats ? formatPrice(globalStats.ratchetPrice) : '...'
-  const abcPriceDisplay = globalStats ? formatPrice(globalStats.abcPrice) : '...'
 
   const tvlDisplay = globalStats
     ? formatUsd(globalStats.totalTvl)
     : '...'
 
   const primaryNav = [
-    { href: ROUTES.MY_POOLS, label: 'Pools' },
     { href: ROUTES.TRADE, label: 'Trade' },
-    { href: ROUTES.ADD_LIQUIDITY, label: '+ Add' },
+    { href: ROUTES.ADVANCED, label: 'Advanced' },
+    { href: ROUTES.BUILD, label: 'Build' },
   ]
 
   const secondaryNav = [
+    { href: ROUTES.MY_POOLS, label: 'Positions' },
+    { href: ROUTES.ADD_LIQUIDITY, label: '+ Add' },
     { href: ROUTES.TRAFFIC, label: 'Traffic' },
-    { href: ROUTES.STAKE, label: 'Ratchet' },
-    { href: ROUTES.CHAOS_THEORY, label: 'Chaos' },
     { href: ROUTES.TREASURY, label: 'Treasury' },
     { href: '/blog', label: 'Blog' },
   ]
@@ -113,12 +115,12 @@ export function AppHeader() {
           <span className="stat-value text-accent">{arbmePriceDisplay}</span>
         </div>
         <div className="stat-item">
-          <span className="stat-label text-secondary">$RATCHET</span>
-          <span className="stat-value">{ratchetPriceDisplay}</span>
+          <span className="stat-label text-secondary">$CHAOS</span>
+          <span className="stat-value">{chaosPriceDisplay}</span>
         </div>
         <div className="stat-item">
-          <span className="stat-label text-secondary">$ABC</span>
-          <span className="stat-value">{abcPriceDisplay}</span>
+          <span className="stat-label text-secondary">$RATCHET</span>
+          <span className="stat-value">{ratchetPriceDisplay}</span>
         </div>
         <div className="stat-item">
           <span className="stat-label text-secondary">TVL</span>

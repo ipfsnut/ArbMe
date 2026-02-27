@@ -660,6 +660,156 @@ const CACHE_TTL = 120_000; // 2 minutes
 // In-flight request deduplication — prevents concurrent cache misses
 // from spawning duplicate API calls
 let pendingFetch: Promise<any> | null = null;
+const pendingTokenFetch = new Map<string, Promise<any>>();
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PER-TOKEN POOL FETCHING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export interface TokenPoolsResponse {
+  pools: PoolData[];
+  tokenPrice: string;
+  tvl: number;
+  lastUpdated: string;
+}
+
+/**
+ * Fetch pools for a single token.
+ * - ARBME: GeckoTerminal + RPC V2 pools + Balancer
+ * - CHAOS/RATCHET: GeckoTerminal only
+ * Includes its own 2min cache and in-flight dedup per token.
+ */
+export async function fetchPoolsForToken(
+  tokenAddress: string,
+  alchemyKey?: string
+): Promise<TokenPoolsResponse> {
+  const cacheKey = `pools_${tokenAddress.toLowerCase()}`;
+  const cached = cache.get(cacheKey);
+
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data;
+  }
+
+  // Dedup in-flight requests per token
+  const pending = pendingTokenFetch.get(cacheKey);
+  if (pending) return pending;
+
+  const promise = _fetchPoolsForTokenInternal(tokenAddress, alchemyKey, cached).finally(() => {
+    pendingTokenFetch.delete(cacheKey);
+  });
+  pendingTokenFetch.set(cacheKey, promise);
+
+  return promise;
+}
+
+async function _fetchPoolsForTokenInternal(
+  tokenAddress: string,
+  alchemyKey: string | undefined,
+  cached: CacheEntry | undefined
+): Promise<TokenPoolsResponse> {
+  const cacheKey = `pools_${tokenAddress.toLowerCase()}`;
+
+  try {
+    const geckoPools = await fetchGeckoTerminalPools(tokenAddress);
+    let allPools = [...geckoPools];
+
+    const isArbme = tokenAddress.toLowerCase() === ARBME.address.toLowerCase();
+
+    if (isArbme) {
+      // Extract prices for RPC pool calculations
+      const tokenPrices = extractTokenPricesFromPools([
+        { searchedToken: tokenAddress, pools: geckoPools },
+      ]);
+
+      const wethAddr = '0x4200000000000000000000000000000000000006';
+      // Fetch missing prices we need for RPC pools
+      const missingTokens = [
+        { key: TOKENS.PAGE.toLowerCase(), addr: TOKENS.PAGE },
+        { key: TOKENS.CLANKER.toLowerCase(), addr: TOKENS.CLANKER },
+      ];
+
+      for (const { key, addr } of missingTokens) {
+        if (!tokenPrices[key]) {
+          const price = await fetchTokenPrice(addr);
+          if (price > 0) tokenPrices[key] = price;
+          await new Promise(resolve => setTimeout(resolve, 300));
+        }
+      }
+
+      const pagePrice = tokenPrices[TOKENS.PAGE.toLowerCase()] || 0;
+      const clankerPrice = tokenPrices[TOKENS.CLANKER.toLowerCase()] || 0;
+      const refArbmePrice = geckoPools.find(p => p.tvl > 0)?.priceUsd;
+      const arbmePriceNum = refArbmePrice ? parseFloat(refArbmePrice) : 0;
+
+      // Fetch RPC + Balancer pools
+      const [pageArbmePool, clankerArbmeV2Pool, balancerPools] = await Promise.all([
+        fetchPageArbmePool(pagePrice, alchemyKey),
+        fetchClankerArbmeV2Pool(clankerPrice, alchemyKey),
+        fetchBalancerV3Pools(arbmePriceNum),
+      ]);
+
+      // Deduplicate
+      const CLANKER_V2_ADDR = '0x14aeb8cfdf477001a60f5196ec2ddfe94771b794';
+      if (pageArbmePool && !allPools.some(p => p.pairAddress.toLowerCase() === PAGE_ARBME_POOL.address.toLowerCase())) {
+        allPools.push(pageArbmePool);
+      }
+      if (clankerArbmeV2Pool && !allPools.some(p => p.pairAddress.toLowerCase() === CLANKER_V2_ADDR.toLowerCase())) {
+        allPools.push(clankerArbmeV2Pool);
+      }
+      for (const balPool of balancerPools) {
+        if (!allPools.some(p => p.pairAddress.toLowerCase() === balPool.pairAddress.toLowerCase())) {
+          allPools.push(balPool);
+        }
+      }
+
+      // Enrich V4 pools with fee data
+      for (const pool of allPools) {
+        if (pool.dex.includes('V4') && !pool.fee && pool.token0 && pool.token1) {
+          const t0 = pool.token0.toLowerCase();
+          const t1 = pool.token1.toLowerCase();
+          const matchingConfig = V4_ARBME_POOLS.find(cfg => {
+            const cfg0 = cfg.token0.toLowerCase();
+            const cfg1 = cfg.token1.toLowerCase();
+            return (t0 === cfg0 && t1 === cfg1) || (t0 === cfg1 && t1 === cfg0);
+          });
+          if (matchingConfig) {
+            pool.fee = matchingConfig.fee;
+          }
+        }
+      }
+    }
+
+    // Sort by TVL and filter dust
+    allPools = allPools.filter(p => p.tvl > 1).sort((a, b) => b.tvl - a.tvl);
+
+    const tvl = allPools.reduce((sum, p) => sum + p.tvl, 0);
+
+    // Best price from highest TVL pool
+    const wethAddr = '0x4200000000000000000000000000000000000006';
+    const v4WethPool = allPools.find(p =>
+      p.dex.includes('V4') &&
+      ((p.token0?.toLowerCase() === tokenAddress.toLowerCase() && p.token1?.toLowerCase() === wethAddr) ||
+       (p.token1?.toLowerCase() === tokenAddress.toLowerCase() && p.token0?.toLowerCase() === wethAddr))
+    );
+    const tokenPrice = v4WethPool?.priceUsd || allPools.find(p => p.tvl > 0)?.priceUsd || '0';
+
+    const result: TokenPoolsResponse = {
+      pools: allPools,
+      tokenPrice,
+      tvl,
+      lastUpdated: new Date().toISOString(),
+    };
+
+    cache.set(cacheKey, { data: result, timestamp: Date.now() });
+    console.log(`[Pools] Cached ${allPools.length} pools for ${tokenAddress.slice(0, 10)}..., TVL $${tvl.toFixed(2)}`);
+    return result;
+
+  } catch (error) {
+    console.error(`[Pools] Error fetching pools for ${tokenAddress}:`, error);
+    if (cached) return cached.data;
+    throw error;
+  }
+}
 
 /**
  * Fetch all ARBME pools

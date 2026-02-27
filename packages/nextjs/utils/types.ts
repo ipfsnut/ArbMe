@@ -42,14 +42,35 @@ export interface PoolsResponse {
   lastUpdated: string;
 }
 
+export interface TokenPoolsResponse {
+  pools: Pool[];
+  tokenPrice: string;
+  tvl: number;
+  lastUpdated: string;
+}
+
+export interface PricesResponse {
+  arbmePrice: string;
+  chaosPrice: string;
+  ratchetPrice: string;
+  arbmeTvl: number;
+  chaosTvl: number;
+  ratchetTvl: number;
+  totalTvl: number;
+  lastUpdated: string;
+}
+
 export interface GlobalStats {
   arbmePrice: string;
+  chaosPrice: string;
   ratchetPrice: string;
-  abcPrice: string;
-  clawdPrice: string;
   totalTvl: number;
   arbmeTvl: number;
+  chaosTvl: number;
   ratchetTvl: number;
+  // Legacy fields kept for backward compat
+  abcPrice: string;
+  clawdPrice: string;
   abcTvl: number;
   clawdTvl: number;
 }

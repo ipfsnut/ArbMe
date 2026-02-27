@@ -6,6 +6,7 @@ import { AppHeader } from '@/components/AppHeader'
 import { Footer } from '@/components/Footer'
 import { BackButton } from '@/components/BackButton'
 import { PositionCard } from '@/components/PositionCard'
+import { TokenLeaderboard } from '@/components/TokenLeaderboard'
 import Link from 'next/link'
 import { ROUTES, CHAOS_FOUNDATION_MULTISIG, CHAOS_GAUGES, CHAOS_STAKING_ADDRESS } from '@/utils/constants'
 import { useSendTransaction } from 'wagmi'
@@ -162,7 +163,7 @@ function CollapsibleSection({ title, description, children, defaultOpen = false 
   )
 }
 
-export default function ChaosTheoryPage() {
+export default function AdvancedPage() {
   const wallet = useWallet()
   const isFarcaster = useIsFarcaster()
   const isSafe = useIsSafe()
@@ -439,12 +440,14 @@ export default function ChaosTheoryPage() {
       <AppHeader />
 
       <div className="main-content">
-        <BackButton href={ROUTES.HOME} label="Back to Home" />
+        <BackButton href={ROUTES.HOME} label="Back" />
 
-        {/* Hero */}
-        <div className="section-header">
-          <h2>ChaosTheory</h2>
+        <div className="page-header">
+          <h1 style={{ fontFamily: 'var(--font-mono)' }}>Advanced</h1>
+          <p className="page-subtitle">$CHAOS — flaunch native</p>
         </div>
+
+        <TokenLeaderboard token="chaos" />
 
         {/* About */}
         <div className="ct-about">

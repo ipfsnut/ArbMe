@@ -88,13 +88,16 @@ export const ROUTES = {
   MY_POOLS: '/positions',
   POSITION_DETAIL: '/positions',
   ADD_LIQUIDITY: '/add-liquidity',
-  STAKE: '/stake',
-  WRAP: '/wrap',
-  TREASURY: '/treasury',
   TRADE: '/trade',
+  ADVANCED: '/advanced',
+  BUILD: '/build',
+  TREASURY: '/treasury',
   TRAFFIC: '/traffic',
-  CHAOS_THEORY: '/chaostheory',
+  WRAP: '/wrap',
   RAILS: '/rails',
+  // Legacy (redirected)
+  STAKE: '/stake',
+  CHAOS_THEORY: '/chaostheory',
 } as const;
 
 // Position Managers

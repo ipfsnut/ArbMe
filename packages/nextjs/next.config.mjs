@@ -23,6 +23,20 @@ const nextConfig = {
     }
     return config;
   },
+  async redirects() {
+    return [
+      {
+        source: '/chaostheory',
+        destination: '/advanced',
+        permanent: true,
+      },
+      {
+        source: '/stake',
+        destination: '/build',
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
       {

@@ -5,6 +5,7 @@ import { useWallet, useIsFarcaster, useIsSafe } from '@/hooks/useWallet'
 import { AppHeader } from '@/components/AppHeader'
 import { Footer } from '@/components/Footer'
 import { BackButton } from '@/components/BackButton'
+import { TokenLeaderboard } from '@/components/TokenLeaderboard'
 import { ROUTES } from '@/utils/constants'
 import { buyRatchet } from '@/lib/actions'
 // SDK imported dynamically to avoid module-level crashes on mobile
@@ -68,7 +69,7 @@ function parseToWei(value: string, decimals: number = 18): string {
   return (BigInt(whole) * 10n ** BigInt(decimals)).toString()
 }
 
-export default function StakePage() {
+export default function BuildPage() {
   const wallet = useWallet()
   const isFarcaster = useIsFarcaster()
   const isSafe = useIsSafe()
@@ -335,12 +336,14 @@ export default function StakePage() {
       <AppHeader />
 
       <div className="main-content">
-        <BackButton href={ROUTES.HOME} label="Back to Home" />
+        <BackButton href={ROUTES.HOME} label="Back" />
 
-        <div className="section-header">
-          <h2>The Ratchet</h2>
-          <p className="section-subtitle">Ecosystem utility token — liquid, stakeable, deflationary</p>
+        <div className="page-header">
+          <h1 style={{ fontFamily: 'var(--font-mono)' }}>Build</h1>
+          <p className="page-subtitle">$RATCHET — builder rewards</p>
         </div>
+
+        <TokenLeaderboard token="ratchet" />
 
         {/* About RATCHET */}
         <div className="ratchet-info">
