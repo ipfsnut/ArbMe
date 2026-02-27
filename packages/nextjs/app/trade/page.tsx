@@ -19,7 +19,7 @@ export default function TradeIndexPage() {
           <p className="page-subtitle">$ARBME pools</p>
         </div>
 
-        <TokenLeaderboard token="arbme" />
+        <TokenLeaderboard token="arbme" collapsible defaultOpen />
       </div>
 
       <Footer />

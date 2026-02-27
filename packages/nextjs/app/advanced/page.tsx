@@ -447,7 +447,7 @@ export default function AdvancedPage() {
           <p className="page-subtitle">$CHAOS — flaunch native</p>
         </div>
 
-        <TokenLeaderboard token="chaos" />
+        <TokenLeaderboard token="chaos" collapsible />
 
         {/* About */}
         <div className="ct-about">

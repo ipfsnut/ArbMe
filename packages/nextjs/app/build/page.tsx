@@ -343,7 +343,7 @@ export default function BuildPage() {
           <p className="page-subtitle">$RATCHET — builder rewards</p>
         </div>
 
-        <TokenLeaderboard token="ratchet" />
+        <TokenLeaderboard token="ratchet" collapsible />
 
         {/* About RATCHET */}
         <div className="ratchet-info">

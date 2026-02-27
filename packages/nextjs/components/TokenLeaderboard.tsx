@@ -18,15 +18,24 @@ function formatUsd(value: number): string {
 interface TokenLeaderboardProps {
   token: 'arbme' | 'chaos' | 'ratchet'
   limit?: number
+  collapsible?: boolean
+  defaultOpen?: boolean
 }
 
-export function TokenLeaderboard({ token, limit = 15 }: TokenLeaderboardProps) {
+const TOKEN_LABELS: Record<string, string> = {
+  arbme: '$ARBME Pools',
+  chaos: '$CHAOS Pools',
+  ratchet: '$RATCHET Pools',
+}
+
+export function TokenLeaderboard({ token, limit = 15, collapsible = false, defaultOpen = false }: TokenLeaderboardProps) {
   const [pools, setPools] = useState<Pool[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('tvl')
   const [showAll, setShowAll] = useState(false)
+  const [open, setOpen] = useState(defaultOpen)
 
   useEffect(() => {
     setLoading(true)
@@ -75,136 +84,172 @@ export function TokenLeaderboard({ token, limit = 15 }: TokenLeaderboardProps) {
 
   const totalCount = pools.filter(p => p.tvl > 1).length
 
-  if (loading) {
-    return (
-      <div className="loading-state">
-        <div className="loading-spinner" />
-        <p>Loading pools...</p>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="error-state">
-        <p>{error}</p>
-      </div>
-    )
-  }
-
-  return (
-    <div className="token-leaderboard">
-      <div className="leaderboard-controls">
-        <input
-          type="text"
-          className="leaderboard-search"
-          placeholder="Search pairs or addresses..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <div className="leaderboard-sort-buttons">
-          {([
-            ['tvl', 'TVL'],
-            ['volume', 'Volume'],
-            ['heat', 'Heat'],
-            ['change', '24h%'],
-          ] as const).map(([key, label]) => (
-            <button
-              key={key}
-              className={`leaderboard-sort-btn ${sortKey === key ? 'active' : ''}`}
-              onClick={() => setSortKey(key)}
-            >
-              {label}
-            </button>
-          ))}
+  // Non-collapsible: show loading/error states inline as before
+  if (!collapsible) {
+    if (loading) {
+      return (
+        <div className="loading-state">
+          <div className="loading-spinner" />
+          <p>Loading pools...</p>
         </div>
-      </div>
+      )
+    }
+    if (error) {
+      return (
+        <div className="error-state">
+          <p>{error}</p>
+        </div>
+      )
+    }
+  }
 
-      {filtered.length === 0 ? (
-        <div className="empty-state">
-          <p>No pools found{search ? ` for "${search}"` : ''}</p>
+  const poolList = (
+    <>
+      {loading ? (
+        <div className="loading-state">
+          <div className="loading-spinner" />
+          <p>Loading pools...</p>
+        </div>
+      ) : error ? (
+        <div className="error-state">
+          <p>{error}</p>
         </div>
       ) : (
         <>
-          <div className="trade-pool-list">
-            {filtered.map((pool) => {
-              const tradeHref = buildTradeHref(pool)
-              const version = dexToVersion(pool.dex) || pool.dex
-              const changeClass = pool.priceChange24h >= 0 ? 'positive' : 'negative'
-              const changeSign = pool.priceChange24h >= 0 ? '+' : ''
-
-              const card = (
-                <div className="trade-pool-card">
-                  <div className="trade-pool-top">
-                    <span className="trade-pool-pair">{pool.pair}</span>
-                    <span className={`version-badge ${typeof version === 'string' ? version.toLowerCase() : ''}`}>{version}</span>
-                  </div>
-                  <div className="trade-pool-stats">
-                    <div className="trade-pool-stat">
-                      <span className="trade-stat-label">TVL</span>
-                      <span className="trade-stat-value">{formatUsd(pool.tvl)}</span>
-                    </div>
-                    <div className="trade-pool-stat">
-                      <span className="trade-stat-label">24h Vol</span>
-                      <span className="trade-stat-value">{formatUsd(pool.volume24h)}</span>
-                    </div>
-                    <div className="trade-pool-stat">
-                      <span className="trade-stat-label">24h</span>
-                      <span className={`trade-stat-value ${changeClass}`}>
-                        {changeSign}{pool.priceChange24h.toFixed(2)}%
-                      </span>
-                    </div>
-                    {pool.fee && (
-                      <div className="trade-pool-stat">
-                        <span className="trade-stat-label">Fee</span>
-                        <span className="trade-stat-value">{(pool.fee / 10000).toFixed(2)}%</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )
-
-              if (tradeHref) {
-                return (
-                  <Link key={pool.pairAddress} href={tradeHref} className="trade-pool-link">
-                    {card}
-                  </Link>
-                )
-              }
-
-              return (
-                <a
-                  key={pool.pairAddress}
-                  href={pool.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="trade-pool-link"
+          <div className="leaderboard-controls">
+            <input
+              type="text"
+              className="leaderboard-search"
+              placeholder="Search pairs or addresses..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <div className="leaderboard-sort-buttons">
+              {([
+                ['tvl', 'TVL'],
+                ['volume', 'Volume'],
+                ['heat', 'Heat'],
+                ['change', '24h%'],
+              ] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  className={`leaderboard-sort-btn ${sortKey === key ? 'active' : ''}`}
+                  onClick={() => setSortKey(key)}
                 >
-                  {card}
-                  <span className="trade-external-badge">External</span>
-                </a>
-              )
-            })}
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {totalCount > limit && !showAll && (
-            <button
-              className="leaderboard-show-all"
-              onClick={() => setShowAll(true)}
-            >
-              Show all {totalCount} pools
-            </button>
-          )}
-          {showAll && totalCount > limit && (
-            <button
-              className="leaderboard-show-all"
-              onClick={() => setShowAll(false)}
-            >
-              Show top {limit}
-            </button>
+          {filtered.length === 0 ? (
+            <div className="empty-state">
+              <p>No pools found{search ? ` for "${search}"` : ''}</p>
+            </div>
+          ) : (
+            <>
+              <div className="trade-pool-list">
+                {filtered.map((pool) => {
+                  const tradeHref = buildTradeHref(pool)
+                  const version = dexToVersion(pool.dex) || pool.dex
+                  const changeClass = pool.priceChange24h >= 0 ? 'positive' : 'negative'
+                  const changeSign = pool.priceChange24h >= 0 ? '+' : ''
+
+                  const card = (
+                    <div className="trade-pool-card">
+                      <div className="trade-pool-top">
+                        <span className="trade-pool-pair">{pool.pair}</span>
+                        <span className={`version-badge ${typeof version === 'string' ? version.toLowerCase() : ''}`}>{version}</span>
+                      </div>
+                      <div className="trade-pool-stats">
+                        <div className="trade-pool-stat">
+                          <span className="trade-stat-label">TVL</span>
+                          <span className="trade-stat-value">{formatUsd(pool.tvl)}</span>
+                        </div>
+                        <div className="trade-pool-stat">
+                          <span className="trade-stat-label">24h Vol</span>
+                          <span className="trade-stat-value">{formatUsd(pool.volume24h)}</span>
+                        </div>
+                        <div className="trade-pool-stat">
+                          <span className="trade-stat-label">24h</span>
+                          <span className={`trade-stat-value ${changeClass}`}>
+                            {changeSign}{pool.priceChange24h.toFixed(2)}%
+                          </span>
+                        </div>
+                        {pool.fee && (
+                          <div className="trade-pool-stat">
+                            <span className="trade-stat-label">Fee</span>
+                            <span className="trade-stat-value">{(pool.fee / 10000).toFixed(2)}%</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+
+                  if (tradeHref) {
+                    return (
+                      <Link key={pool.pairAddress} href={tradeHref} className="trade-pool-link">
+                        {card}
+                      </Link>
+                    )
+                  }
+
+                  return (
+                    <a
+                      key={pool.pairAddress}
+                      href={pool.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="trade-pool-link"
+                    >
+                      {card}
+                      <span className="trade-external-badge">External</span>
+                    </a>
+                  )
+                })}
+              </div>
+
+              {totalCount > limit && !showAll && (
+                <button
+                  className="leaderboard-show-all"
+                  onClick={() => setShowAll(true)}
+                >
+                  Show all {totalCount} pools
+                </button>
+              )}
+              {showAll && totalCount > limit && (
+                <button
+                  className="leaderboard-show-all"
+                  onClick={() => setShowAll(false)}
+                >
+                  Show top {limit}
+                </button>
+              )}
+            </>
           )}
         </>
       )}
+    </>
+  )
+
+  if (!collapsible) {
+    return <div className="token-leaderboard">{poolList}</div>
+  }
+
+  const countLabel = loading ? '' : ` (${totalCount})`
+
+  return (
+    <div className="token-leaderboard">
+      <button
+        className="leaderboard-collapse-toggle"
+        onClick={() => setOpen(!open)}
+      >
+        <span className="leaderboard-collapse-title">
+          {TOKEN_LABELS[token] || 'Pools'}{countLabel}
+        </span>
+        <span className={`leaderboard-collapse-arrow ${open ? 'open' : ''}`}>&#9662;</span>
+      </button>
+      {open && poolList}
     </div>
   )
 }

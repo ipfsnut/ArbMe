@@ -5777,6 +5777,40 @@ button.button-primary:hover {
   color: var(--accent);
 }
 
+.leaderboard-collapse-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.leaderboard-collapse-toggle:hover {
+  border-color: var(--accent);
+}
+
+.leaderboard-collapse-title {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.leaderboard-collapse-arrow {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  transition: transform 0.2s;
+}
+
+.leaderboard-collapse-arrow.open {
+  transform: rotate(180deg);
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════════
    Trade UI — Balance, Slippage, Quote Refresh, Tx Confirmation
    ═══════════════════════════════════════════════════════════════════════════════ */
