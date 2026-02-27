@@ -33,7 +33,7 @@ interface ApiResponse {
 const FETCH_TIMEOUT_MS = 45_000
 
 async function fetchPositionsFromApi(wallet: string, bustCache = false): Promise<ApiResponse> {
-  const url = `${API_BASE}/positions?wallet=${wallet}&mode=full${bustCache ? '&refresh=true' : ''}`
+  const url = `${API_BASE}/positions?wallet=${wallet}&mode=full&filter=all${bustCache ? '&refresh=true' : ''}`
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
   try {

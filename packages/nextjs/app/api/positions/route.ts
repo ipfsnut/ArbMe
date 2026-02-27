@@ -12,6 +12,8 @@ export async function GET(request: NextRequest) {
     const wallet = searchParams.get('wallet')
     const refresh = searchParams.get('refresh') === 'true'
     const mode = searchParams.get('mode') // 'full' returns enriched Position[] (backward compat)
+    const filter = searchParams.get('filter') // 'all' = show all positions, default = ecosystem only
+    const ecosystemOnly = filter !== 'all'
 
     if (!wallet) {
       return NextResponse.json(
@@ -32,7 +34,7 @@ export async function GET(request: NextRequest) {
       if (refresh) invalidateDiscoveryCache(wallet)
       const FETCH_TIMEOUT_MS = 50_000
       const positions = await Promise.race([
-        fetchUserPositions(wallet, ALCHEMY_KEY),
+        fetchUserPositions(wallet, ALCHEMY_KEY, { ecosystemOnly }),
         new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error('Position fetch timed out')), FETCH_TIMEOUT_MS)
         ),
@@ -66,7 +68,7 @@ export async function GET(request: NextRequest) {
     const DISCOVER_TIMEOUT_MS = 20_000
     try {
       const result = await Promise.race([
-        discoverUserPositions(wallet, ALCHEMY_KEY),
+        discoverUserPositions(wallet, ALCHEMY_KEY, { ecosystemOnly }),
         new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error('Discovery timed out')), DISCOVER_TIMEOUT_MS)
         ),

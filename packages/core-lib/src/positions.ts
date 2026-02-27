@@ -259,7 +259,8 @@ export interface RawPosition {
  */
 export async function discoverUserPositions(
   walletAddress: string,
-  alchemyKey?: string
+  alchemyKey?: string,
+  options?: { ecosystemOnly?: boolean }
 ): Promise<{ summaries: PositionSummary[]; rawPositions: RawPosition[] }> {
   const rpcUrl = alchemyKey
     ? `https://base-mainnet.g.alchemy.com/v2/${alchemyKey}`
@@ -292,18 +293,22 @@ export async function discoverUserPositions(
     }
   }
 
-  // Filter to ecosystem positions only (ARBME, CHAOS, or RATCHET on at least one side)
-  const unfilteredCount = rawPositions.length;
-  const ecosystemPositions = rawPositions.filter(raw => {
-    const t0 = raw.token0Address.toLowerCase();
-    const t1 = raw.token1Address.toLowerCase();
-    return ECOSYSTEM_TOKENS.has(t0) || ECOSYSTEM_TOKENS.has(t1);
-  });
-  if (ecosystemPositions.length < unfilteredCount) {
-    console.log(`[Positions] Filtered ${unfilteredCount} → ${ecosystemPositions.length} ecosystem positions`);
+  // Filter to ecosystem positions only when requested (Farcaster miniapp)
+  // Desktop/browser shows ALL positions for full portfolio visibility
+  const ecosystemOnly = options?.ecosystemOnly !== false;
+  if (ecosystemOnly) {
+    const unfilteredCount = rawPositions.length;
+    const ecosystemPositions = rawPositions.filter(raw => {
+      const t0 = raw.token0Address.toLowerCase();
+      const t1 = raw.token1Address.toLowerCase();
+      return ECOSYSTEM_TOKENS.has(t0) || ECOSYSTEM_TOKENS.has(t1);
+    });
+    if (ecosystemPositions.length < unfilteredCount) {
+      console.log(`[Positions] Filtered ${unfilteredCount} → ${ecosystemPositions.length} ecosystem positions`);
+    }
+    rawPositions.length = 0;
+    rawPositions.push(...ecosystemPositions);
   }
-  rawPositions.length = 0;
-  rawPositions.push(...ecosystemPositions);
 
   // Batch fetch token metadata for pair names (single multicall, fast)
   const tokenAddresses = new Set<string>();
@@ -610,9 +615,10 @@ export function summaryToPosition(summary: PositionSummary): Position {
  */
 export async function fetchUserPositions(
   walletAddress: string,
-  alchemyKey?: string
+  alchemyKey?: string,
+  options?: { ecosystemOnly?: boolean }
 ): Promise<Position[]> {
-  const { rawPositions } = await discoverUserPositions(walletAddress, alchemyKey);
+  const { rawPositions } = await discoverUserPositions(walletAddress, alchemyKey, options);
 
   if (rawPositions.length === 0) return [];
 
