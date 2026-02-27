@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAppState } from '@/store/AppContext'
 import { WalletConnectButton } from '@/components/WalletProvider'
-import { formatUsd, formatPrice } from '@/utils/format'
+import { formatPrice } from '@/utils/format'
 import { ROUTES } from '@/utils/constants'
 import { fetchTokenPricesOnly } from '@/services/api'
 
@@ -45,10 +45,6 @@ export function AppHeader() {
   const arbmePriceDisplay = globalStats ? formatPrice(globalStats.arbmePrice) : '...'
   const chaosPriceDisplay = globalStats ? formatPrice(globalStats.chaosPrice) : '...'
   const ratchetPriceDisplay = globalStats ? formatPrice(globalStats.ratchetPrice) : '...'
-
-  const tvlDisplay = globalStats
-    ? formatUsd(globalStats.totalTvl)
-    : '...'
 
   const primaryNav = [
     { href: ROUTES.TRADE, label: 'Trade' },
@@ -121,10 +117,6 @@ export function AppHeader() {
         <div className="stat-item">
           <span className="stat-label text-secondary">$RATCHET</span>
           <span className="stat-value">{ratchetPriceDisplay}</span>
-        </div>
-        <div className="stat-item">
-          <span className="stat-label text-secondary">TVL</span>
-          <span className="stat-value">{tvlDisplay}</span>
         </div>
       </div>
     </header>

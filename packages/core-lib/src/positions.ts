@@ -6,6 +6,7 @@ import { createPublicClient, http, Address, formatUnits, keccak256 } from 'viem'
 import { base } from 'viem/chains';
 import { getTokenMetadataBatch } from './tokens.js';
 import { getTokenPrices, getTokenPricesOnChain } from './pricing.js';
+import { ECOSYSTEM_TOKENS } from './constants.js';
 
 // Contract addresses
 const V2_ROUTER = '0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24';
@@ -290,6 +291,19 @@ export async function discoverUserPositions(
       console.error(`[Positions] ${labels[i]} fetch failed (continuing with others):`, result.reason);
     }
   }
+
+  // Filter to ecosystem positions only (ARBME, CHAOS, or RATCHET on at least one side)
+  const unfilteredCount = rawPositions.length;
+  const ecosystemPositions = rawPositions.filter(raw => {
+    const t0 = raw.token0Address.toLowerCase();
+    const t1 = raw.token1Address.toLowerCase();
+    return ECOSYSTEM_TOKENS.has(t0) || ECOSYSTEM_TOKENS.has(t1);
+  });
+  if (ecosystemPositions.length < unfilteredCount) {
+    console.log(`[Positions] Filtered ${unfilteredCount} → ${ecosystemPositions.length} ecosystem positions`);
+  }
+  rawPositions.length = 0;
+  rawPositions.push(...ecosystemPositions);
 
   // Batch fetch token metadata for pair names (single multicall, fast)
   const tokenAddresses = new Set<string>();
@@ -602,30 +616,9 @@ export async function fetchUserPositions(
 
   if (rawPositions.length === 0) return [];
 
-  // Collect all unique token addresses across all positions
-  const allTokenAddresses = new Set<string>();
-  for (const raw of rawPositions) {
-    allTokenAddresses.add(raw.token0Address.toLowerCase());
-    allTokenAddresses.add(raw.token1Address.toLowerCase());
-  }
-  const tokenList = Array.from(allTokenAddresses);
-
-  // Single batch: fetch all metadata + all prices upfront
-  const [metadata, priceMap] = await Promise.all([
-    getTokenMetadataBatch(tokenList, alchemyKey),
-    getTokenPrices(tokenList, alchemyKey).catch(() => new Map<string, number>()),
-  ]);
-
-  console.log(`[Positions] Pre-fetched ${metadata.size} metadata, ${priceMap.size} prices for ${rawPositions.length} positions`);
-
-  // Enrich all with shared price data — no more per-position price fetches
-  const results = await Promise.allSettled(
-    rawPositions.map(raw => enrichSinglePosition(raw, alchemyKey, { priceMap, metadata }))
-  );
-
-  const positions = results
-    .filter((r): r is PromiseFulfilledResult<Position> => r.status === 'fulfilled')
-    .map(r => r.value);
+  // Use batched multicall enrichment — dramatically fewer RPC calls
+  // (~5 multicalls total vs ~2 per position with enrichSinglePosition)
+  const positions = await enrichPositionsWithMetadata(rawPositions, alchemyKey);
 
   // Sort by TVL descending
   positions.sort((a, b) => b.liquidityUsd - a.liquidityUsd);

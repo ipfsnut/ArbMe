@@ -22,9 +22,17 @@ export const TOKENS = {
   OINC: '0x59e058780dd8a6017061596a62288b6438edbe68',
   CLANKER: '0x1bc0c42215582d5a085795f4badbac3ff36d1bcb',
   RATCHET: '0x392bc5DeEa227043d69Af0e67BadCbBAeD511B07',
+  CHAOS: '0xfab2ee8eb6b26208bfb5c41012661e62b4dc9292',
   ABC: '0x5c0872b790Bb73e2B3A9778Db6E7704095624b07',
   CLAWD: '0x9f86db9fc6f7c9408e8fda3ff8ce4e78ac7a6b07',
 };
+
+// Ecosystem tokens — positions must have one of these to appear in the app
+export const ECOSYSTEM_TOKENS = new Set([
+  ARBME.address.toLowerCase(),
+  TOKENS.RATCHET.toLowerCase(),
+  TOKENS.CHAOS.toLowerCase(),
+]);
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // External APIs
