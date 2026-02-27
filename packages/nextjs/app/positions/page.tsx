@@ -3,7 +3,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import { useWallet, useIsFarcaster, useIsSafe } from '@/hooks/useWallet'
-import { usePositions } from '@/hooks/usePositions'
 import { usePositionList } from '@/hooks/usePositionList'
 import { useSendTransaction } from 'wagmi'
 import { AppHeader } from '@/components/AppHeader'
@@ -21,79 +20,64 @@ export default function PositionsPage() {
   const isSafe = useIsSafe()
   const { sendTransactionAsync } = useSendTransaction()
 
-  // ── Desktop: old monolithic hook ──────────────────────────────────────────
-  const desktop = usePositions(isFarcaster ? null : wallet)
+  // Both desktop and Farcaster use progressive loading now.
+  // Desktop: all positions, larger pages. Farcaster: ecosystem only, smaller pages.
+  const pl = usePositionList(wallet, isFarcaster ? undefined : { filter: 'all' })
 
-  // ── Farcaster: progressive loading hook ───────────────────────────────────
-  const fc = usePositionList(isFarcaster ? wallet : null)
+  const {
+    summaries,
+    enrichedMap,
+    loading,
+    refreshing,
+    error,
+    lastRefresh,
+    refresh,
+    refreshPosition,
+    enrichBatch,
+  } = pl
 
-  // ── Unified interface ─────────────────────────────────────────────────────
-  const positions = isFarcaster ? [] as Position[] : desktop.positions
-  const summaries = isFarcaster ? fc.summaries : []
-  const enrichedMap = isFarcaster ? fc.enrichedMap : new Map<string, Position>()
-  const loading = isFarcaster ? fc.loading : desktop.loading
-  const refreshing = isFarcaster ? fc.refreshing : desktop.refreshing
-  const error = isFarcaster ? fc.error : desktop.error
-  const lastRefresh = isFarcaster ? fc.lastRefresh : desktop.lastRefresh
-  const refresh = isFarcaster ? fc.refresh : desktop.refresh
-  const invalidate = isFarcaster ? fc.refresh : desktop.invalidate
-
-  // Item count for display
-  const itemCount = isFarcaster ? summaries.length : positions.length
+  const itemCount = summaries.length
 
   // Collect All state
   const [collectAllStatus, setCollectAllStatus] = useState<CollectAllStatus>('idle')
   const [collectProgress, setCollectProgress] = useState({ current: 0, total: 0, succeeded: 0, failed: 0 })
 
-  // Pagination
-  const PAGE_SIZE = isFarcaster ? 3 : 20
+  // Pagination — desktop gets more per page
+  const PAGE_SIZE = isFarcaster ? 3 : 10
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const hasMore = visibleCount < itemCount
 
-  // Farcaster: trigger enrichment for visible positions
+  // Visible summaries and enrichment trigger
   const visibleSummaries = summaries.slice(0, visibleCount)
   const visibleIds = useMemo(
     () => visibleSummaries.map(s => s.id),
     [visibleSummaries.length, visibleCount, summaries]
   )
   useEffect(() => {
-    if (isFarcaster && visibleIds.length > 0) {
-      fc.enrichBatch(visibleIds)
+    if (visibleIds.length > 0) {
+      enrichBatch(visibleIds)
     }
-  }, [isFarcaster, visibleIds, fc.enrichBatch])
+  }, [visibleIds, enrichBatch])
 
-  // Desktop: displayed positions
-  const displayedPositions = positions.slice(0, visibleCount)
-
-  // TVL calculation
+  // TVL calculation from enriched positions
   const { totalTvl, pricedCount } = useMemo(() => {
-    if (isFarcaster) {
-      let tvl = 0
-      let priced = 0
-      for (const pos of enrichedMap.values()) {
-        tvl += pos.liquidityUsd || 0
-        if (pos.liquidityUsd > 0) priced++
-      }
-      return { totalTvl: tvl, pricedCount: priced }
-    } else {
-      const tvl = positions.reduce((sum, p) => sum + (p.liquidityUsd || 0), 0)
-      const priced = positions.filter(p => p.liquidityUsd > 0).length
-      return { totalTvl: tvl, pricedCount: priced }
+    let tvl = 0
+    let priced = 0
+    for (const pos of enrichedMap.values()) {
+      tvl += pos.liquidityUsd || 0
+      if (pos.liquidityUsd > 0) priced++
     }
-  }, [isFarcaster, positions, enrichedMap])
+    return { totalTvl: tvl, pricedCount: priced }
+  }, [enrichedMap])
 
-  // Collectable positions
+  // Collectable positions (from enriched data)
   const collectablePositions = useMemo(() => {
-    if (isFarcaster) {
-      const result: Position[] = []
-      for (const pos of enrichedMap.values()) {
-        if (pos.feesEarnedUsd > 0 && pos.version !== 'V2') result.push(pos)
-      }
-      return result
-    } else {
-      return positions.filter(p => p.feesEarnedUsd > 0 && p.version !== 'V2')
+    const result: Position[] = []
+    for (const pos of enrichedMap.values()) {
+      if (pos.feesEarnedUsd > 0 && pos.version !== 'V2') result.push(pos)
     }
-  }, [isFarcaster, positions, enrichedMap])
+    return result
+  }, [enrichedMap])
 
   const totalFees = useMemo(() =>
     collectablePositions.reduce((sum, p) => sum + (p.feesEarnedUsd || 0), 0),
@@ -167,7 +151,7 @@ export default function PositionsPage() {
     setCollectAllStatus(progress.failed === progress.total ? 'error' : 'done')
 
     setTimeout(async () => {
-      await invalidate()
+      await refresh()
       setCollectAllStatus('idle')
       setCollectProgress({ current: 0, total: 0, succeeded: 0, failed: 0 })
     }, 3000)
@@ -215,7 +199,7 @@ export default function PositionsPage() {
               <span className="tvl-banner-label">Total Value</span>
               <span className="tvl-banner-amount">
                 {formatUsd(totalTvl)}
-                {isFarcaster && pricedCount < summaries.length && (
+                {pricedCount < summaries.length && (
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-muted, #888)', marginLeft: '0.5rem' }}>
                     ({pricedCount}/{summaries.length} priced)
                   </span>
@@ -278,23 +262,15 @@ export default function PositionsPage() {
         ) : (
           <>
             <div className="positions-grid">
-              {isFarcaster ? (
-                /* Farcaster: progressive enrichment with summaries */
-                visibleSummaries.map((summary) => (
-                  <PositionCard
-                    key={summary.id}
-                    summary={summary}
-                    enriched={enrichedMap.get(summary.id)}
-                    enriching={!enrichedMap.has(summary.id)}
-                    onRefresh={() => fc.refreshPosition(summary.id)}
-                  />
-                ))
-              ) : (
-                /* Desktop: fully enriched positions */
-                displayedPositions.map((position) => (
-                  <PositionCard key={position.id} position={position} />
-                ))
-              )}
+              {visibleSummaries.map((summary) => (
+                <PositionCard
+                  key={summary.id}
+                  summary={summary}
+                  enriched={enrichedMap.get(summary.id)}
+                  enriching={!enrichedMap.has(summary.id)}
+                  onRefresh={() => refreshPosition(summary.id)}
+                />
+              ))}
             </div>
 
             {hasMore && (

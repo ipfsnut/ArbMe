@@ -48,12 +48,12 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Default: return summaries (fast discovery)
+    // Default: return summaries (fast discovery) — used by both desktop and Farcaster
     if (refresh) {
       invalidateDiscoveryCache(wallet)
     }
 
-    const cached = getDiscoveryCache(wallet)
+    const cached = getDiscoveryCache(wallet, filter || undefined)
     if (cached) {
       return NextResponse.json({
         wallet,
@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
         ),
       ])
 
-      const entry = setDiscoveryCache(wallet, result.summaries, result.rawPositions)
+      const entry = setDiscoveryCache(wallet, result.summaries, result.rawPositions, filter || undefined)
 
       return NextResponse.json({
         wallet,
@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
       })
     } catch (fetchErr: any) {
       // Return stale cache if available
-      const stale = getDiscoveryCache(wallet)
+      const stale = getDiscoveryCache(wallet, filter || undefined)
       if (stale) {
         console.warn(`[positions] Discovery failed (${fetchErr.message}), returning stale cache`)
         return NextResponse.json({

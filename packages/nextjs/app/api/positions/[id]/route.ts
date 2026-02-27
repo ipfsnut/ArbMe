@@ -95,14 +95,14 @@ export async function GET(
       }
     }
 
-    // Find raw position from discovery cache
-    let discoveryData = getDiscoveryCache(wallet)
+    // Find raw position from discovery cache — check both filtered and unfiltered
+    let discoveryData = getDiscoveryCache(wallet, 'all') || getDiscoveryCache(wallet)
 
     if (!discoveryData) {
-      // No discovery cache — run discovery first (fast, ~2s)
+      // No discovery cache — run unfiltered discovery (fast, ~2s)
       console.log(`[positions/${positionId}] No discovery cache, running discovery for ${wallet}`)
-      const result = await discoverUserPositions(wallet, ALCHEMY_KEY)
-      setDiscoveryCache(wallet, result.summaries, result.rawPositions)
+      const result = await discoverUserPositions(wallet, ALCHEMY_KEY, { ecosystemOnly: false })
+      setDiscoveryCache(wallet, result.summaries, result.rawPositions, 'all')
       discoveryData = { summaries: result.summaries, rawPositions: result.rawPositions, lastUpdated: new Date().toISOString(), timestamp: Date.now() }
     }
 

@@ -33,8 +33,9 @@ interface SummaryApiResponse {
   lastUpdated?: string
 }
 
-async function fetchSummariesFromApi(wallet: string, bustCache = false): Promise<SummaryApiResponse> {
-  const url = `${API_BASE}/positions?wallet=${wallet}${bustCache ? '&refresh=true' : ''}`
+async function fetchSummariesFromApi(wallet: string, bustCache = false, filter?: string): Promise<SummaryApiResponse> {
+  const filterParam = filter ? `&filter=${filter}` : ''
+  const url = `${API_BASE}/positions?wallet=${wallet}${filterParam}${bustCache ? '&refresh=true' : ''}`
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
   try {
@@ -58,7 +59,8 @@ async function fetchEnrichedPosition(wallet: string, positionId: string, bustCac
   return data.position
 }
 
-export function usePositionList(wallet: string | null): UsePositionListResult {
+export function usePositionList(wallet: string | null, options?: { filter?: string }): UsePositionListResult {
+  const filter = options?.filter
   const [summaries, setSummaries] = useState<PositionSummary[]>([])
   const [enrichedMap, setEnrichedMap] = useState<Map<string, Position>>(new Map())
   const [loading, setLoading] = useState(true)
@@ -130,7 +132,7 @@ export function usePositionList(wallet: string | null): UsePositionListResult {
     setError(null)
 
     try {
-      const { summaries: fresh, lastUpdated } = await fetchSummariesFromApi(w, true)
+      const { summaries: fresh, lastUpdated } = await fetchSummariesFromApi(w, true, filter)
       if (walletRef.current !== w) return
       setSummaries(fresh)
       await setCachedSummaries(w, fresh)
@@ -211,7 +213,7 @@ export function usePositionList(wallet: string | null): UsePositionListResult {
 
       // 2. Fetch from API
       try {
-        const { summaries: fresh, lastUpdated } = await fetchSummariesFromApi(w)
+        const { summaries: fresh, lastUpdated } = await fetchSummariesFromApi(w, false, filter)
         if (cancelled) return
         setSummaries(fresh)
         await setCachedSummaries(w, fresh)

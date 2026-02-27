@@ -1,6 +1,9 @@
 /**
  * Shared server-side discovery cache for positions API.
  * Used by both /api/positions and /api/positions/[id].
+ *
+ * Cache keys include filter type so ecosystem-only and all-positions
+ * results don't collide for the same wallet.
  */
 
 import type { PositionSummary, RawPosition } from '@arbme/core-lib'
@@ -17,8 +20,12 @@ const DISCOVERY_CACHE_TTL = 10 * 60_000  // 10 minutes
 
 const discoveryCache = new Map<string, DiscoveryCacheEntry>()
 
-export function getDiscoveryCache(wallet: string): DiscoveryCacheEntry | null {
-  const key = wallet.toLowerCase()
+function cacheKey(wallet: string, filter?: string): string {
+  return `${wallet.toLowerCase()}:${filter || 'ecosystem'}`
+}
+
+export function getDiscoveryCache(wallet: string, filter?: string): DiscoveryCacheEntry | null {
+  const key = cacheKey(wallet, filter)
   const entry = discoveryCache.get(key)
   if (!entry) return null
 
@@ -33,8 +40,8 @@ export function getDiscoveryCache(wallet: string): DiscoveryCacheEntry | null {
   return entry
 }
 
-export function setDiscoveryCache(wallet: string, summaries: PositionSummary[], rawPositions: RawPosition[]): DiscoveryCacheEntry {
-  const key = wallet.toLowerCase()
+export function setDiscoveryCache(wallet: string, summaries: PositionSummary[], rawPositions: RawPosition[], filter?: string): DiscoveryCacheEntry {
+  const key = cacheKey(wallet, filter)
   const entry: DiscoveryCacheEntry = {
     summaries,
     rawPositions,
@@ -50,6 +57,9 @@ export function setDiscoveryCache(wallet: string, summaries: PositionSummary[], 
   return entry
 }
 
-export function invalidateDiscoveryCache(wallet: string): void {
-  discoveryCache.delete(wallet.toLowerCase())
+export function invalidateDiscoveryCache(wallet: string, filter?: string): void {
+  // Invalidate both filtered and unfiltered for this wallet
+  const w = wallet.toLowerCase()
+  discoveryCache.delete(`${w}:ecosystem`)
+  discoveryCache.delete(`${w}:all`)
 }
