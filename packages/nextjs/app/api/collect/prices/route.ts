@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { fetchPools } from '@arbme/core-lib'
+import { getTokenPrices, ARBME, TOKENS } from '@arbme/core-lib'
 import { recordPrices, getHistoryStats } from '@/lib/price-history'
 
 const ALCHEMY_KEY = process.env.ALCHEMY_API_KEY
+
+const WETH_ADDRESS = '0x4200000000000000000000000000000000000006'
+const CLANKER_ADDRESS = '0x1bc0c42215582d5a085795f4badbac3ff36d1bcb'
 
 /**
  * POST /api/collect/prices
@@ -22,31 +25,32 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Fetch current pool data
-    const poolData = await fetchPools(ALCHEMY_KEY)
+    // Fetch prices for all tokens we track via the consolidated pricing service
+    const priceMap = await getTokenPrices(
+      [WETH_ADDRESS, ARBME.address, TOKENS.RATCHET, TOKENS.ABC, TOKENS.CLAWD, CLANKER_ADDRESS],
+      ALCHEMY_KEY,
+    )
 
-    // Build prices object from all available data
+    // Build prices object for recording
     const prices: Record<string, number> = {}
 
-    // Core token prices
-    if (poolData.tokenPrices?.WETH) prices['ETH'] = poolData.tokenPrices.WETH
-    if (poolData.tokenPrices?.CLANKER) prices['CLANKER'] = poolData.tokenPrices.CLANKER
+    const wethPrice = priceMap.get(WETH_ADDRESS.toLowerCase())
+    if (wethPrice && wethPrice > 0) prices['ETH'] = wethPrice
 
-    // ARBME price (from main ARBME/WETH pool)
-    const arbmePrice = parseFloat(poolData.arbmePrice)
-    if (arbmePrice > 0) prices['ARBME'] = arbmePrice
+    const clankerPrice = priceMap.get(CLANKER_ADDRESS.toLowerCase())
+    if (clankerPrice && clankerPrice > 0) prices['CLANKER'] = clankerPrice
 
-    // RATCHET price
-    const ratchetPrice = parseFloat(poolData.ratchetPrice)
-    if (ratchetPrice > 0) prices['RATCHET'] = ratchetPrice
+    const arbmePrice = priceMap.get(ARBME.address.toLowerCase())
+    if (arbmePrice && arbmePrice > 0) prices['ARBME'] = arbmePrice
 
-    // ABC price
-    const abcPrice = parseFloat(poolData.abcPrice)
-    if (abcPrice > 0) prices['ABC'] = abcPrice
+    const ratchetPrice = priceMap.get(TOKENS.RATCHET.toLowerCase())
+    if (ratchetPrice && ratchetPrice > 0) prices['RATCHET'] = ratchetPrice
 
-    // CLAWD price
-    const clawdPrice = parseFloat(poolData.clawdPrice)
-    if (clawdPrice > 0) prices['CLAWD'] = clawdPrice
+    const abcPrice = priceMap.get(TOKENS.ABC.toLowerCase())
+    if (abcPrice && abcPrice > 0) prices['ABC'] = abcPrice
+
+    const clawdPrice = priceMap.get(TOKENS.CLAWD.toLowerCase())
+    if (clawdPrice && clawdPrice > 0) prices['CLAWD'] = clawdPrice
 
     // Record to history
     recordPrices(prices)

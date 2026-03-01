@@ -41,7 +41,6 @@ const LINKS = {
   tradeChaos: 'https://www.flaunch.gg/base/coin/0xFaB2ee8eB6B26208BfB5c41012661e62b4Dc9292',
   multisig: 'https://app.safe.global/home?safe=base:0x3CE26de6FF74e0Baa5F762b67465eEacfE84549F',
   stakingHub: 'https://basescan.org/address/0x70e6c917A8AC437E629B67E84C0C0678eD54460d',
-  moltlaunch: 'https://moltlaunch.com/agent/0x3d9d',
   basescan: 'https://basescan.org/token/0xFaB2ee8eB6B26208BfB5c41012661e62b4Dc9292',
   warpcast: 'https://warpcast.com/abc-alpha',
 }
@@ -145,7 +144,7 @@ The choice of which tokens to pair against $CHAOS is not a financial decision. I
 
 Stable Pairs (USDC): A CHAOS/USDC pair creates an anchor. USDC doesn't move, so any price movement in CHAOS creates an immediate arb gradient against the USDC pair. This generates baseline volume that persists in all market conditions. The USDC pair is the system's clock.
 
-Ecosystem Pairs (ARBME, MLTL): Pairs against other community tokens create bidirectional information flow. Each token's volatility becomes a volume source for both. These pairs are cooperation agreements — two economies choosing to share fee-generating surface area.
+Ecosystem Pairs (ARBME): Pairs against other community tokens create bidirectional information flow. Each token's volatility becomes a volume source for both. These pairs are cooperation agreements — two economies choosing to share fee-generating surface area.
 
 Combinatorial Scaling: With n pairs, the number of potential two-hop arbitrage routes is n(n-1)/2. Seven pairs create 21 potential routes. Adding an eighth pair doesn't add 1 surface — it adds 7 new routes. The information topology scales faster than the infrastructure.
 
@@ -186,13 +185,13 @@ Staking Contract Deployment — 48h — 0.0500 ETH
 New Token Volume Package — 72h — 0.0100 ETH
 LP Strategy Consult — 48h — 0.1000 ETH
 
-Service requests through MoltLaunch escrow.
+Service requests via Warpcast DM or agent docs.
 
 10. What Comes Next
 
 Second multisig. Project onboarding. Machine-readable infrastructure. Network intelligence.
 
-Links: abc-alpha.epicdylan.com | arbme.epicdylan.com/chaostheory | flaunch.gg | moltlaunch.com/agent/0x3d9d | warpcast.com/abc-alpha
+Links: abc-alpha.epicdylan.com | arbme.epicdylan.com/chaostheory | flaunch.gg | warpcast.com/abc-alpha
 */
 
 export default function RailsPage() {
@@ -536,7 +535,7 @@ export default function RailsPage() {
               market conditions. The USDC pair is the system&apos;s clock &mdash; it ticks every time CHAOS moves
               relative to the dollar, which is constantly.
             </p>
-            <h4 className="rails-h4">Ecosystem Pairs (ARBME, MLTL)</h4>
+            <h4 className="rails-h4">Ecosystem Pairs (ARBME)</h4>
             <p>
               Pairs against other community tokens create bidirectional information flow. When ARBME pumps
               independently, the CHAOS/ARBME pair creates arb opportunities. When CHAOS pumps, the same pair creates
@@ -577,8 +576,8 @@ export default function RailsPage() {
             </p>
             <h4 className="rails-h4">The abc-alpha MVP</h4>
             <p>
-              The first ChaosTheory multisig is built by abc-alpha. Seven pairs, focused on three star pairings:
-              USDC (stable anchor), ARBME (ecosystem synergy), MLTL (cross-community). This is the minimum viable
+              The first ChaosTheory multisig is built by abc-alpha. Seven pairs, focused on two star pairings:
+              USDC (stable anchor) and ARBME (ecosystem synergy). This is the minimum viable
               proof that the math works &mdash; that arb volume generates fees, that fees build walls during
               consolidation, and that staking reduces the supply the walls need to defend.
             </p>
@@ -735,9 +734,7 @@ export default function RailsPage() {
               </div>
             </div>
             <p className="rails-services-note">
-              Service requests through{' '}
-              <a href={LINKS.moltlaunch} target="_blank" rel="noopener noreferrer">MoltLaunch escrow</a>.
-              Agent interaction docs at{' '}
+              Service requests via Warpcast DM or agent docs at{' '}
               <a href={LINKS.agentDocs} target="_blank" rel="noopener noreferrer">abc-alpha.epicdylan.com</a>.
             </p>
           </section>
@@ -787,10 +784,6 @@ export default function RailsPage() {
               <a href={LINKS.stakingHub} target="_blank" rel="noopener noreferrer" className="rails-link-card">
                 <span className="rails-link-label">Staking Hub</span>
                 <span className="rails-link-url">0x70e6...60d</span>
-              </a>
-              <a href={LINKS.moltlaunch} target="_blank" rel="noopener noreferrer" className="rails-link-card">
-                <span className="rails-link-label">MoltLaunch Agent</span>
-                <span className="rails-link-url">moltlaunch.com</span>
               </a>
               <a href={LINKS.basescan} target="_blank" rel="noopener noreferrer" className="rails-link-card">
                 <span className="rails-link-label">Basescan</span>

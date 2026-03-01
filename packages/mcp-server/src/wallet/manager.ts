@@ -26,7 +26,6 @@ export const TOKENS: Record<string, Address> = {
   ABC: getAddress("0x5c0872b790Bb73e2B3A9778Db6E7704095624b07"),
   PAGE: getAddress("0xc4730f86d1F86cE0712a7b17EE919Db7dEFad7FE"),
   // Connected Tokens
-  MLTL: getAddress("0xa448d40f6793773938a6b7427091c35676899125"),
   MOLT: getAddress("0xB695559b26BB2c9703ef1935c37AeaE9526bab07"),
   CLANKER: getAddress("0x1bc0c42215582d5A085795f4baDbaC3ff36d1Bcb"),
   BNKR: getAddress("0x22aF33FE49fD1Fa80c7149773dDe5890D3c76F3b"),

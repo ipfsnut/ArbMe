@@ -450,7 +450,6 @@ export default function TradePage() {
       '0x5c0872b790bb73e2b3a9778db6e7704095624b07': { symbol: 'ABC', decimals: 18 },
       '0xc4730f86d1f86ce0712a7b17ee919db7defad7fe': { symbol: 'PAGE', decimals: 18 },
       // Connected Tokens
-      '0xa448d40f6793773938a6b7427091c35676899125': { symbol: 'MLTL', decimals: 18 },
       '0xb695559b26bb2c9703ef1935c37aeae9526bab07': { symbol: 'MOLT', decimals: 18 },
       '0x1bc0c42215582d5a085795f4badbac3ff36d1bcb': { symbol: 'CLANKER', decimals: 18 },
       '0x22af33fe49fd1fa80c7149773dde5890d3c76f3b': { symbol: 'BNKR', decimals: 18 },

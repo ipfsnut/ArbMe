@@ -19,6 +19,8 @@ import {
   GET_RESERVES,
 } from './constants.js';
 
+import { getTokenPrices as getPrices } from './pricing.js';
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // TYPES
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -280,157 +282,21 @@ async function fetchGeckoTerminalPools(tokenAddress: string): Promise<PoolData[]
   }
 }
 
-/**
- * Fetch token price from GeckoTerminal (uses highest TVL pool)
- */
-async function fetchTokenPrice(tokenAddress: string): Promise<number> {
-  try {
-    const response = await fetchWithRetry(
-      `${GECKO_API}/networks/base/tokens/${tokenAddress.toLowerCase()}/pools?page=1`,
-      { headers: { Accept: 'application/json' } },
-      2,
-      GECKO_TIMEOUT
-    );
 
-    if (!response.ok) return 0;
-
-    const data = await response.json() as { data: GeckoPoolData[] };
-    if (!data.data?.length) return 0;
-
-    // Find highest TVL pool with a stable pair
-    let bestPrice = 0;
-    let bestTvl = 0;
-
-    for (const pool of data.data) {
-      const tvl = parseFloat(pool.attributes.reserve_in_usd) || 0;
-      const name = pool.attributes.name.toLowerCase();
-
-      // Prefer pools paired with stable/major tokens
-      const isGoodPair = name.includes('weth') || name.includes('usdc') ||
-                         name.includes('clanker') || name.includes('eth');
-
-      if (tvl > bestTvl && isGoodPair) {
-        const baseTokenId = pool.relationships.base_token.data.id;
-        const isTokenBase = baseTokenId.toLowerCase().includes(tokenAddress.toLowerCase());
-        const price = parseFloat(
-          isTokenBase
-            ? pool.attributes.base_token_price_usd
-            : pool.attributes.quote_token_price_usd
-        );
-
-        if (price > 0) {
-          bestPrice = price;
-          bestTvl = tvl;
-        }
-      }
-    }
-
-    return bestPrice;
-  } catch (error) {
-    console.error(`[Pools] Error fetching price for ${tokenAddress}:`, error);
-    return 0;
-  }
-}
 
 /**
- * Fetch all required token prices (fallback — only used if pool extraction misses tokens)
+ * Helper to get token prices from the consolidated pricing service.
+ * Converts Map to Record for internal use.
  */
-async function fetchTokenPrices(): Promise<Record<string, number>> {
-  const tokens = {
-    PAGE: TOKENS.PAGE.toLowerCase(),
-    OINC: TOKENS.OINC.toLowerCase(),
-    CLANKER: TOKENS.CLANKER.toLowerCase(),
-    WETH: '0x4200000000000000000000000000000000000006',
-    USDC: '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913',
-    cbBTC: '0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf',
-  };
-
-  const [pagePrice, oincPrice, clankerPrice, wethPrice, usdcPrice, cbbtcPrice] = await Promise.all([
-    fetchTokenPrice(tokens.PAGE),
-    fetchTokenPrice(tokens.OINC),
-    fetchTokenPrice(tokens.CLANKER),
-    fetchTokenPrice(tokens.WETH),
-    fetchTokenPrice(tokens.USDC),
-    fetchTokenPrice(tokens.cbBTC),
-  ]);
-
-  console.log(`[Pools] Prices - PAGE: $${pagePrice}, OINC: $${oincPrice}, CLANKER: $${clankerPrice}, WETH: $${wethPrice}, USDC: $${usdcPrice}, cbBTC: $${cbbtcPrice}`);
-
-  return {
-    [tokens.PAGE]: pagePrice,
-    [tokens.OINC]: oincPrice,
-    [tokens.CLANKER]: clankerPrice,
-    [tokens.WETH]: wethPrice,
-    [tokens.USDC]: usdcPrice,
-    [tokens.cbBTC]: cbbtcPrice,
-  };
-}
-
-/**
- * Extract token prices from pool data we already fetched — avoids extra API calls.
- * Each pool group was fetched by searching for a specific token, so priceUsd
- * corresponds to that searched token's price. We pair each group with its
- * searched token address to assign prices correctly.
- */
-function extractTokenPricesFromPools(
-  poolGroups: Array<{ searchedToken: string; pools: PoolData[] }>
-): Record<string, number> {
-  // Track best price per token (from highest TVL pool)
-  const bestPrices = new Map<string, { price: number; tvl: number }>();
-
-  const updatePrice = (addr: string, price: number, tvl: number) => {
-    if (!addr || price <= 0) return;
-    const key = addr.toLowerCase();
-    const existing = bestPrices.get(key);
-    if (!existing || tvl > existing.tvl) {
-      bestPrices.set(key, { price, tvl });
-    }
-  };
-
-  for (const { searchedToken, pools } of poolGroups) {
-    const searchedAddr = searchedToken.toLowerCase();
-
-    for (const pool of pools) {
-      if (!pool.token0 || !pool.token1) continue;
-
-      const priceUsd = parseFloat(pool.priceUsd);
-      if (priceUsd <= 0 || pool.tvl <= 0) continue;
-
-      // priceUsd is the searched token's price — assign to its address
-      updatePrice(searchedAddr, priceUsd, pool.tvl);
-
-      // Infer the OTHER token's price from TVL:
-      // In a 2-token pool, each side holds ~TVL/2 worth.
-      // otherTokenPrice = TVL / 2 / otherTokenReserve
-      // We don't have reserves, but we can estimate:
-      // If searchedToken has price P and the pool has TVL T,
-      // then the searched token's value = T/2, so searchedReserve = (T/2) / P
-      // The other token's value also = T/2.
-      // We can get the other price from GeckoTerminal's quote_token_price_usd,
-      // but we didn't store that. So for the other token, we skip unless
-      // it's a well-known stable (USDC = $1).
-      const t0 = pool.token0.toLowerCase();
-      const t1 = pool.token1.toLowerCase();
-      const otherAddr = t0 === searchedAddr ? t1 : t0;
-
-      // USDC is always ~$1
-      if (otherAddr === '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913') {
-        updatePrice(otherAddr, 1, pool.tvl);
-      }
-    }
-  }
-
+async function fetchPricesFromPricingService(
+  addresses: string[],
+  alchemyKey?: string
+): Promise<Record<string, number>> {
+  const priceMap = await getPrices(addresses, alchemyKey);
   const result: Record<string, number> = {};
-  for (const [addr, { price }] of bestPrices) {
+  for (const [addr, price] of priceMap) {
     result[addr] = price;
   }
-
-  const pageAddr = TOKENS.PAGE.toLowerCase();
-  const oincAddr = TOKENS.OINC.toLowerCase();
-  const clankerAddr = TOKENS.CLANKER.toLowerCase();
-
-  console.log(`[Pools] Extracted prices from pool data - PAGE: $${result[pageAddr] || 0}, OINC: $${result[oincAddr] || 0}, CLANKER: $${result[clankerAddr] || 0}`);
-
   return result;
 }
 
@@ -716,25 +582,11 @@ async function _fetchPoolsForTokenInternal(
     const isArbme = tokenAddress.toLowerCase() === ARBME.address.toLowerCase();
 
     if (isArbme) {
-      // Extract prices for RPC pool calculations
-      const tokenPrices = extractTokenPricesFromPools([
-        { searchedToken: tokenAddress, pools: geckoPools },
-      ]);
-
-      const wethAddr = '0x4200000000000000000000000000000000000006';
-      // Fetch missing prices we need for RPC pools
-      const missingTokens = [
-        { key: TOKENS.PAGE.toLowerCase(), addr: TOKENS.PAGE },
-        { key: TOKENS.CLANKER.toLowerCase(), addr: TOKENS.CLANKER },
-      ];
-
-      for (const { key, addr } of missingTokens) {
-        if (!tokenPrices[key]) {
-          const price = await fetchTokenPrice(addr);
-          if (price > 0) tokenPrices[key] = price;
-          await new Promise(resolve => setTimeout(resolve, 300));
-        }
-      }
+      // Fetch prices we need for RPC pool calculations via consolidated pricing
+      const tokenPrices = await fetchPricesFromPricingService(
+        [TOKENS.PAGE, TOKENS.CLANKER],
+        alchemyKey,
+      );
 
       const pagePrice = tokenPrices[TOKENS.PAGE.toLowerCase()] || 0;
       const clankerPrice = tokenPrices[TOKENS.CLANKER.toLowerCase()] || 0;
@@ -874,40 +726,15 @@ async function _fetchPoolsInternal(alchemyKey: string | undefined, cached: Cache
       fetchGeckoTerminalPools(TOKENS.CLAWD),
     ]);
 
-    // Extract prices for our searched tokens (ARBME, RATCHET, ABC, CLAWD) from pool data
-    const tokenPrices = extractTokenPricesFromPools([
-      { searchedToken: ARBME.address, pools: arbmePools },
-      { searchedToken: TOKENS.RATCHET, pools: ratchetPools },
-      { searchedToken: TOKENS.ABC, pools: abcPools },
-      { searchedToken: TOKENS.CLAWD, pools: clawdPools },
-    ]);
-
-    // Fetch remaining prices we need but can't extract from pool data.
-    // Stagger these sequentially to avoid rate limits (3 calls instead of 6).
+    // Fetch all needed prices via consolidated pricing service (on-chain primary, Gecko fallback)
     const wethAddr = '0x4200000000000000000000000000000000000006';
-    const missingTokens = [
-      { key: TOKENS.PAGE.toLowerCase(), addr: TOKENS.PAGE },
-      { key: TOKENS.CLANKER.toLowerCase(), addr: TOKENS.CLANKER },
-      { key: wethAddr, addr: wethAddr },
-    ];
-
-    for (const { key, addr } of missingTokens) {
-      if (!tokenPrices[key]) {
-        const price = await fetchTokenPrice(addr);
-        if (price > 0) tokenPrices[key] = price;
-        // Small delay between sequential calls
-        await new Promise(resolve => setTimeout(resolve, 300));
-      }
-    }
-
-    // OINC price: try to get from OINC pools in the ARBME results
-    const oincAddr = TOKENS.OINC.toLowerCase();
-    if (!tokenPrices[oincAddr]) {
-      // OINC appears as a pair token in ARBME pools — estimate from pool TVL
-      // If not found, fetch it (costs 1 more API call)
-      const oincPrice = await fetchTokenPrice(TOKENS.OINC);
-      if (oincPrice > 0) tokenPrices[oincAddr] = oincPrice;
-    }
+    const tokenPrices = await fetchPricesFromPricingService(
+      [
+        ARBME.address, TOKENS.RATCHET, TOKENS.ABC, TOKENS.CLAWD,
+        TOKENS.PAGE, TOKENS.OINC, TOKENS.CLANKER, wethAddr,
+      ],
+      alchemyKey,
+    );
 
     const pagePrice = tokenPrices[TOKENS.PAGE.toLowerCase()] || 0;
     const oincPrice = tokenPrices[TOKENS.OINC.toLowerCase()] || 0;

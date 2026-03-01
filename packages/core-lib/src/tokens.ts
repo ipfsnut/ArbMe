@@ -53,10 +53,6 @@ export const KNOWN_TOKENS: Record<string, TokenMetadata> = {
     address: '0xc4730f86d1F86cE0712a7b17EE919Db7dEFad7FE',
   },
   // ── Connected Tokens ──
-  '0xa448d40f6793773938a6b7427091c35676899125': {
-    symbol: 'MLTL', decimals: 18,
-    address: '0xa448d40f6793773938a6b7427091c35676899125',
-  },
   '0xb695559b26bb2c9703ef1935c37aeae9526bab07': {
     symbol: 'MOLT', decimals: 18,
     address: '0xB695559b26BB2c9703ef1935c37AeaE9526bab07',

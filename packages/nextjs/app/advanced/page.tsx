@@ -14,7 +14,6 @@ import { formatUnits } from 'viem'
 import type { Position } from '@/utils/types'
 
 const BASESCAN_SAFE_URL = `https://app.safe.global/home?safe=base:${CHAOS_FOUNDATION_MULTISIG}`
-const MOLTLAUNCH_URL = 'https://moltlaunch.com/agent/0x3d9d'
 const FLAUNCH_TRADE_URL = 'https://www.flaunch.gg/base/coin/0xFaB2ee8eB6B26208BfB5c41012661e62b4Dc9292'
 const BASESCAN_TOKEN_URL = 'https://basescan.org/token/0xFaB2ee8eB6B26208BfB5c41012661e62b4Dc9292'
 const ABC_ALPHA_URL = 'https://warpcast.com/abc-alpha'
@@ -62,7 +61,6 @@ const ECOSYSTEM_TOKENS = [
   { symbol: 'ARBME', role: 'Infrastructure' },
   { symbol: 'USDC', role: 'Stablecoin' },
   { symbol: 'ALPHACLAW', role: 'Infrastructure' },
-  { symbol: 'MLTL', role: 'Rail Token' },
   { symbol: 'OSO', role: 'Rail Token' },
   { symbol: 'Cnews', role: 'Rail Token' },
   { symbol: 'RATCHET', role: 'Infrastructure' },
@@ -459,9 +457,6 @@ export default function AdvancedPage() {
             <a href={FLAUNCH_TRADE_URL} target="_blank" rel="noopener noreferrer" className="ct-link-pill">
               Trade $CHAOS
             </a>
-            <a href={MOLTLAUNCH_URL} target="_blank" rel="noopener noreferrer" className="ct-link-pill">
-              MoltLaunch Agent
-            </a>
             <a href={ABC_ALPHA_URL} target="_blank" rel="noopener noreferrer" className="ct-link-pill">
               @abc_alpha
             </a>
@@ -512,8 +507,8 @@ export default function AdvancedPage() {
               </div>
             ))}
           </div>
-          <a href={MOLTLAUNCH_URL} target="_blank" rel="noopener noreferrer" className="ct-hire-btn">
-            Hire ChaosTheory on MoltLaunch
+          <a href={ABC_ALPHA_URL} target="_blank" rel="noopener noreferrer" className="ct-hire-btn">
+            Hire ChaosTheory
           </a>
         </div>
 

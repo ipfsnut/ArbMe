@@ -19,6 +19,7 @@ import {
   type Address,
 } from "viem";
 import { getPublicClient, getWalletManager, TOKENS, TOKEN_DECIMALS } from "../wallet/manager.js";
+import { fetchPoolsForToken, type PoolData } from "@arbme/core-lib";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 function text(t: string) {
@@ -281,45 +282,29 @@ export function registerDefiTools(server: McpServer, config: ServerConfig) {
       const minTvlVal = minTvl || 0;
 
       try {
-        const url = `https://api.geckoterminal.com/api/v2/networks/base/tokens/${tokenAddr}/pools?page=1`;
-        const response = await fetch(url);
-        if (!response.ok) {
-          return textErr(`GeckoTerminal API error: ${response.status}`);
-        }
-
-        const data = (await response.json()) as any;
+        const result = await fetchPoolsForToken(tokenAddr, config.baseRpcUrl?.split("/v2/")[1]);
         const pools: GeckoPool[] = [];
 
-        for (const pool of data.data || []) {
-          const attrs = pool.attributes;
-          const tvl = parseFloat(attrs.reserve_in_usd) || null;
-
-          if (minTvlVal > 0 && (tvl === null || tvl < minTvlVal)) continue;
+        for (const pool of result.pools) {
+          if (minTvlVal > 0 && pool.tvl < minTvlVal) continue;
 
           let version = "V2";
-          const dexName = attrs.dex || "";
-          if (dexName.includes("v4")) version = "V4";
-          else if (dexName.includes("v3")) version = "V3";
-          else if (dexName.includes("balancer")) version = "Balancer";
-
-          const feeMatch = attrs.name?.match(/(\d+\.?\d*)%/);
-          const fee = feeMatch ? feeMatch[1] + "%" : undefined;
+          if (pool.dex.includes("V4")) version = "V4";
+          else if (pool.dex.includes("V3")) version = "V3";
+          else if (pool.dex.includes("Balancer")) version = "Balancer";
 
           pools.push({
-            name: attrs.name,
-            address: attrs.address,
-            dex: dexName,
+            name: pool.pair,
+            address: pool.pairAddress,
+            dex: pool.dex,
             version,
-            fee,
-            tvl,
-            priceUSD: parseFloat(attrs.base_token_price_usd) || 0,
-            volume24h: parseFloat(attrs.volume_usd?.h24) || 0,
-            priceChange24h: parseFloat(attrs.price_change_percentage?.h24) || 0,
+            fee: pool.fee ? `${pool.fee / 10000}%` : undefined,
+            tvl: pool.tvl,
+            priceUSD: parseFloat(pool.priceUsd) || 0,
+            volume24h: pool.volume24h,
+            priceChange24h: pool.priceChange24h,
           });
         }
-
-        pools.sort((a, b) => (b.tvl || 0) - (a.tvl || 0));
-        const totalTvl = pools.reduce((sum, p) => sum + (p.tvl || 0), 0);
 
         return text(
           JSON.stringify(
@@ -327,7 +312,7 @@ export function registerDefiTools(server: McpServer, config: ServerConfig) {
               token: tokenAddr,
               pools,
               totalPools: pools.length,
-              totalTvl: Math.round(totalTvl * 100) / 100,
+              totalTvl: Math.round(result.tvl * 100) / 100,
               timestamp: new Date().toISOString(),
             },
             null,
@@ -600,13 +585,7 @@ export function registerDefiTools(server: McpServer, config: ServerConfig) {
       const GAS_COST_USD = 0.02;
 
       try {
-        const url = `https://api.geckoterminal.com/api/v2/networks/base/tokens/${tokenAddr}/pools?page=1`;
-        const response = await fetch(url);
-        if (!response.ok) {
-          return textErr(`GeckoTerminal API error: ${response.status}`);
-        }
-
-        const data = (await response.json()) as any;
+        const result = await fetchPoolsForToken(tokenAddr, config.baseRpcUrl?.split("/v2/")[1]);
 
         interface ArbPool {
           name: string;
@@ -619,25 +598,23 @@ export function registerDefiTools(server: McpServer, config: ServerConfig) {
         }
 
         const pools: ArbPool[] = [];
-        for (const pool of data.data || []) {
-          const attrs = pool.attributes;
-          const price = parseFloat(attrs.base_token_price_usd);
+        for (const pool of result.pools) {
+          const price = parseFloat(pool.priceUsd);
           if (!price || price <= 0) continue;
 
           let version = "V2";
-          const dexName = attrs.dex || "";
-          if (dexName.includes("v4")) version = "V4";
-          else if (dexName.includes("v3")) version = "V3";
-          else if (dexName.includes("balancer")) version = "Balancer";
+          if (pool.dex.includes("V4")) version = "V4";
+          else if (pool.dex.includes("V3")) version = "V3";
+          else if (pool.dex.includes("Balancer")) version = "Balancer";
 
           pools.push({
-            name: attrs.name,
-            address: attrs.address,
-            dex: dexName,
+            name: pool.pair,
+            address: pool.pairAddress,
+            dex: pool.dex,
             version,
-            tvl: parseFloat(attrs.reserve_in_usd) || null,
+            tvl: pool.tvl,
             priceUSD: price,
-            volume24h: parseFloat(attrs.volume_usd?.h24) || 0,
+            volume24h: pool.volume24h,
           });
         }
 

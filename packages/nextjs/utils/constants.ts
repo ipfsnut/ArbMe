@@ -11,7 +11,6 @@ export const ABC_ADDRESS = '0x5c0872b790Bb73e2B3A9778Db6E7704095624b07';
 export const PAGE_ADDRESS = '0xc4730f86d1F86cE0712a7b17EE919Db7dEFad7FE';
 
 // ── Connected Tokens ────────────────────────────────────────────────────
-export const MLTL_ADDRESS = '0xa448d40f6793773938a6b7427091c35676899125';
 export const MOLT_ADDRESS = '0xB695559b26BB2c9703ef1935c37AeaE9526bab07';
 export const CLANKER_ADDRESS = '0x1bc0c42215582d5A085795f4baDbaC3ff36d1Bcb';
 export const BNKR_ADDRESS = '0x22aF33FE49fD1Fa80c7149773dDe5890D3c76F3b';
@@ -74,7 +73,7 @@ export const CHAOS_GAUGES: GaugeConfig[] = [
   { symbol: 'ARBME',   tokenAddress: ARBME_ADDRESS,   gaugeAddress: '0x37547710faE12B4be7458b5E87C3106a85CfD72F', decimals: 18, pool: 'CHAOS / ARBME',   week: 1 },
   { symbol: 'USDC',    tokenAddress: USDC_ADDRESS,    gaugeAddress: '0x8d3074Bdf9412D77269F59Cc506E318E5da27914', decimals: 6,  pool: 'CHAOS / USDC',    week: 2 },
   { symbol: 'ALPHACLAW', tokenAddress: ALPHACLAW_ADDRESS, gaugeAddress: '0x0000000000000000000000000000000000000000', decimals: 18, pool: 'CHAOS / ALPHACLAW', week: 3 },
-  { symbol: 'MLTL',    tokenAddress: MLTL_ADDRESS,    gaugeAddress: '0x0000000000000000000000000000000000000000', decimals: 18, pool: 'CHAOS / MLTL',    week: 4 },
+
   { symbol: 'OSO',     tokenAddress: OSO_ADDRESS,     gaugeAddress: '0x0000000000000000000000000000000000000000', decimals: 18, pool: 'CHAOS / OSO',     week: 5 },
   { symbol: 'Cnews',   tokenAddress: CNEWS_ADDRESS,   gaugeAddress: '0x0000000000000000000000000000000000000000', decimals: 18, pool: 'CHAOS / Cnews',   week: 6 },
   { symbol: 'RATCHET', tokenAddress: RATCHET_ADDRESS, gaugeAddress: '0x0000000000000000000000000000000000000000', decimals: 18, pool: 'CHAOS / RATCHET', week: 7 },

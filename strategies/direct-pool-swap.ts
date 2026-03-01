@@ -8,7 +8,7 @@
  * Usage:
  *   # ERC20 swap (flaunch pool, default)
  *   npx ts-node strategies/direct-pool-swap.ts \
- *     --tokenIn MLTL --tokenOut CHAOS --amount 15000 --dry-run
+ *     --tokenIn ARBME --tokenOut CHAOS --amount 15000 --dry-run
  *
  *   # Buy >e with native ETH from Clanker pool
  *   npx ts-node strategies/direct-pool-swap.ts \
@@ -49,7 +49,6 @@ const TOKENS: Record<string, { address: Address; decimals: number; native?: bool
   WETH:   { address: '0x4200000000000000000000000000000000000006', decimals: 18 },
   // Ecosystem tokens
   CHAOS:  { address: '0xfab2ee8eb6b26208bfb5c41012661e62b4dc9292', decimals: 18 },
-  MLTL:   { address: '0xa448d40f6793773938a6b7427091c35676899125', decimals: 18 },
   ARBME:  { address: '0xC647421C5Dc78D1c3960faA7A33f9aEFDF4B7B07', decimals: 18 },
   WOLF:   { address: '0xc3a366c03a0fc57d96065e3adb27dd0036d83b80', decimals: 18 },
   EDGE:   { address: '0x1966a17d806a79f742e6e228ecc9421f401a8a32', decimals: 18 },
@@ -155,7 +154,7 @@ const UNIVERSAL_ROUTER_ABI = [
 ] as const;
 
 function loadWallet(): { address: Address; privateKey: Hex } {
-  const walletPath = path.join(process.env.HOME || '', '.moltlaunch', 'wallet.json');
+  const walletPath = path.join(process.env.HOME || '', '.arbme', 'wallet.json');
   const data = JSON.parse(fs.readFileSync(walletPath, 'utf-8'));
   return {
     address: data.address as Address,
@@ -171,7 +170,7 @@ Usage:
   npx ts-node strategies/direct-pool-swap.ts [options]
 
 Options:
-  --tokenIn <SYM>       Input token symbol (default: MLTL)
+  --tokenIn <SYM>       Input token symbol (default: ARBME)
   --tokenOut <SYM>      Output token symbol (default: CHAOS)
   --amount <N>          Amount of input token (default: 15000)
   --hook <type>         Hook: flaunch | clanker | none (default: flaunch)
@@ -195,7 +194,7 @@ async function main() {
     return;
   }
 
-  let tokenInSymbol = 'MLTL';
+  let tokenInSymbol = 'ARBME';
   let tokenOutSymbol = 'CHAOS';
   let amount = 15000;
   let dryRun = true;

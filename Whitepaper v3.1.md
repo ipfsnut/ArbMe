@@ -116,7 +116,7 @@ The choice of which tokens to pair against $CHAOS is not a financial decision. I
 
 **Stable Pairs (USDC):** A CHAOS/USDC pair creates an anchor. USDC doesn't move, so any price movement in CHAOS creates an immediate arb gradient against the USDC pair. This generates baseline volume that persists in all market conditions. The USDC pair is the system's clock — it ticks every time CHAOS moves relative to the dollar, which is constantly.
 
-**Ecosystem Pairs (ARBME, MLTL):** Pairs against other community tokens create bidirectional information flow. When ARBME pumps independently, the CHAOS/ARBME pair creates arb opportunities. When CHAOS pumps, the same pair creates opportunities in the other direction. Each token's volatility becomes a volume source for both. These pairs are cooperation agreements — two economies choosing to share fee-generating surface area.
+**Ecosystem Pairs (ARBME):** Pairs against other community tokens create bidirectional information flow. When ARBME pumps independently, the CHAOS/ARBME pair creates arb opportunities. When CHAOS pumps, the same pair creates opportunities in the other direction. Each token's volatility becomes a volume source for both. These pairs are cooperation agreements — two economies choosing to share fee-generating surface area.
 
 **Combinatorial Scaling:** With *n* pairs, the number of potential two-hop arbitrage routes is n(n-1)/2. Seven pairs create 21 potential routes. Each route is a channel through which price information can flow, generating volume at each hop. Adding an eighth pair doesn't add 1 surface — it adds 7 new routes. The information topology scales faster than the infrastructure.
 
@@ -132,7 +132,7 @@ ChaosTheory is the staking layer. It is a model, not an entity. Anyone can deplo
 
 $CHAOS holders stake to a specific multisig's staking hub, earning LP fee revenue from that portfolio. Reward streams run on 180-day rolling windows, restarting with each weekly deposit.
 
-**The abc-alpha MVP.** The first ChaosTheory multisig is built by abc-alpha. Seven pairs, focused on three star pairings: USDC (stable anchor), ARBME (ecosystem synergy), MLTL (cross-community). This is the minimum viable proof that the math works — that arb volume generates fees, that fees build walls during consolidation, and that staking reduces the supply the walls need to defend.
+**The abc-alpha MVP.** The first ChaosTheory multisig is built by abc-alpha. Seven pairs, focused on two star pairings: USDC (stable anchor) and ARBME (ecosystem synergy). This is the minimum viable proof that the math works — that arb volume generates fees, that fees build walls during consolidation, and that staking reduces the supply the walls need to defend.
 
 **Multiple Multisigs.** The model scales through competition. Any project or operator hires the abc-alpha bot to deploy a ChaosTheory Gnosis Safe. The bot handles Safe creation, LP setup, staking contracts, and routing integration. Machine-readable docs at [abc-alpha.epicdylan.com](https://abc-alpha.epicdylan.com).
 
@@ -191,7 +191,7 @@ The abc-alpha bot deploys ChaosTheory Safes and integrates projects into the rou
 | New Token Volume Package | 72h | 0.0100 ETH |
 | LP Strategy Consult | 48h | 0.1000 ETH |
 
-Service requests through [MoltLaunch escrow](https://moltlaunch.com/agent/0x3d9d). Agent interaction docs at [abc-alpha.epicdylan.com](https://abc-alpha.epicdylan.com).
+Service requests via [Warpcast DM](https://warpcast.com/abc-alpha). Agent interaction docs at [abc-alpha.epicdylan.com](https://abc-alpha.epicdylan.com).
 
 ---
 
@@ -207,4 +207,4 @@ Service requests through [MoltLaunch escrow](https://moltlaunch.com/agent/0x3d9d
 
 ---
 
-**Links:** [abc-alpha.epicdylan.com](https://abc-alpha.epicdylan.com) · [arbme.epicdylan.com/chaostheory](https://arbme.epicdylan.com/chaostheory) · [flaunch.gg](https://www.flaunch.gg/base/coin/0xFaB2ee8eB6B26208BfB5c41012661e62b4Dc9292) · [moltlaunch.com/agent/0x3d9d](https://moltlaunch.com/agent/0x3d9d) · [@abc-alpha](https://warpcast.com/abc-alpha)
+**Links:** [abc-alpha.epicdylan.com](https://abc-alpha.epicdylan.com) · [arbme.epicdylan.com/chaostheory](https://arbme.epicdylan.com/chaostheory) · [flaunch.gg](https://www.flaunch.gg/base/coin/0xFaB2ee8eB6B26208BfB5c41012661e62b4Dc9292) · [@abc-alpha](https://warpcast.com/abc-alpha)

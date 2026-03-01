@@ -12,6 +12,7 @@ import {
   FEE_TO_TICK_SPACING,
   setAlchemyKey,
   getTokenMetadata,
+  getTokenPrices,
   ARBME,
 } from '@arbme/core-lib'
 import { parseUnits } from 'viem'
@@ -29,25 +30,18 @@ const KNOWN_DECIMALS: Record<string, number> = {
   '0x50c5725949a6f0c72e6c4a641f24049a917db0cb': 18, // DAI
 }
 
-// Fetch cached prices from our own /api/pools endpoint
-async function getCachedPrices(baseUrl: string): Promise<{ arbmePrice: number; tokenPrices: Record<string, number> } | null> {
+// Fetch token prices directly from consolidated pricing service
+async function getTokenPriceMap(token0: string, token1: string): Promise<Record<string, number>> {
   try {
-    const response = await fetch(`${baseUrl}/api/pools`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-    })
-    if (!response.ok) {
-      console.error('[build-create-pool] Failed to fetch cached prices:', response.status)
-      return null
+    const priceMap = await getTokenPrices([token0, token1], process.env.ALCHEMY_API_KEY)
+    const result: Record<string, number> = {}
+    for (const [addr, price] of priceMap) {
+      result[addr] = price
     }
-    const data = await response.json()
-    return {
-      arbmePrice: parseFloat(data.arbmePrice) || 0,
-      tokenPrices: data.tokenPrices || {},
-    }
+    return result
   } catch (error) {
-    console.error('[build-create-pool] Error fetching cached prices:', error)
-    return null
+    console.error('[build-create-pool] Error fetching prices:', error)
+    return {}
   }
 }
 
@@ -55,11 +49,6 @@ export async function POST(request: NextRequest) {
   try {
     // Set Alchemy key for RPC calls
     setAlchemyKey(ALCHEMY_KEY)
-
-    // Get base URL from request for internal API calls
-    const protocol = request.headers.get('x-forwarded-proto') || 'https'
-    const host = request.headers.get('host') || 'localhost:3000'
-    const baseUrl = `${protocol}://${host}`
 
     const {
       version,
@@ -117,8 +106,8 @@ export async function POST(request: NextRequest) {
     const amount0Wei = parseUnits(String(amount0), token0Decimals).toString()
     const amount1Wei = parseUnits(String(amount1), token1Decimals).toString()
 
-    // Fetch cached prices from our pools endpoint for V3/V4 price calculation
-    const cachedPrices = await getCachedPrices(baseUrl)
+    // Fetch token prices directly for V3/V4 price calculation
+    const tokenPriceMap = await getTokenPriceMap(token0, token1)
 
     if (versionLower === 'v2') {
       // V2: Single transaction to add liquidity (creates pool if doesn't exist)
@@ -157,25 +146,9 @@ export async function POST(request: NextRequest) {
       const [sortedToken0, sortedToken1] = sortTokens(token0, token1)
       const isSwapped = sortedToken0.toLowerCase() !== token0.toLowerCase()
 
-      // Try to get prices from cache first
-      let token0UsdPrice: number | null = null
-      let token1UsdPrice: number | null = null
-
-      if (cachedPrices) {
-        // Check if either token is ARBME
-        const arbmeAddr = ARBME.address.toLowerCase()
-        if (token0Lower === arbmeAddr) {
-          token0UsdPrice = cachedPrices.arbmePrice
-        } else if (cachedPrices.tokenPrices[token0Lower]) {
-          token0UsdPrice = cachedPrices.tokenPrices[token0Lower]
-        }
-
-        if (token1Lower === arbmeAddr) {
-          token1UsdPrice = cachedPrices.arbmePrice
-        } else if (cachedPrices.tokenPrices[token1Lower]) {
-          token1UsdPrice = cachedPrices.tokenPrices[token1Lower]
-        }
-      }
+      // Get token prices from consolidated pricing service
+      const token0UsdPrice: number | null = tokenPriceMap[token0Lower] || null
+      const token1UsdPrice: number | null = tokenPriceMap[token1Lower] || null
 
       // Calculate sqrtPriceX96 from price, adjusted for decimals
       // sqrtPriceX96 expects: token1_raw / token0_raw (where token0 < token1 lexicographically)
@@ -282,24 +255,9 @@ export async function POST(request: NextRequest) {
       const [sortedToken0, sortedToken1] = sortTokens(token0, token1)
       const isSwappedV4 = sortedToken0.toLowerCase() !== token0.toLowerCase()
 
-      // Try to get prices from cache first (reuse variables from V3 scope or recalculate)
-      let token0UsdPriceV4: number | null = null
-      let token1UsdPriceV4: number | null = null
-
-      if (cachedPrices) {
-        const arbmeAddr = ARBME.address.toLowerCase()
-        if (token0Lower === arbmeAddr) {
-          token0UsdPriceV4 = cachedPrices.arbmePrice
-        } else if (cachedPrices.tokenPrices[token0Lower]) {
-          token0UsdPriceV4 = cachedPrices.tokenPrices[token0Lower]
-        }
-
-        if (token1Lower === arbmeAddr) {
-          token1UsdPriceV4 = cachedPrices.arbmePrice
-        } else if (cachedPrices.tokenPrices[token1Lower]) {
-          token1UsdPriceV4 = cachedPrices.tokenPrices[token1Lower]
-        }
-      }
+      // Get token prices from consolidated pricing service
+      const token0UsdPriceV4: number | null = tokenPriceMap[token0Lower] || null
+      const token1UsdPriceV4: number | null = tokenPriceMap[token1Lower] || null
 
       // Calculate sqrtPriceX96 from price, adjusted for decimals
       let adjustedPriceV4: number

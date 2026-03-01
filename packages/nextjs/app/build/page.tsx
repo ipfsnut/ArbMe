@@ -349,7 +349,7 @@ export default function BuildPage() {
         <div className="ratchet-info">
           <div className="info-card">
             <h3>How it works</h3>
-            <p>$RATCHET is designed to be liquid. It trades against multiple tokens in the ecosystem — CHAOS, ARBME, MLTL, and more. When you stake RATCHET, you earn more RATCHET from protocol emissions while constricting the circulating supply.</p>
+            <p>$RATCHET is designed to be liquid. It trades against multiple tokens in the ecosystem — CHAOS, ARBME, and more. When you stake RATCHET, you earn more RATCHET from protocol emissions while constricting the circulating supply.</p>
             <p>Trading fees from RATCHET pairs are used to buy $ARBME, tying the two tokens together. More RATCHET volume means more ARBME demand.</p>
           </div>
 
