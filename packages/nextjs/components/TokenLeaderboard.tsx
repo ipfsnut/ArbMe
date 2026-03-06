@@ -24,7 +24,7 @@ interface TokenLeaderboardProps {
 
 const TOKEN_LABELS: Record<string, string> = {
   arbme: '$ARBME Pools',
-  chaos: '$CHAOS Pools',
+  chaos: '$CHAOSLP Pools',
   ratchet: '$RATCHET Pools',
 }
 

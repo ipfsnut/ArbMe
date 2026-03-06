@@ -6,17 +6,16 @@
 export const ARBME_ADDRESS = '0xC647421C5Dc78D1c3960faA7A33f9aEFDF4B7B07';
 export const RATCHET_ADDRESS = '0x392bc5DeEa227043d69Af0e67BadCbBAeD511B07';
 export const CHAOS_ADDRESS = '0xfab2ee8eb6b26208bfb5c41012661e62b4dc9292';
+export const CHAOSLP_ADDRESS = '0x8454d062506a27675706148ecdd194e45e44067a';
 export const ALPHACLAW_ADDRESS = '0x8C19A8b92FA406Ae097EB9eA8a4A44cBC10EafE2';
 export const ABC_ADDRESS = '0x5c0872b790Bb73e2B3A9778Db6E7704095624b07';
 export const PAGE_ADDRESS = '0xc4730f86d1F86cE0712a7b17EE919Db7dEFad7FE';
 
 // ── Connected Tokens ────────────────────────────────────────────────────
-export const MOLT_ADDRESS = '0xB695559b26BB2c9703ef1935c37AeaE9526bab07';
+export const FLAY_ADDRESS = '0xf1a7000000950c7ad8aff13118bb7ab561a448ee';
+export const VIRTUAL_ADDRESS = '0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b';
 export const CLANKER_ADDRESS = '0x1bc0c42215582d5A085795f4baDbaC3ff36d1Bcb';
 export const BNKR_ADDRESS = '0x22aF33FE49fD1Fa80c7149773dDe5890D3c76F3b';
-export const CLAWD_ADDRESS = '0x53aD48291407E16E29822DeB505b30D47F965Ebb';
-export const OPENCLAW_ADDRESS = '0xf3bb567d4c79cb32d92b9db151255cdd3b91f04a';
-export const OSO_ADDRESS = '0xc78fabc2cb5b9cf59e0af3da8e3bc46d47753a4e';
 export const CNEWS_ADDRESS = '0x01de044ad8eb037334ddda97a38bb0c798e4eb07';
 
 // ── Base Assets ─────────────────────────────────────────────────────────
@@ -74,7 +73,6 @@ export const CHAOS_GAUGES: GaugeConfig[] = [
   { symbol: 'USDC',    tokenAddress: USDC_ADDRESS,    gaugeAddress: '0x8d3074Bdf9412D77269F59Cc506E318E5da27914', decimals: 6,  pool: 'CHAOS / USDC',    week: 2 },
   { symbol: 'ALPHACLAW', tokenAddress: ALPHACLAW_ADDRESS, gaugeAddress: '0x0000000000000000000000000000000000000000', decimals: 18, pool: 'CHAOS / ALPHACLAW', week: 3 },
 
-  { symbol: 'OSO',     tokenAddress: OSO_ADDRESS,     gaugeAddress: '0x0000000000000000000000000000000000000000', decimals: 18, pool: 'CHAOS / OSO',     week: 5 },
   { symbol: 'Cnews',   tokenAddress: CNEWS_ADDRESS,   gaugeAddress: '0x0000000000000000000000000000000000000000', decimals: 18, pool: 'CHAOS / Cnews',   week: 6 },
   { symbol: 'RATCHET', tokenAddress: RATCHET_ADDRESS, gaugeAddress: '0x0000000000000000000000000000000000000000', decimals: 18, pool: 'CHAOS / RATCHET', week: 7 },
 ];

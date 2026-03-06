@@ -10,7 +10,7 @@ import { BackButton } from '@/components/BackButton'
 import { TokenInput } from '@/components/TokenInput'
 import { FeeTierSelector } from '@/components/FeeTierSelector'
 import { StepIndicator } from '@/components/StepIndicator'
-import { ROUTES, ARBME_ADDRESS, RATCHET_ADDRESS, CHAOS_ADDRESS, ALPHACLAW_ADDRESS, ABC_ADDRESS, PAGE_ADDRESS, CLANKER_ADDRESS, CLAWD_ADDRESS, USDC_ADDRESS, WETH_ADDRESS, OSO_ADDRESS, CNEWS_ADDRESS, V2_ROUTER, V3_POSITION_MANAGER, V4_POSITION_MANAGER, V3_FEE_TIERS, V4_FEE_TIERS } from '@/utils/constants'
+import { ROUTES, ARBME_ADDRESS, RATCHET_ADDRESS, CHAOSLP_ADDRESS, ALPHACLAW_ADDRESS, ABC_ADDRESS, PAGE_ADDRESS, FLAY_ADDRESS, VIRTUAL_ADDRESS, CLANKER_ADDRESS, USDC_ADDRESS, WETH_ADDRESS, CNEWS_ADDRESS, V2_ROUTER, V3_POSITION_MANAGER, V4_POSITION_MANAGER, V3_FEE_TIERS, V4_FEE_TIERS } from '@/utils/constants'
 // SDK imported dynamically to avoid module-level crashes on mobile
 import { useSendTransaction } from 'wagmi'
 import { parseUnits } from 'viem'
@@ -95,13 +95,13 @@ interface FlowState {
 const COMMON_TOKENS = [
   { address: ARBME_ADDRESS, symbol: 'ARBME' },
   { address: RATCHET_ADDRESS, symbol: 'RATCHET' },
-  { address: CHAOS_ADDRESS, symbol: 'CHAOS' },
+  { address: CHAOSLP_ADDRESS, symbol: 'CHAOSLP' },
   { address: ALPHACLAW_ADDRESS, symbol: 'ALPHACLAW' },
   { address: ABC_ADDRESS, symbol: 'ABC' },
   { address: PAGE_ADDRESS, symbol: 'PAGE' },
-  { address: CLAWD_ADDRESS, symbol: 'CLAWD' },
+  { address: FLAY_ADDRESS, symbol: 'FLAY' },
+  { address: VIRTUAL_ADDRESS, symbol: 'VIRTUAL' },
   { address: CLANKER_ADDRESS, symbol: 'CLANKER' },
-  { address: OSO_ADDRESS, symbol: 'OSO' },
   { address: CNEWS_ADDRESS, symbol: 'CNEWS' },
   { address: WETH_ADDRESS, symbol: 'WETH' },
   { address: USDC_ADDRESS, symbol: 'USDC' },

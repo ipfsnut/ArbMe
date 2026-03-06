@@ -111,7 +111,7 @@ export function AppHeader() {
           <span className="stat-value text-accent">{arbmePriceDisplay}</span>
         </div>
         <div className="stat-item">
-          <span className="stat-label text-secondary">$CHAOS</span>
+          <span className="stat-label text-secondary">$CHAOSLP</span>
           <span className="stat-value">{chaosPriceDisplay}</span>
         </div>
         <div className="stat-item">

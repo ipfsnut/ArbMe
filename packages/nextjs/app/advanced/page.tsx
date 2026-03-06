@@ -14,55 +14,16 @@ import { formatUnits } from 'viem'
 import type { Position } from '@/utils/types'
 
 const BASESCAN_SAFE_URL = `https://app.safe.global/home?safe=base:${CHAOS_FOUNDATION_MULTISIG}`
-const FLAUNCH_TRADE_URL = 'https://www.flaunch.gg/base/coin/0xFaB2ee8eB6B26208BfB5c41012661e62b4Dc9292'
-const BASESCAN_TOKEN_URL = 'https://basescan.org/token/0xFaB2ee8eB6B26208BfB5c41012661e62b4Dc9292'
+const CHAOSLP_INFO_URL = 'https://chaos-theory.epicdylan.com'
+const FLAUNCH_TRADE_URL = 'https://www.flaunch.gg/base/coin/0x8454d062506a27675706148ecdd194e45e44067a'
+const BASESCAN_TOKEN_URL = 'https://basescan.org/token/0x8454d062506a27675706148ecdd194e45e44067a'
 const ABC_ALPHA_URL = 'https://warpcast.com/abc-alpha'
 
-const SERVICES = [
-  {
-    name: 'Token Analysis',
-    type: 'audit',
-    description: 'Scan your token\'s pools. Report on spreads, fees, routing, and fixes.',
-    turnaround: '24h',
-    price: '0.0050 ETH',
-  },
-  {
-    name: 'Safe Setup',
-    type: 'defi',
-    description: 'Gnosis Safe on Base with Uniswap + ArbMe. Ownership transferred to you.',
-    turnaround: '24h',
-    price: '0.0050 ETH',
-  },
-  {
-    name: 'Staking Contract Deployment',
-    type: 'defi',
-    description: 'Custom staking contract for your ERC20 token on any EVM chain. Tested templates available.',
-    turnaround: '48h',
-    price: '0.0500 ETH',
-  },
-  {
-    name: 'New Token Volume Package',
-    type: 'defi',
-    description: 'Starter volume package. Pool spread analysis, pair recommendations, and routing integration with the ArbMe network.',
-    turnaround: '72h',
-    price: '0.0100 ETH',
-  },
-  {
-    name: 'LP Strategy Consult',
-    type: 'strategy',
-    description: 'Liquidity strategy for your token on Base. Pool analysis, fee tier recommendations, and routing through ArbMe ecosystem pairs.',
-    turnaround: '48h',
-    price: '0.1000 ETH',
-  },
-]
-
 const ECOSYSTEM_TOKENS = [
-  { symbol: 'CHAOS', role: 'Hub' },
+  { symbol: 'CHAOSLP', role: 'Hub' },
   { symbol: 'ARBME', role: 'Infrastructure' },
   { symbol: 'USDC', role: 'Stablecoin' },
-  { symbol: 'ALPHACLAW', role: 'Infrastructure' },
-  { symbol: 'OSO', role: 'Rail Token' },
-  { symbol: 'Cnews', role: 'Rail Token' },
+  { symbol: 'FLAY', role: 'Flaunch Ecosystem' },
   { symbol: 'RATCHET', role: 'Infrastructure' },
 ]
 
@@ -442,7 +403,7 @@ export default function AdvancedPage() {
 
         <div className="page-header">
           <h1 style={{ fontFamily: 'var(--font-mono)' }}>Advanced</h1>
-          <p className="page-subtitle">$CHAOS — flaunch native</p>
+          <p className="page-subtitle">$CHAOSLP — high-risk coordination asset</p>
         </div>
 
         <TokenLeaderboard token="chaos" collapsible />
@@ -450,22 +411,22 @@ export default function AdvancedPage() {
         {/* About */}
         <div className="ct-about">
           <p className="ct-about-text">
-            Stake $CHAOS once. Earn 7 tokens. 180-day rolling streams from LP fees
-            across 7 CHAOS pairs managed by the ChaosTheory Foundation.
+            $CHAOSLP is a high-risk coordination asset for ArbMe. Stake to earn from four reward streams
+            (CHAOSLP, ARBME, USDC, FLAY) sourced from LP fee revenue across three Uniswap V4 pools.
           </p>
           <div className="ct-about-links">
-            <a href={FLAUNCH_TRADE_URL} target="_blank" rel="noopener noreferrer" className="ct-link-pill">
-              Trade $CHAOS
+            <a href={CHAOSLP_INFO_URL} target="_blank" rel="noopener noreferrer" className="ct-link-pill">
+              ChaosLP Info
             </a>
-            <a href={ABC_ALPHA_URL} target="_blank" rel="noopener noreferrer" className="ct-link-pill">
-              @abc_alpha
+            <a href={FLAUNCH_TRADE_URL} target="_blank" rel="noopener noreferrer" className="ct-link-pill">
+              Trade $CHAOSLP
             </a>
             <a href={BASESCAN_TOKEN_URL} target="_blank" rel="noopener noreferrer" className="ct-link-pill">
               Basescan
             </a>
-            <Link href={ROUTES.RAILS} className="ct-link-pill">
-              Whitepaper
-            </Link>
+            <a href={ABC_ALPHA_URL} target="_blank" rel="noopener noreferrer" className="ct-link-pill">
+              @abc_alpha
+            </a>
           </div>
         </div>
 
@@ -487,32 +448,13 @@ export default function AdvancedPage() {
           </div>
         </div>
 
-        {/* Services */}
+        {/* ═══════ CHAOS STAKING HUB (OLD) ═══════ */}
         <div className="ct-section">
           <div className="section-header">
-            <h2>Services</h2>
+            <h2>CHAOS Staking (OLD)</h2>
+            <p className="ct-section-desc">Legacy staking for the original $CHAOS token. ChaosLP staking coming soon.</p>
           </div>
-          <div className="ct-services-list">
-            {SERVICES.map((svc) => (
-              <div key={svc.name} className="ct-service-card">
-                <div className="ct-service-top">
-                  <span className="ct-service-name">{svc.name}</span>
-                  <span className="ct-service-type">{svc.type}</span>
-                </div>
-                <p className="ct-service-desc">{svc.description}</p>
-                <div className="ct-service-meta">
-                  <span>{svc.turnaround}</span>
-                  <span className="ct-service-price">{svc.price}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-          <a href={ABC_ALPHA_URL} target="_blank" rel="noopener noreferrer" className="ct-hire-btn">
-            Hire ChaosTheory
-          </a>
         </div>
-
-        {/* ═══════ CHAOS STAKING HUB ═══════ */}
         {!isDeployed ? (
           <div className="empty-state">
             <p>Deployment in progress</p>

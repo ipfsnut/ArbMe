@@ -567,12 +567,12 @@ export async function getCorePrices(alchemyKey?: string): Promise<CorePricesResu
 
   // Fetch prices for all three core tokens + WETH
   const priceMap = await getTokenPrices(
-    [ARBME.address, TOKENS.CHAOS, TOKENS.RATCHET],
+    [ARBME.address, TOKENS.CHAOSLP, TOKENS.RATCHET],
     alchemyKey,
   );
 
   const arbmePrice = priceMap.get(ARBME.address.toLowerCase()) || 0;
-  const chaosPrice = priceMap.get(TOKENS.CHAOS.toLowerCase()) || 0;
+  const chaosPrice = priceMap.get(TOKENS.CHAOSLP.toLowerCase()) || 0;
   const ratchetPrice = priceMap.get(TOKENS.RATCHET.toLowerCase()) || 0;
 
   // TVL: try to read from fetchPoolsForToken cache (lazy import to avoid circular deps)
@@ -586,7 +586,7 @@ export async function getCorePrices(alchemyKey?: string): Promise<CorePricesResu
     // fetchPoolsForToken has its own 2min cache — if warm, this is instant
     const [arbmePools, chaosPools, ratchetPools] = await Promise.all([
       fetchPoolsForToken(ARBME.address, alchemyKey),
-      fetchPoolsForToken(TOKENS.CHAOS),
+      fetchPoolsForToken(TOKENS.CHAOSLP),
       fetchPoolsForToken(TOKENS.RATCHET),
     ]);
 

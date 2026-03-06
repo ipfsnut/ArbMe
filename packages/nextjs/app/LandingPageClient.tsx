@@ -401,7 +401,7 @@ DeFi:
 RATCHET  = 0x392bc5DeEa227043d69Af0e67BadCbBAeD511B07
 ABC      = 0x5c0872b790Bb73e2B3A9778Db6E7704095624b07
 ALPHACLAW = 0x8C19A8b92FA406Ae097EB9eA8a4A44cBC10EafE2
-CHAOS    = 0xfab2ee8eb6b26208bfb5c41012661e62b4dc9292
+CHAOSLP  = 0x8454d062506a27675706148ecdd194e45e44067a
 PAGE     = 0xc4730f86d1F86cE0712a7b17EE919Db7dEFad7FE`}</pre>
           </div>
 
@@ -409,7 +409,7 @@ PAGE     = 0xc4730f86d1F86cE0712a7b17EE919Db7dEFad7FE`}</pre>
             <div className="lp-agent-heading">Links</div>
             <pre className="lp-agent-pre">{`llms.txt:          https://arbme.epicdylan.com/llms.txt
 llms-full.txt:     https://arbme.epicdylan.com/llms-full.txt
-CHAOS Rails:       https://chaostheory.epicdylan.com
+ChaosLP:           https://chaos-theory.epicdylan.com
 BaseScan (ARBME):  https://basescan.org/token/0xC647421C5Dc78D1c3960faA7A33f9aEFDF4B7B07
 DexScreener:       https://dexscreener.com/base/0x6afd39b7114a0892d10ffaae2eefcc16777dd376273c25d9d4f3a1a065131b83`}</pre>
           </div>

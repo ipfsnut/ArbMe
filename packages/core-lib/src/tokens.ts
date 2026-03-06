@@ -40,6 +40,10 @@ export const KNOWN_TOKENS: Record<string, TokenMetadata> = {
     symbol: 'CHAOS', decimals: 18,
     address: '0xFaB2ee8eB6B26208BfB5c41012661e62b4Dc9292',
   },
+  '0x8454d062506a27675706148ecdd194e45e44067a': {
+    symbol: 'CHAOSLP', decimals: 18,
+    address: '0x8454d062506a27675706148ecdd194e45e44067a',
+  },
   '0x8c19a8b92fa406ae097eb9ea8a4a44cbc10eafe2': {
     symbol: 'ALPHACLAW', decimals: 18,
     address: '0x8C19A8b92FA406Ae097EB9eA8a4A44cBC10EafE2',
@@ -49,14 +53,18 @@ export const KNOWN_TOKENS: Record<string, TokenMetadata> = {
     address: '0x5c0872b790Bb73e2B3A9778Db6E7704095624b07',
   },
   '0xc4730f86d1f86ce0712a7b17ee919db7defad7fe': {
-    symbol: 'PAGE', decimals: 18,
+    symbol: 'PAGE', decimals: 8,
     address: '0xc4730f86d1F86cE0712a7b17EE919Db7dEFad7FE',
   },
-  // ── Connected Tokens ──
-  '0xb695559b26bb2c9703ef1935c37aeae9526bab07': {
-    symbol: 'MOLT', decimals: 18,
-    address: '0xB695559b26BB2c9703ef1935c37AeaE9526bab07',
+  '0xf1a7000000950c7ad8aff13118bb7ab561a448ee': {
+    symbol: 'FLAY', decimals: 18,
+    address: '0xf1a7000000950c7ad8aff13118bb7ab561a448ee',
   },
+  '0x0b3e328455c4059eeb9e3f84b5543f74e24e7e1b': {
+    symbol: 'VIRTUAL', decimals: 18,
+    address: '0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b',
+  },
+  // ── Connected Tokens ──
   '0x1bc0c42215582d5a085795f4badbac3ff36d1bcb': {
     symbol: 'CLANKER', decimals: 18,
     address: '0x1bc0c42215582d5A085795f4baDbaC3ff36d1Bcb',
@@ -64,18 +72,6 @@ export const KNOWN_TOKENS: Record<string, TokenMetadata> = {
   '0x22af33fe49fd1fa80c7149773dde5890d3c76f3b': {
     symbol: 'BNKR', decimals: 18,
     address: '0x22aF33FE49fD1Fa80c7149773dDe5890D3c76F3b',
-  },
-  '0x53ad48291407e16e29822deb505b30d47f965ebb': {
-    symbol: 'CLAWD', decimals: 18,
-    address: '0x53aD48291407E16E29822DeB505b30D47F965Ebb',
-  },
-  '0xf3bb567d4c79cb32d92b9db151255cdd3b91f04a': {
-    symbol: 'OPENCLAW', decimals: 18,
-    address: '0xf3bb567d4c79cb32d92b9db151255cdd3b91f04a',
-  },
-  '0xc78fabc2cb5b9cf59e0af3da8e3bc46d47753a4e': {
-    symbol: 'OSO', decimals: 18,
-    address: '0xc78fabc2cb5b9cf59e0af3da8e3bc46d47753a4e',
   },
   '0x01de044ad8eb037334ddda97a38bb0c798e4eb07': {
     symbol: 'CNEWS', decimals: 18,

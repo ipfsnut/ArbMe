@@ -2,7 +2,7 @@
  * Farcaster action handlers (Buy, Tip, etc.)
  */
 
-import { ARBME_ADDRESS, RATCHET_ADDRESS, CHAOS_ADDRESS, ABC_ADDRESS, USDC_ADDRESS } from '../utils/constants';
+import { ARBME_ADDRESS, RATCHET_ADDRESS, CHAOSLP_ADDRESS, ABC_ADDRESS, USDC_ADDRESS } from '../utils/constants';
 
 async function getSDK() {
   return (await import('@farcaster/miniapp-sdk')).default;
@@ -43,13 +43,13 @@ export async function buyArbme(): Promise<void> {
 }
 
 /**
- * Launch Farcaster's swap widget to buy $CHAOS
+ * Launch Farcaster's swap widget to buy $CHAOSLP
  */
 export async function buyChaos(): Promise<void> {
   try {
-    console.log('[Actions] Opening buy widget for CHAOS...');
+    console.log('[Actions] Opening buy widget for CHAOSLP...');
 
-    const chaosToken = `eip155:8453/erc20:${CHAOS_ADDRESS}`;
+    const chaosToken = `eip155:8453/erc20:${CHAOSLP_ADDRESS}`;
 
     const sdk = await getSDK();
     const result = await sdk.actions.swapToken({

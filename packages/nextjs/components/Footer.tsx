@@ -4,6 +4,7 @@ import Link from 'next/link'
 
 export function Footer() {
   const externalLinks = [
+    { label: 'ChaosLP', url: 'https://chaos-theory.epicdylan.com' },
     { label: 'Buy on Uniswap', url: 'https://app.uniswap.org/swap?outputCurrency=0xC647421C5Dc78D1c3960faA7A33f9aEFDF4B7B07&chain=base' },
     { label: 'Chart', url: 'https://dexscreener.com/base/0x6afd39b7114a0892d10ffaae2eefcc16777dd376273c25d9d4f3a1a065131b83' },
     { label: 'Contract', url: 'https://basescan.org/token/0xC647421C5Dc78D1c3960faA7A33f9aEFDF4B7B07' },
@@ -14,7 +15,6 @@ export function Footer() {
     { label: 'App', href: '/app' },
     { label: 'Traffic', href: '/traffic' },
     { label: 'Treasury', href: '/treasury' },
-    { label: 'ChaosTheory', href: '/chaostheory' },
   ]
 
   const allLinks = [...internalLinks, ...externalLinks.map(l => ({ ...l, href: l.url }))]

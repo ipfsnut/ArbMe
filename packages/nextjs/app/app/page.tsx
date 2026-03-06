@@ -24,7 +24,7 @@ function formatUsd(value: number): string {
 // Main pool addresses for browser swap links
 const MAIN_POOLS = {
   arbme: '/trade/0x269bbee1e347ab5092e9cEAbc593c6239eE0B016?t0=0x4200000000000000000000000000000000000006&t1=0xc647421c5dc78d1c3960faa7a33f9aefdf4b7b07&v=V3&fee=10000&ts=200&pair=WETH/ARBME',
-  chaos: 'https://www.flaunch.gg/base/coin/0xFaB2ee8eB6B26208BfB5c41012661e62b4Dc9292',
+  chaos: 'https://www.flaunch.gg/base/coin/0x8454d062506a27675706148ecdd194e45e44067a',
   ratchet: '/trade/0x5058a53f05fa65e0bab7cf9a1bfb978b1b099307?t0=0x4200000000000000000000000000000000000006&t1=0x392bc5deea227043d69af0e67badcbbaed511b07&v=V3&fee=10000&ts=200&pair=WETH/RATCHET',
 }
 
@@ -202,7 +202,7 @@ export default function AppPage() {
           </div>
           <div className="buy-token-card">
             <div className="buy-token-logo-text">C</div>
-            <div className="buy-token-name">$CHAOS</div>
+            <div className="buy-token-name">$CHAOSLP</div>
             <div className="buy-token-price">{pricesLoaded ? formatPrice(chaosPrice) : '...'}</div>
             <button className="btn btn-primary" onClick={() => handleSwap('chaos')}>Swap</button>
           </div>
