@@ -288,17 +288,12 @@ export default function AdvancedPage() {
 
   // Admin actions
   const handleAdminApprove = async (gaugeIndex: number) => {
-    const gauge = adminGauges[gaugeIndex]
-    if (!gauge) return
-    const rawAmount = rewardAmounts[gaugeIndex]
-    const amount = parseToWei(rawAmount || '0', gauge.decimals)
-    if (amount === '0') return
     setAdminActionLoading(`approve-${gaugeIndex}`); setAdminError(null)
     try {
       const res = await fetch('/api/chaos-staking/admin/approve-reward', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gaugeIndex, amount }),
+        body: JSON.stringify({ gaugeIndex }),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
@@ -672,28 +667,29 @@ export default function AdvancedPage() {
 
                       {ag.deployed ? (
                         <div className="admin-gauge-actions">
-                          <div className="admin-notify-row">
-                            <div className="input-wrapper">
-                              <input
-                                type="number"
-                                className="amount-input"
-                                placeholder="0.00"
-                                value={rewardAmounts[idx] || ''}
-                                onChange={e => setRewardAmounts(prev => ({ ...prev, [idx]: e.target.value }))}
-                                min="0"
-                                step="any"
-                              />
-                              <div className="input-token">{ag.symbol}</div>
-                            </div>
-                            {BigInt(ag.allowance) < BigInt(parseToWei(rewardAmounts[idx] || '0', ag.decimals)) ? (
-                              <button
-                                className="btn btn-secondary btn-sm"
-                                onClick={() => handleAdminApprove(idx)}
-                                disabled={adminActionLoading === `approve-${idx}` || !rewardAmounts[idx]}
-                              >
-                                {adminActionLoading === `approve-${idx}` ? 'Approving...' : `Approve`}
-                              </button>
-                            ) : (
+                          {BigInt(ag.allowance) === 0n && (
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => handleAdminApprove(idx)}
+                              disabled={adminActionLoading === `approve-${idx}`}
+                            >
+                              {adminActionLoading === `approve-${idx}` ? 'Approving...' : `Approve ${ag.symbol}`}
+                            </button>
+                          )}
+                          {BigInt(ag.allowance) > 0n && (
+                            <div className="admin-notify-row">
+                              <div className="input-wrapper">
+                                <input
+                                  type="number"
+                                  className="amount-input"
+                                  placeholder="0.00"
+                                  value={rewardAmounts[idx] || ''}
+                                  onChange={e => setRewardAmounts(prev => ({ ...prev, [idx]: e.target.value }))}
+                                  min="0"
+                                  step="any"
+                                />
+                                <div className="input-token">{ag.symbol}</div>
+                              </div>
                               <button
                                 className="btn btn-primary btn-sm"
                                 onClick={() => handleNotifyReward(idx)}
@@ -701,8 +697,8 @@ export default function AdvancedPage() {
                               >
                                 {adminActionLoading === `notify-${idx}` ? 'Sending...' : 'Notify'}
                               </button>
-                            )}
-                          </div>
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <div className="admin-gauge-actions">
