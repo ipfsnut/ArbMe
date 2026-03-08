@@ -25,6 +25,7 @@ const ECOSYSTEM_TOKENS = [
   { symbol: 'CLANKER', role: 'Clanker Ecosystem' },
   { symbol: 'FLAY', role: 'Flaunch Ecosystem' },
   { symbol: 'VIRTUAL', role: 'Virtuals Ecosystem' },
+  { symbol: 'VENDYZ', role: 'Farcaster Ecosystem' },
 ]
 
 // -- Helpers --
@@ -69,6 +70,7 @@ interface GaugeData {
   rewardRate: string
   periodFinish: number
   earned: string
+  apr: number
   inAssetApr: number
   status: string
 }
@@ -79,6 +81,7 @@ interface StakingInfo {
   rewardRate: string
   periodFinish: number
   hubApr: number
+  totalApr: number
   staked: string
   earned: string
   allowance: string
@@ -384,8 +387,10 @@ export default function AdvancedPage() {
   const totalTvl = positions.reduce((sum, p) => sum + (p.liquidityUsd || 0), 0)
   const isDeployed = stakingData?.contractDeployed ?? false
   const gauges = stakingData?.gauges || CHAOS_GAUGES.map(g => ({
-    ...g, rewardRate: '0', periodFinish: 0, earned: '0', inAssetApr: 0, status: 'pending',
+    ...g, rewardRate: '0', periodFinish: 0, earned: '0', apr: 0, inAssetApr: 0, status: 'pending',
   }))
+  const spokeGauges = gauges.filter(g => g.symbol !== 'CHAOSLP')
+  const totalApr = stakingData?.totalApr ?? 0
 
   const setMaxStake = () => {
     if (stakingData) setStakeAmount(formatUnits(BigInt(stakingData.balance), 18))
@@ -411,7 +416,7 @@ export default function AdvancedPage() {
         {/* About */}
         <div className="ct-about">
           <p className="ct-about-text">
-            $CHAOSLP is a high-risk coordination asset for ArbMe. Stake to earn from five reward streams
+            $CHAOSLP is a high-risk coordination asset for ArbMe. Stake to earn from six reward streams
             (CHAOSLP, ARBME, CLANKER, FLAY, VIRTUAL) sourced from LP fee revenue across ChaosLP pools.
           </p>
           <div className="ct-about-links">
@@ -430,7 +435,7 @@ export default function AdvancedPage() {
           </div>
         </div>
 
-        {/* Stats Row — matches stake page pattern exactly */}
+        {/* Stats Row */}
         <div className="staking-stats">
           <div className="stat-card">
             <span className="stat-label">Total Staked</span>
@@ -439,11 +444,11 @@ export default function AdvancedPage() {
             </span>
           </div>
           <div className="stat-card">
-            <span className="stat-label">Positions</span>
-            <span className="stat-value">{posLoading ? '...' : positions.length}</span>
+            <span className="stat-label">Total APR</span>
+            <span className="stat-value">{totalApr > 0 ? `${totalApr.toFixed(1)}%` : '--'}</span>
           </div>
           <div className="stat-card">
-            <span className="stat-label">Foundation TVL</span>
+            <span className="stat-label">Rails TVL</span>
             <span className="stat-value">{posLoading ? '...' : formatUsd(totalTvl)}</span>
           </div>
         </div>
@@ -452,7 +457,7 @@ export default function AdvancedPage() {
         <div className="ct-section">
           <div className="section-header">
             <h2>ChaosLP Staking</h2>
-            <p className="ct-section-desc">Stake $CHAOSLP to earn from five reward streams. Rewards are distributed automatically — claim anytime.</p>
+            <p className="ct-section-desc">Stake $CHAOSLP to earn from six reward streams. Rewards are distributed automatically — claim anytime.</p>
           </div>
         </div>
         {!isDeployed ? (
@@ -467,7 +472,7 @@ export default function AdvancedPage() {
           </div>
         ) : (
           <div className="staking-container">
-            {/* User Info — matches stake page */}
+            {/* User Info */}
             <div className="staking-user-info">
               <div className="user-stat">
                 <span className="user-stat-label">Your Stake</span>
@@ -479,7 +484,7 @@ export default function AdvancedPage() {
                   <span className="user-stat-value text-positive">{formatNumber(stakingData!.earned)} CHAOSLP</span>
                 </div>
               )}
-              {gauges.filter(g => g.status === 'live' && BigInt(g.earned) > 0n).map(g => (
+              {spokeGauges.filter(g => g.status === 'live' && BigInt(g.earned) > 0n).map(g => (
                 <div className="user-stat" key={g.symbol}>
                   <span className="user-stat-label">{g.symbol} Earned</span>
                   <span className="user-stat-value text-positive">{formatNumber(g.earned, g.decimals)} {g.symbol}</span>
@@ -560,19 +565,19 @@ export default function AdvancedPage() {
             <div className="staking-section">
               <h3>Rewards</h3>
               <div className="rewards-list">
-                {gauges.filter(g => g.status === 'live').map(g => (
-                  <div className="rewards-row" key={g.symbol}>
-                    <span className="rewards-amount">{formatNumber(g.earned, g.decimals)}</span>
-                    <span className="rewards-token">{g.symbol}</span>
-                  </div>
-                ))}
                 {BigInt(stakingData!.earned) > 0n && (
                   <div className="rewards-row">
                     <span className="rewards-amount">{formatNumber(stakingData!.earned)}</span>
                     <span className="rewards-token">CHAOSLP (hub)</span>
                   </div>
                 )}
-                {gauges.filter(g => g.status === 'live').length === 0 && BigInt(stakingData!.earned) === 0n && (
+                {spokeGauges.filter(g => g.status === 'live').map(g => (
+                  <div className="rewards-row" key={g.symbol}>
+                    <span className="rewards-amount">{formatNumber(g.earned, g.decimals)}</span>
+                    <span className="rewards-token">{g.symbol}</span>
+                  </div>
+                ))}
+                {spokeGauges.filter(g => g.status === 'live').length === 0 && BigInt(stakingData!.earned) === 0n && (
                   <div className="rewards-row">
                     <span className="rewards-token">No active rewards yet</span>
                   </div>
@@ -596,7 +601,7 @@ export default function AdvancedPage() {
         {isMultisig && (
           <div className="ct-section">
             <div className="section-header">
-              <h2>Foundation Admin</h2>
+              <h2>Rails Admin</h2>
             </div>
             <p className="ct-section-desc">
               Manage reward distribution. Approve reward tokens to gauge contracts, then call
@@ -754,9 +759,11 @@ export default function AdvancedPage() {
                 <div className="rg-pool">{g.pool}</div>
                 <div className="rg-stats-row">
                   <div className="rg-stat">
-                    <span className="rg-stat-label">In-Asset APR</span>
+                    <span className="rg-stat-label">APR</span>
                     <span className="rg-stat-value">
-                      {g.status === 'live' && g.inAssetApr > 0
+                      {g.status === 'live' && g.apr > 0
+                        ? `${g.apr.toFixed(1)}%`
+                        : g.status === 'live' && g.inAssetApr > 0
                         ? `${g.inAssetApr.toFixed(2)} ${g.symbol}/yr`
                         : '--'}
                     </span>
@@ -817,14 +824,14 @@ export default function AdvancedPage() {
 
         {/* Multisig */}
         <div className="ct-address-card">
-          <div className="ct-label">Foundation Multisig (Gnosis Safe)</div>
+          <div className="ct-label">Rails Multisig (Gnosis Safe)</div>
           <a href={BASESCAN_SAFE_URL} target="_blank" rel="noopener noreferrer" className="ct-address">
             {CHAOS_FOUNDATION_MULTISIG}
           </a>
         </div>
 
-        {/* Foundation Positions */}
-        <CollapsibleSection title="Foundation Positions">
+        {/* Rails Positions */}
+        <CollapsibleSection title="Rails Positions">
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.5rem' }}>
             <button className="btn btn-sm btn-secondary" onClick={fetchPositions} disabled={posLoading}
               style={{ minWidth: 'auto', padding: '0.25rem 0.5rem' }}>
@@ -1052,21 +1059,30 @@ export default function AdvancedPage() {
         .rewards-list {
           display: flex;
           flex-direction: column;
-          gap: 0.5rem;
-          padding: 0.5rem 0;
+          border: 1px solid var(--border);
+          border-radius: 8px;
+          overflow: hidden;
+          margin-bottom: 0.75rem;
         }
 
         .rewards-row {
           display: flex;
-          align-items: baseline;
-          gap: 0.5rem;
+          justify-content: space-between;
+          align-items: center;
+          padding: 0.5rem 0.75rem;
+          background: var(--bg-secondary);
+        }
+
+        .rewards-row + .rewards-row {
+          border-top: 1px solid var(--border);
         }
 
         .rewards-amount {
           font-family: ui-monospace, 'SF Mono', Monaco, monospace;
-          font-size: 1.125rem;
+          font-size: 0.875rem;
           font-weight: 700;
           color: var(--accent);
+          font-variant-numeric: tabular-nums;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;

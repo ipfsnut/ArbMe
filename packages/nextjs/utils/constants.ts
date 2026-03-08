@@ -17,6 +17,7 @@ export const VIRTUAL_ADDRESS = '0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b';
 export const CLANKER_ADDRESS = '0x1bc0c42215582d5A085795f4baDbaC3ff36d1Bcb';
 export const BNKR_ADDRESS = '0x22aF33FE49fD1Fa80c7149773dDe5890D3c76F3b';
 export const CNEWS_ADDRESS = '0x01de044ad8eb037334ddda97a38bb0c798e4eb07';
+export const VENDYZ_ADDRESS = '0x24245dff20ee3d826f99e1b3f685670166e673dc';
 
 // ── Base Assets ─────────────────────────────────────────────────────────
 export const USDC_ADDRESS = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
@@ -53,8 +54,10 @@ export const FEATURED_POOLS: FeaturedPoolConfig[] = [
   },
 ];
 
-// Foundation
-export const CHAOS_FOUNDATION_MULTISIG = '0xb7DD467A573809218aAE30EB2c60e8AE3a9198a0';
+// Rails Multisig
+export const RAILS_MULTISIG = '0xb7DD467A573809218aAE30EB2c60e8AE3a9198a0';
+/** @deprecated Use RAILS_MULTISIG */
+export const CHAOS_FOUNDATION_MULTISIG = RAILS_MULTISIG;
 
 // ChaosLP Staking Hub + Gauge Spokes (update addresses after deployment)
 export const CHAOS_STAKING_ADDRESS: string = '0x48D9eC58746aD41731De91Efb1e315c8fcF5d20a';
@@ -73,6 +76,7 @@ export const CHAOS_GAUGES: GaugeConfig[] = [
   { symbol: 'CLANKER', tokenAddress: CLANKER_ADDRESS,  gaugeAddress: '0xb9135C878DA7f229E39CD16121B5F7796eE7DB53', decimals: 18, pool: 'CHAOSLP / CLANKER' },
   { symbol: 'FLAY',    tokenAddress: FLAY_ADDRESS,    gaugeAddress: '0xE2aCDb1dea6422671e95500834eBc21dbbDf5F7D', decimals: 18, pool: 'CHAOSLP / FLAY' },
   { symbol: 'VIRTUAL', tokenAddress: VIRTUAL_ADDRESS,  gaugeAddress: '0x839ac3EB369D7f5d55f01Fb13770D515841439d6', decimals: 18, pool: 'CHAOSLP / VIRTUAL' },
+  { symbol: 'VENDYZ', tokenAddress: VENDYZ_ADDRESS,   gaugeAddress: '0x0000000000000000000000000000000000000000', decimals: 18, pool: 'CHAOSLP / VENDYZ' },
 ];
 
 // Routes

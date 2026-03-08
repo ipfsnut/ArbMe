@@ -65,6 +65,10 @@ export const KNOWN_TOKENS: Record<string, TokenMetadata> = {
     address: '0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b',
   },
   // ── Connected Tokens ──
+  '0x24245dff20ee3d826f99e1b3f685670166e673dc': {
+    symbol: 'VENDYZ', decimals: 18,
+    address: '0x24245dff20ee3d826f99e1b3f685670166e673dc',
+  },
   '0x1bc0c42215582d5a085795f4badbac3ff36d1bcb': {
     symbol: 'CLANKER', decimals: 18,
     address: '0x1bc0c42215582d5A085795f4baDbaC3ff36d1Bcb',

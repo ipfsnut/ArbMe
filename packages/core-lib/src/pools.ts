@@ -17,6 +17,7 @@ import {
   OINC_ARBME_POOL,
   GET_SLOT0,
   GET_RESERVES,
+  CHAOSLP_POOL_ADDRESSES,
 } from './constants.js';
 
 import { getTokenPrices as getPrices } from './pricing.js';
@@ -283,6 +284,81 @@ async function fetchGeckoTerminalPools(tokenAddress: string): Promise<PoolData[]
 }
 
 
+
+/**
+ * Fetch specific pools by address from GeckoTerminal multi-pool endpoint
+ */
+async function fetchGeckoTerminalPoolsByAddress(poolAddresses: readonly string[]): Promise<PoolData[]> {
+  if (poolAddresses.length === 0) return [];
+
+  try {
+    const addressList = poolAddresses.join('%2C');
+    const response = await fetchWithRetry(
+      `${GECKO_API}/networks/base/pools/multi/${addressList}`,
+      { headers: { Accept: 'application/json' } },
+      2,
+      GECKO_TIMEOUT
+    );
+
+    if (!response.ok) {
+      console.error(`[Pools] GeckoTerminal multi-pool error: ${response.status}`);
+      return [];
+    }
+
+    const data = await response.json() as { data: GeckoPoolData[] };
+    if (!data.data?.length) return [];
+
+    const pools: PoolData[] = [];
+
+    for (const pool of data.data) {
+      const attrs = pool.attributes;
+      const tvl = parseFloat(attrs.reserve_in_usd) || 0;
+      const volume24h = parseFloat(attrs.volume_usd?.h24) || 0;
+      const priceChange24h = parseFloat(attrs.price_change_percentage?.h24) || 0;
+
+      const poolName = attrs.name.replace(/\s+\d+(\.\d+)?%$/, '').trim();
+
+      const dexId = pool.relationships.dex.data.id.toLowerCase();
+      let dexName = 'DEX';
+      if (dexId.includes('uniswap-v4') || dexId.includes('uniswap_v4')) dexName = 'Uniswap V4';
+      else if (dexId.includes('uniswap-v3') || dexId.includes('uniswap_v3')) dexName = 'Uniswap V3';
+      else if (dexId.includes('uniswap-v2') || dexId.includes('uniswap_v2')) dexName = 'Uniswap V2';
+      else if (dexId.includes('aerodrome')) dexName = 'Aerodrome';
+
+      const token0Addr = extractTokenAddress(pool.relationships.base_token.data.id);
+      const token1Addr = extractTokenAddress(pool.relationships.quote_token.data.id);
+
+      // Determine token price — use CHAOSLP side
+      const baseTokenId = pool.relationships.base_token.data.id;
+      const isChaoslpBase = baseTokenId.toLowerCase().includes(TOKENS.CHAOSLP.toLowerCase());
+      const tokenPrice = isChaoslpBase
+        ? attrs.base_token_price_usd
+        : attrs.quote_token_price_usd;
+
+      pools.push({
+        pair: poolName,
+        pairAddress: attrs.address,
+        dex: dexName,
+        tvl,
+        volume24h,
+        priceUsd: tokenPrice,
+        priceChange24h,
+        url: `https://dexscreener.com/base/${attrs.address}`,
+        source: 'geckoterminal',
+        token0: token0Addr,
+        token1: token1Addr,
+        token0Logo: getTokenLogo(token0Addr),
+        token1Logo: getTokenLogo(token1Addr),
+      });
+    }
+
+    console.log(`[Pools] Fetched ${pools.length} hardcoded CHAOSLP pools from GeckoTerminal`);
+    return pools;
+  } catch (error) {
+    console.error('[Pools] GeckoTerminal multi-pool fetch error:', error);
+    return [];
+  }
+}
 
 /**
  * Helper to get token prices from the consolidated pricing service.
@@ -628,6 +704,32 @@ async function _fetchPoolsForTokenInternal(
             pool.fee = matchingConfig.fee;
           }
         }
+      }
+    }
+
+    // CHAOSLP: ensure hardcoded pools always appear
+    const isChaoslp = tokenAddress.toLowerCase() === TOKENS.CHAOSLP.toLowerCase();
+    if (isChaoslp) {
+      // Find which hardcoded pools are missing from GeckoTerminal token search
+      const existingAddrs = new Set(allPools.map(p => p.pairAddress.toLowerCase()));
+      const missingAddrs = CHAOSLP_POOL_ADDRESSES.filter(a => !existingAddrs.has(a.toLowerCase()));
+
+      if (missingAddrs.length > 0) {
+        console.log(`[Pools] ${missingAddrs.length} hardcoded CHAOSLP pools missing, fetching by address...`);
+        const hardcodedPools = await fetchGeckoTerminalPoolsByAddress(missingAddrs);
+        for (const pool of hardcodedPools) {
+          if (!existingAddrs.has(pool.pairAddress.toLowerCase())) {
+            allPools.push(pool);
+            existingAddrs.add(pool.pairAddress.toLowerCase());
+          }
+        }
+      }
+
+      // Also try fetching all hardcoded pools if GeckoTerminal token search returned nothing
+      if (allPools.length === 0) {
+        console.log(`[Pools] No CHAOSLP pools from token search, fetching all hardcoded pools...`);
+        const hardcodedPools = await fetchGeckoTerminalPoolsByAddress(CHAOSLP_POOL_ADDRESSES);
+        allPools.push(...hardcodedPools);
       }
     }
 

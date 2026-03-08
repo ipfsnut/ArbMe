@@ -152,6 +152,20 @@ export const FEE_TO_TICK_SPACING: Record<number, number> = {
 // Contract Selectors
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// CHAOSLP Hardcoded Pools (V4 pool IDs from GeckoTerminal)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export const CHAOSLP_POOL_ADDRESSES = [
+  '0xc5660b9a18bc35ead763988a411cccfb1643061fb71b258d2848ebac1b9e85cb', // CHAOSLP / ARBME 3%
+  '0x70a1aecd71e70ea90dee53b2c015c3e4fdfe909ab14b34ebd76d738d3829a0b3', // CLANKER / CHAOSLP 5%
+  '0x578db397f2d5796d99c79b90aa3b76307bc04a7353665d5b470a05b0fb38745f', // CHAOSLP / FLAY 3%
+] as const;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Contract Selectors
+// ═══════════════════════════════════════════════════════════════════════════════
+
 // V2 getReserves() selector
 export const GET_RESERVES = '0x0902f1ac';
 

@@ -29,6 +29,7 @@ export const TOKENS: Record<string, Address> = {
   FLAY: getAddress("0xf1a7000000950c7ad8aff13118bb7ab561a448ee"),
   VIRTUAL: getAddress("0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b"),
   // Connected Tokens
+  VENDYZ: getAddress("0x24245dff20ee3d826f99e1b3f685670166e673dc"),
   CLANKER: getAddress("0x1bc0c42215582d5A085795f4baDbaC3ff36d1Bcb"),
   BNKR: getAddress("0x22aF33FE49fD1Fa80c7149773dDe5890D3c76F3b"),
   CNEWS: getAddress("0x01de044ad8eb037334ddda97a38bb0c798e4eb07"),

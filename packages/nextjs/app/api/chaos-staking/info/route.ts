@@ -35,6 +35,26 @@ function getClient() {
   })
 }
 
+async function fetchTokenPrices(addresses: string[]): Promise<Record<string, number>> {
+  try {
+    const joined = addresses.map(a => a.toLowerCase()).join('%2C')
+    const res = await fetch(
+      `https://api.geckoterminal.com/api/v2/simple/networks/base/token_price/${joined}`,
+      { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(5000) }
+    )
+    if (!res.ok) return {}
+    const json = await res.json() as { data?: { attributes?: { token_prices?: Record<string, string> } } }
+    const prices: Record<string, number> = {}
+    const raw = json.data?.attributes?.token_prices || {}
+    for (const [addr, price] of Object.entries(raw)) {
+      prices[addr.toLowerCase()] = parseFloat(price) || 0
+    }
+    return prices
+  } catch {
+    return {}
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const wallet = request.nextUrl.searchParams.get('wallet')
@@ -47,6 +67,7 @@ export async function GET(request: NextRequest) {
         rewardRate: '0',
         periodFinish: 0,
         hubApr: 0,
+        totalApr: 0,
         staked: '0',
         earned: '0',
         allowance: '0',
@@ -56,6 +77,7 @@ export async function GET(request: NextRequest) {
           rewardRate: '0',
           periodFinish: 0,
           earned: '0',
+          apr: 0,
           inAssetApr: 0,
           status: 'pending' as const,
         })),
@@ -67,13 +89,19 @@ export async function GET(request: NextRequest) {
     const chaosAddr = CHAOSLP_ADDRESS as `0x${string}`
     const walletAddr = wallet as `0x${string}` | undefined
 
-    // Read hub state
-    const [totalSupply, rewardRate, periodFinish, rewardsDuration] = await Promise.all([
-      client.readContract({ address: stakingAddr, abi: STAKING_ABI, functionName: 'totalSupply' }),
-      client.readContract({ address: stakingAddr, abi: STAKING_ABI, functionName: 'rewardRate' }),
-      client.readContract({ address: stakingAddr, abi: STAKING_ABI, functionName: 'periodFinish' }),
-      client.readContract({ address: stakingAddr, abi: STAKING_ABI, functionName: 'rewardsDuration' }),
+    // Read hub state + token prices in parallel
+    const allTokenAddrs = [CHAOSLP_ADDRESS, ...CHAOS_GAUGES.map(g => g.tokenAddress)]
+    const [contractData, prices] = await Promise.all([
+      Promise.all([
+        client.readContract({ address: stakingAddr, abi: STAKING_ABI, functionName: 'totalSupply' }),
+        client.readContract({ address: stakingAddr, abi: STAKING_ABI, functionName: 'rewardRate' }),
+        client.readContract({ address: stakingAddr, abi: STAKING_ABI, functionName: 'periodFinish' }),
+        client.readContract({ address: stakingAddr, abi: STAKING_ABI, functionName: 'rewardsDuration' }),
+      ]),
+      fetchTokenPrices(allTokenAddrs),
     ])
+    const [totalSupply, rewardRate, periodFinish, rewardsDuration] = contractData
+    const chaoslpPrice = prices[CHAOSLP_ADDRESS.toLowerCase()] || 0
 
     // Hub APR: (rewardRate * 365 days) / totalSupply * 100
     const now = Math.floor(Date.now() / 1000)
@@ -98,10 +126,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Read each gauge
+    const totalSupplyFloat = Number(formatUnits(totalSupply, 18))
     const gaugeData = await Promise.all(
       CHAOS_GAUGES.map(async (g) => {
         if (g.gaugeAddress === '0x0000000000000000000000000000000000000000') {
-          return { ...g, rewardRate: '0', periodFinish: 0, earned: '0', inAssetApr: 0, status: 'pending' as const }
+          return { ...g, rewardRate: '0', periodFinish: 0, earned: '0', apr: 0, inAssetApr: 0, status: 'pending' as const }
         }
 
         const addr = g.gaugeAddress as `0x${string}`
@@ -113,13 +142,18 @@ export async function GET(request: NextRequest) {
             : 0n,
         ])
 
-        // In-asset APR: annual tokens per 1 CHAOS staked (scaled to token decimals)
         let inAssetApr = 0
+        let apr = 0
         if (totalSupply > 0n && Number(gPeriodFinish) > now) {
-          // (rewardRate * 365 * 86400) / totalSupply gives annual tokens per 1 CHAOS (in raw units)
-          // Format to human-readable: per 1 full CHAOS token
           const annualRaw = gRewardRate * 365n * 86400n
-          inAssetApr = Number(formatUnits(annualRaw, g.decimals)) / Number(formatUnits(totalSupply, 18))
+          inAssetApr = Number(formatUnits(annualRaw, g.decimals)) / totalSupplyFloat
+
+          // USD-based APR %
+          const rewardPrice = prices[g.tokenAddress.toLowerCase()] || 0
+          if (chaoslpPrice > 0 && rewardPrice > 0) {
+            const annualTokens = Number(formatUnits(annualRaw, g.decimals))
+            apr = (annualTokens * rewardPrice) / (totalSupplyFloat * chaoslpPrice) * 100
+          }
         }
 
         const status = Number(gPeriodFinish) > now ? 'live' : Number(gPeriodFinish) > 0 ? 'ended' : 'pending'
@@ -129,11 +163,16 @@ export async function GET(request: NextRequest) {
           rewardRate: gRewardRate.toString(),
           periodFinish: Number(gPeriodFinish),
           earned: gEarned.toString(),
+          apr,
           inAssetApr,
           status,
         }
       })
     )
+
+    // Total APR = hub + spoke gauges (exclude CHAOSLP hub gauge to avoid double-counting)
+    const spokeApr = gaugeData.filter(g => g.symbol !== 'CHAOSLP').reduce((sum, g) => sum + g.apr, 0)
+    const totalApr = hubApr + spokeApr
 
     return NextResponse.json({
       contractDeployed: true,
@@ -141,6 +180,7 @@ export async function GET(request: NextRequest) {
       rewardRate: rewardRate.toString(),
       periodFinish: Number(periodFinish),
       hubApr,
+      totalApr,
       staked,
       earned,
       allowance,
