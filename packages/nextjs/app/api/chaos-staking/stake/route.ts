@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       transaction: { to: CHAOS_STAKING_ADDRESS, data, value: '0' },
-      description: 'Stake $CHAOS tokens',
+      description: 'Stake $CHAOSLP tokens',
     })
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Failed to build stake transaction' }, { status: 500 })

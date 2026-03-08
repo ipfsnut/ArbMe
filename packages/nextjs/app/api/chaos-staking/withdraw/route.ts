@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       transaction: { to: CHAOS_STAKING_ADDRESS, data, value: '0' },
-      description: 'Withdraw staked $CHAOS tokens',
+      description: 'Withdraw staked $CHAOSLP tokens',
     })
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Failed to build withdraw transaction' }, { status: 500 })

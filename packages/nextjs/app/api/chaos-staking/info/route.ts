@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createPublicClient, http, formatUnits } from 'viem'
 import { base } from 'viem/chains'
-import { CHAOS_STAKING_ADDRESS, CHAOS_ADDRESS, CHAOS_GAUGES } from '@/utils/constants'
+import { CHAOS_STAKING_ADDRESS, CHAOSLP_ADDRESS, CHAOS_GAUGES } from '@/utils/constants'
 
 const STAKING_ABI = [
   { name: 'totalSupply', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
 
     const client = getClient()
     const stakingAddr = CHAOS_STAKING_ADDRESS as `0x${string}`
-    const chaosAddr = CHAOS_ADDRESS as `0x${string}`
+    const chaosAddr = CHAOSLP_ADDRESS as `0x${string}`
     const walletAddr = wallet as `0x${string}` | undefined
 
     // Read hub state

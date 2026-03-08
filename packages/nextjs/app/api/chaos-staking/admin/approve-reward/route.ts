@@ -1,21 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { encodeFunctionData, maxUint256 } from 'viem'
+import { encodeFunctionData } from 'viem'
 import { CHAOS_GAUGES } from '@/utils/constants'
 
 export async function POST(request: NextRequest) {
   try {
-    const { gaugeIndex } = await request.json()
+    const { gaugeIndex, amount } = await request.json()
 
     if (gaugeIndex === undefined || gaugeIndex < 0 || gaugeIndex >= CHAOS_GAUGES.length) {
       return NextResponse.json({ error: 'Invalid gauge index' }, { status: 400 })
     }
+    if (!amount) return NextResponse.json({ error: 'Missing amount' }, { status: 400 })
+    try { BigInt(amount) } catch { return NextResponse.json({ error: 'Invalid amount' }, { status: 400 }) }
 
     const gauge = CHAOS_GAUGES[gaugeIndex]
     if (gauge.gaugeAddress === '0x0000000000000000000000000000000000000000') {
       return NextResponse.json({ error: `${gauge.symbol} gauge not yet deployed` }, { status: 400 })
     }
 
-    // Approve the reward token to the gauge contract
+    // Approve exact reward amount to the gauge contract
     const data = encodeFunctionData({
       abi: [{
         name: 'approve',
@@ -25,7 +27,7 @@ export async function POST(request: NextRequest) {
         outputs: [{ type: 'bool' }],
       }],
       functionName: 'approve',
-      args: [gauge.gaugeAddress as `0x${string}`, maxUint256],
+      args: [gauge.gaugeAddress as `0x${string}`, BigInt(amount)],
     })
 
     return NextResponse.json({

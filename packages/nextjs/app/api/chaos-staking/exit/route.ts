@@ -16,7 +16,7 @@ export async function POST(_request: NextRequest) {
     return NextResponse.json({
       success: true,
       transaction: { to: CHAOS_STAKING_ADDRESS, data, value: '0' },
-      description: 'Withdraw all staked CHAOS and claim all rewards',
+      description: 'Withdraw all staked CHAOSLP and claim all rewards',
     })
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Failed to build exit transaction' }, { status: 500 })
