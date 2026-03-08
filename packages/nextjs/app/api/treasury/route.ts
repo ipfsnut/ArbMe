@@ -92,8 +92,12 @@ export async function GET() {
     const wethPrice = prices[WETH_ADDRESS.toLowerCase()] || 0
     const ethValueUsd = ethBalance * wethPrice
 
+    const missingPrices: string[] = []
     const assets = tokensWithBalance.map(t => {
       const priceUsd = prices[t.address] || 0
+      if (priceUsd === 0 && t.balance > 0) {
+        missingPrices.push(t.symbol)
+      }
       return {
         address: t.address,
         symbol: t.symbol,
@@ -114,6 +118,9 @@ export async function GET() {
       ethValueUsd,
       assets,
       totalValue,
+      ...(missingPrices.length > 0 && {
+        warning: `Prices unavailable for: ${missingPrices.join(', ')}. Total may be underreported.`,
+      }),
     })
   } catch (error: any) {
     console.error('[Treasury API] Error:', error)

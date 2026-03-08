@@ -206,8 +206,13 @@ async function poolExists(
       args: [poolId],
     });
     return result[0] > 0n;
-  } catch {
-    return false;
+  } catch (err: unknown) {
+    // Contract revert = pool doesn't exist. Network/RPC errors should propagate.
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("revert") || msg.includes("execution reverted") || msg.includes("call exception")) {
+      return false;
+    }
+    throw err;
   }
 }
 
@@ -282,7 +287,7 @@ export function registerDefiTools(server: McpServer, config: ServerConfig) {
       const minTvlVal = minTvl || 0;
 
       try {
-        const result = await fetchPoolsForToken(tokenAddr, config.baseRpcUrl?.split("/v2/")[1]);
+        const result = await fetchPoolsForToken(tokenAddr, config.alchemyKey ?? undefined);
         const pools: GeckoPool[] = [];
 
         for (const pool of result.pools) {
@@ -585,7 +590,7 @@ export function registerDefiTools(server: McpServer, config: ServerConfig) {
       const GAS_COST_USD = 0.02;
 
       try {
-        const result = await fetchPoolsForToken(tokenAddr, config.baseRpcUrl?.split("/v2/")[1]);
+        const result = await fetchPoolsForToken(tokenAddr, config.alchemyKey ?? undefined);
 
         interface ArbPool {
           name: string;
@@ -733,10 +738,10 @@ export function registerDefiTools(server: McpServer, config: ServerConfig) {
           abi: permit2Abi,
           functionName: "allowance",
           args: [manager.address, token, UNIVERSAL_ROUTER],
-        }) as [bigint, number, number];
+        }) as [bigint, bigint, bigint];
 
-        const now = Math.floor(Date.now() / 1000);
-        const permit2Expired = permit2Expiration > 0 && permit2Expiration < now;
+        const now = BigInt(Math.floor(Date.now() / 1000));
+        const permit2Expired = permit2Expiration > 0n && permit2Expiration < now;
         const needsErc20Approval = erc20Allowance < amountWei;
         const needsPermit2Approval = permit2Amount < amountWei || permit2Expired;
 
@@ -789,7 +794,7 @@ export function registerDefiTools(server: McpServer, config: ServerConfig) {
         const manager = getWalletManager(config);
         const token = getAddress(tokenRaw);
         const MAX_UINT256 = BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-        const MAX_UINT160 = BigInt("0xffffffffffffffffffffffffffffffff");
+        const MAX_UINT160 = BigInt("0x" + "f".repeat(40));
 
         let txHash: `0x${string}`;
 

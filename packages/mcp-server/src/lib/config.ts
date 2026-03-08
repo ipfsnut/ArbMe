@@ -25,6 +25,8 @@ export interface ServerConfig {
   baseRpcUrl: string;
   /** Private key for DeFi wallet (hex, with 0x prefix) */
   arbmePrivateKey: string | null;
+  /** Alchemy API key for enhanced RPC (optional) */
+  alchemyKey: string | null;
 }
 
 export function loadConfig(): ServerConfig {
@@ -44,5 +46,6 @@ export function loadConfig(): ServerConfig {
     channelId: process.env.CN_CHANNEL_ID || null,
     baseRpcUrl: process.env.BASE_RPC_URL || "https://mainnet.base.org",
     arbmePrivateKey: process.env.ARBME_PRIVATE_KEY || null,
+    alchemyKey: process.env.ALCHEMY_API_KEY || null,
   };
 }

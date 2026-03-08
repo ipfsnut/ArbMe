@@ -13,7 +13,6 @@ import {
   setAlchemyKey,
   getTokenMetadata,
   getTokenPrices,
-  ARBME,
 } from '@arbme/core-lib'
 import { parseUnits } from 'viem'
 
@@ -21,14 +20,7 @@ export const maxDuration = 60
 
 const ALCHEMY_KEY = process.env.ALCHEMY_API_KEY
 
-// Known token decimals to avoid RPC calls for common tokens
-const KNOWN_DECIMALS: Record<string, number> = {
-  [ARBME.address.toLowerCase()]: 18, // ARBME
-  '0x4200000000000000000000000000000000000006': 18, // WETH
-  '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913': 6,  // USDC
-  '0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf': 8,  // cbBTC
-  '0x50c5725949a6f0c72e6c4a641f24049a917db0cb': 18, // DAI
-}
+// Token decimals resolved via core-lib's KNOWN_TOKENS (no RPC for known tokens)
 
 // Fetch token prices directly from consolidated pricing service
 async function getTokenPriceMap(token0: string, token1: string): Promise<Record<string, number>> {
@@ -85,22 +77,15 @@ export async function POST(request: NextRequest) {
     const versionLower = version.toLowerCase()
     const transactions: Array<{ to: string; data: string; value: string; description: string }> = []
 
-    // Use known decimals first, fall back to RPC only if needed
+    // Resolve decimals via core-lib (KNOWN_TOKENS cache avoids RPC for common tokens)
     const token0Lower = token0.toLowerCase()
     const token1Lower = token1.toLowerCase()
-
-    let token0Decimals = KNOWN_DECIMALS[token0Lower]
-    let token1Decimals = KNOWN_DECIMALS[token1Lower]
-
-    // Only fetch from RPC if we don't have known decimals
-    if (token0Decimals === undefined || token1Decimals === undefined) {
-      const [token0Metadata, token1Metadata] = await Promise.all([
-        token0Decimals === undefined ? getTokenMetadata(token0, ALCHEMY_KEY) : Promise.resolve({ decimals: token0Decimals }),
-        token1Decimals === undefined ? getTokenMetadata(token1, ALCHEMY_KEY) : Promise.resolve({ decimals: token1Decimals }),
-      ])
-      token0Decimals = token0Decimals ?? token0Metadata.decimals
-      token1Decimals = token1Decimals ?? token1Metadata.decimals
-    }
+    const [token0Metadata, token1Metadata] = await Promise.all([
+      getTokenMetadata(token0, ALCHEMY_KEY),
+      getTokenMetadata(token1, ALCHEMY_KEY),
+    ])
+    const token0Decimals = token0Metadata.decimals
+    const token1Decimals = token1Metadata.decimals
 
     // Convert decimal amounts to wei strings
     const amount0Wei = parseUnits(String(amount0), token0Decimals).toString()
@@ -499,13 +484,12 @@ export async function POST(request: NextRequest) {
             })
           }
         } catch (simErr) {
-          // Can't simulate, add init tx anyway
-          transactions.push({
-            to: initTx.to,
-            data: initTx.data,
-            value: initTx.value,
-            description: 'Initialize V4 pool with initial price',
-          })
+          // Simulation RPC failed — don't blindly add the init tx
+          console.warn('[build-create-pool] V4 init simulation failed, skipping init tx:', simErr)
+          return NextResponse.json(
+            { error: 'Unable to verify pool state — RPC simulation failed. Please try again.' },
+            { status: 503 }
+          )
         }
       }
 

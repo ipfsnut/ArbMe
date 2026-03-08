@@ -824,7 +824,10 @@ export function buildV3InitializePoolTransaction(params: V3CreatePoolParams): Tr
  * Build V3 mint position transaction (full range)
  */
 export function buildV3MintPositionTransaction(params: V3CreatePoolParams): Transaction {
-  const tickSpacing = FEE_TO_TICK_SPACING[params.fee] || 60;
+  const tickSpacing = FEE_TO_TICK_SPACING[params.fee];
+  if (!tickSpacing) {
+    throw new Error(`Invalid V3 fee tier: ${params.fee}. Valid V3 fees: 100, 500, 3000, 10000`);
+  }
   const { minTick, maxTick } = getTickRange(tickSpacing);
 
   // Calculate slippage using BigInt arithmetic to avoid precision loss

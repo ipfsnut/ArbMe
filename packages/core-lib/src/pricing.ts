@@ -186,7 +186,7 @@ function computePoolId(
  */
 function encodeGetSlot0(poolId: string): string {
   // function selector for getSlot0(bytes32)
-  const selector = '0x3b5349b2'; // keccak256("getSlot0(bytes32)") first 4 bytes
+  const selector = '0xc815641c'; // keccak256("getSlot0(bytes32)") first 4 bytes
   // pad poolId to 32 bytes (remove 0x prefix, should already be 64 hex chars)
   const id = poolId.startsWith('0x') ? poolId.slice(2) : poolId;
   return selector + id.padStart(64, '0');

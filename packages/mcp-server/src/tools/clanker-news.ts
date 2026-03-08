@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ServerConfig } from "../lib/config.js";
 import { CN_BASE_URL, CHAIN_ID, REGISTRY, AGENT_ID } from "../lib/config.js";
 import { createAuthHeader, postWithPayment } from "../lib/auth.js";
+import { fetchWithTimeout, safeJson } from "../lib/fetch.js";
 
 function requireAgentKey(config: ServerConfig) {
   if (!config.agentKey) {
@@ -33,7 +34,7 @@ export function registerClankerNewsTools(server: McpServer, config: ServerConfig
       const p = page ?? 1;
       const l = limit ?? 15;
 
-      const response = await fetch(`${CN_BASE_URL}/?p=${p}`, {
+      const response = await fetchWithTimeout(`${CN_BASE_URL}/?p=${p}`, {
         headers: { Accept: "application/json" },
       });
 
@@ -41,7 +42,8 @@ export function registerClankerNewsTools(server: McpServer, config: ServerConfig
         return text(`CN feed error: ${response.status} ${await response.text()}`);
       }
 
-      const data = await response.json() as { posts: Array<{ id: string; title: string; url: string; votes: number; agent: { name?: string; id: string } }> };
+      const data = await safeJson<{ posts: Array<{ id: string; title: string; url: string; votes: number; agent: { name?: string; id: string } }> }>(response);
+      if (!data?.posts) return textErr("Failed to parse CN feed response");
       const posts = data.posts.slice(0, l);
 
       const lines: string[] = [];
@@ -70,9 +72,9 @@ export function registerClankerNewsTools(server: McpServer, config: ServerConfig
       const account = requireAgentKey(config);
       const body = JSON.stringify({ url, title, comment });
       const response = await postWithPayment(account, "submit", body);
-      const result = await response.json() as { id?: string; error?: string };
+      const result = await safeJson<{ id?: string; error?: string }>(response);
 
-      if (response.status === 201) {
+      if (response.status === 201 && result?.id) {
         return text(`Post submitted! ${CN_BASE_URL}/post/${result.id}`);
       }
       return textErr(`Error (${response.status}): ${JSON.stringify(result)}`);
@@ -88,7 +90,7 @@ export function registerClankerNewsTools(server: McpServer, config: ServerConfig
       const account = requireAgentKey(config);
       const body = JSON.stringify({ post_id, text: commentText });
       const response = await postWithPayment(account, "comment/agent", body);
-      const result = await response.json() as { error?: string };
+      const result = await safeJson<{ error?: string }>(response);
 
       if (response.status === 201) {
         return text(`Comment posted! ${CN_BASE_URL}/post/${post_id}`);
@@ -112,7 +114,7 @@ export function registerClankerNewsTools(server: McpServer, config: ServerConfig
 
       const authHeader = await createAuthHeader(account, "GET", agentPath, "");
 
-      const response = await fetch(url, {
+      const response = await fetchWithTimeout(url, {
         headers: { Accept: "application/json", Authorization: authHeader },
       });
 
@@ -120,14 +122,14 @@ export function registerClankerNewsTools(server: McpServer, config: ServerConfig
         return textErr(`Error: ${response.status} ${await response.text()}`);
       }
 
-      const data = await response.json() as {
+      const data = await safeJson<{
         comments: Array<{
           post_id: string; post_title: string; author_name: string;
           author_type: string; text: string; created_at: string;
         }>;
-      };
+      }>(response);
 
-      if (data.comments.length === 0) {
+      if (!data?.comments || data.comments.length === 0) {
         return text("No new replies.");
       }
 

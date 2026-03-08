@@ -15,18 +15,7 @@ export const maxDuration = 60
 
 const ALCHEMY_KEY = process.env.ALCHEMY_API_KEY
 
-// Known token decimals to avoid RPC calls
-const KNOWN_DECIMALS: Record<string, number> = {
-  [ARBME.address.toLowerCase()]: 18,
-  '0x4200000000000000000000000000000000000006': 18, // WETH
-  '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913': 6,  // USDC
-  '0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf': 8,  // cbBTC
-  '0x50c5725949a6f0c72e6c4a641f24049a917db0cb': 18, // DAI
-}
-
 async function getDecimals(token: string): Promise<number> {
-  const known = KNOWN_DECIMALS[token.toLowerCase()]
-  if (known !== undefined) return known
   return getTokenDecimals(token as `0x${string}`)
 }
 

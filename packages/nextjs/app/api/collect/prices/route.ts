@@ -16,11 +16,11 @@ const CLANKER_ADDRESS = '0x1bc0c42215582d5a085795f4badbac3ff36d1bcb'
  * Optional auth via CRON_SECRET for security.
  */
 export async function POST(request: NextRequest) {
-  // Optional: verify cron secret for security
+  // Verify cron secret for security
   const authHeader = request.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET
 
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

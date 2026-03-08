@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server'
 import { fetchPoolsForToken } from '@arbme/core-lib'
+import { RATCHET_ADDRESS } from '@/utils/constants'
 
 export const maxDuration = 60
-
-const RATCHET_ADDRESS = '0x392bc5DeEa227043d69Af0e67BadCbBAeD511B07'
 
 export async function GET() {
   try {

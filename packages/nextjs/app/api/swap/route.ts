@@ -39,8 +39,8 @@ export async function POST(request: NextRequest) {
     if (BigInt(amountIn) <= 0n) {
       return NextResponse.json({ error: 'amountIn must be positive' }, { status: 400 })
     }
-    if (BigInt(minAmountOut) < 0n) {
-      return NextResponse.json({ error: 'minAmountOut cannot be negative' }, { status: 400 })
+    if (BigInt(minAmountOut) <= 0n) {
+      return NextResponse.json({ error: 'minAmountOut must be positive' }, { status: 400 })
     }
 
     // Validate hooks address if provided

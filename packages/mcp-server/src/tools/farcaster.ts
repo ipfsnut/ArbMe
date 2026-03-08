@@ -1,13 +1,16 @@
 import { z } from "zod";
-import { readFileSync, writeFileSync } from "fs";
+import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
+import { homedir } from "os";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ServerConfig } from "../lib/config.js";
 import { CN_BASE_URL } from "../lib/config.js";
+import { fetchWithTimeout } from "../lib/fetch.js";
 
 // ── Crosspost state management ──────────────────────────────────────
 
-const STATE_FILE = join(process.cwd(), ".crosspost-state.json");
+const STATE_DIR = join(process.env.XDG_CACHE_HOME || join(homedir(), ".cache"), "arbme-mcp");
+const STATE_FILE = join(STATE_DIR, "crosspost-state.json");
 
 function loadState(): Set<string> {
   try {
@@ -20,6 +23,7 @@ function loadState(): Set<string> {
 
 function saveState(posted: Set<string>): void {
   const ids = [...posted].slice(-500);
+  mkdirSync(STATE_DIR, { recursive: true });
   writeFileSync(
     STATE_FILE,
     JSON.stringify({ posted: ids, updated: new Date().toISOString() }),
@@ -39,7 +43,7 @@ async function castToFarcaster(
   if (embedUrl) body.embeds = [{ url: embedUrl }];
   if (channelId) body.channel_id = channelId;
 
-  const response = await fetch("https://api.neynar.com/v2/farcaster/cast", {
+  const response = await fetchWithTimeout("https://api.neynar.com/v2/farcaster/cast", {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-api-key": apiKey },
     body: JSON.stringify(body),
@@ -81,7 +85,7 @@ export function registerFarcasterTools(server: McpServer, config: ServerConfig) 
       const maxCrosspost = max_posts ?? config.maxCrosspost;
       const isDryRun = dry_run ?? false;
 
-      const feedResponse = await fetch(`${CN_BASE_URL}/?p=1`, {
+      const feedResponse = await fetchWithTimeout(`${CN_BASE_URL}/?p=1`, {
         headers: { Accept: "application/json" },
       });
 
@@ -160,7 +164,7 @@ export function registerFarcasterTools(server: McpServer, config: ServerConfig) 
       }
 
       const l = limit ?? 20;
-      const response = await fetch(
+      const response = await fetchWithTimeout(
         `https://api.neynar.com/v2/farcaster/notifications?fid=${targetFid}&limit=${l}`,
         { headers: { "x-api-key": config.neynarApiKey } },
       );

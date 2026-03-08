@@ -66,7 +66,7 @@ export const BASE_RPCS_FALLBACK = [
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const PAGE_ARBME_POOL = {
-  address: '0x11FD494780ba58550E027ef64C0e36a914FF0F8A',
+  address: '0x11FD4947bE07E721B57622df3ef1E1C773ED5655',
   token0: TOKENS.PAGE,
   token1: ARBME.address,
   fee: 0.003, // 0.3%
@@ -155,5 +155,5 @@ export const FEE_TO_TICK_SPACING: Record<number, number> = {
 // V2 getReserves() selector
 export const GET_RESERVES = '0x0902f1ac';
 
-// V4 getSlot0 selector (on StateView)
-export const GET_SLOT0 = '0x3850c7bd';
+// V4 StateView.getSlot0(bytes32) selector — keccak256("getSlot0(bytes32)")[:4]
+export const GET_SLOT0 = '0xc815641c';

@@ -467,6 +467,7 @@ export default function TradePage() {
       return { address, ...knownTokens[lowerAddr] }
     }
 
+    console.warn(`[trade] Unknown token ${address}, defaulting to 18 decimals — amounts may be wrong`)
     return {
       address,
       symbol: address.slice(0, 6) + '...',
@@ -760,14 +761,25 @@ export default function TradePage() {
             {txHash && swapStatus === 'success' && (
               <div className="tx-success">
                 <span>{isSafe ? 'Proposed to Safe' : 'Swap successful!'}</span>
-                <a
-                  href={`https://basescan.org/tx/${txHash}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="tx-link"
-                >
-                  View on Basescan
-                </a>
+                {isSafe ? (
+                  <a
+                    href={`https://app.safe.global/transactions/queue?safe=base:${wallet}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="tx-link"
+                  >
+                    View in Safe
+                  </a>
+                ) : (
+                  <a
+                    href={`https://basescan.org/tx/${txHash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="tx-link"
+                  >
+                    View on Basescan
+                  </a>
+                )}
                 <button
                   className="tx-dismiss"
                   onClick={() => { setTxHash(null); setSwapStatus('idle') }}

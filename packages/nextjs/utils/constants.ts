@@ -54,10 +54,10 @@ export const FEATURED_POOLS: FeaturedPoolConfig[] = [
 ];
 
 // Foundation
-export const CHAOS_FOUNDATION_MULTISIG = '0x3CE26de6FF74e0Baa5F762b67465eEacfE84549F';
+export const CHAOS_FOUNDATION_MULTISIG = '0xb7DD467A573809218aAE30EB2c60e8AE3a9198a0';
 
-// CHAOS Staking Hub + Spokes (update addresses after deployment)
-export const CHAOS_STAKING_ADDRESS: string = '0x70e6c917A8AC437E629B67E84C0C0678eD54460d';
+// ChaosLP Staking Hub + Gauge Spokes (update addresses after deployment)
+export const CHAOS_STAKING_ADDRESS: string = '0x48D9eC58746aD41731De91Efb1e315c8fcF5d20a';
 
 export interface GaugeConfig {
   symbol: string;
@@ -69,12 +69,11 @@ export interface GaugeConfig {
 }
 
 export const CHAOS_GAUGES: GaugeConfig[] = [
-  { symbol: 'ARBME',   tokenAddress: ARBME_ADDRESS,   gaugeAddress: '0x37547710faE12B4be7458b5E87C3106a85CfD72F', decimals: 18, pool: 'CHAOS / ARBME',   week: 1 },
-  { symbol: 'USDC',    tokenAddress: USDC_ADDRESS,    gaugeAddress: '0x8d3074Bdf9412D77269F59Cc506E318E5da27914', decimals: 6,  pool: 'CHAOS / USDC',    week: 2 },
-  { symbol: 'ALPHACLAW', tokenAddress: ALPHACLAW_ADDRESS, gaugeAddress: '0x0000000000000000000000000000000000000000', decimals: 18, pool: 'CHAOS / ALPHACLAW', week: 3 },
-
-  { symbol: 'Cnews',   tokenAddress: CNEWS_ADDRESS,   gaugeAddress: '0x0000000000000000000000000000000000000000', decimals: 18, pool: 'CHAOS / Cnews',   week: 6 },
-  { symbol: 'RATCHET', tokenAddress: RATCHET_ADDRESS, gaugeAddress: '0x0000000000000000000000000000000000000000', decimals: 18, pool: 'CHAOS / RATCHET', week: 7 },
+  { symbol: 'CHAOSLP', tokenAddress: CHAOSLP_ADDRESS, gaugeAddress: '0x48D9eC58746aD41731De91Efb1e315c8fcF5d20a', decimals: 18, pool: 'Hub Reward',       week: 1 },
+  { symbol: 'ARBME',   tokenAddress: ARBME_ADDRESS,   gaugeAddress: '0xecf0307ed8d64cEEc82B1A2488D9c7969c0B26f2', decimals: 18, pool: 'CHAOSLP / ARBME',    week: 2 },
+  { symbol: 'CLANKER', tokenAddress: CLANKER_ADDRESS,  gaugeAddress: '0xb9135C878DA7f229E39CD16121B5F7796eE7DB53', decimals: 18, pool: 'CHAOSLP / CLANKER',  week: 3 },
+  { symbol: 'FLAY',    tokenAddress: FLAY_ADDRESS,    gaugeAddress: '0xE2aCDb1dea6422671e95500834eBc21dbbDf5F7D', decimals: 18, pool: 'CHAOSLP / FLAY',     week: 4 },
+  { symbol: 'VIRTUAL', tokenAddress: VIRTUAL_ADDRESS,  gaugeAddress: '0x839ac3EB369D7f5d55f01Fb13770D515841439d6', decimals: 18, pool: 'CHAOSLP / VIRTUAL',  week: 5 },
 ];
 
 // Routes

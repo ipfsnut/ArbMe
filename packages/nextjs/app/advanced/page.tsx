@@ -22,9 +22,9 @@ const ABC_ALPHA_URL = 'https://warpcast.com/abc-alpha'
 const ECOSYSTEM_TOKENS = [
   { symbol: 'CHAOSLP', role: 'Hub' },
   { symbol: 'ARBME', role: 'Infrastructure' },
-  { symbol: 'USDC', role: 'Stablecoin' },
+  { symbol: 'CLANKER', role: 'Clanker Ecosystem' },
   { symbol: 'FLAY', role: 'Flaunch Ecosystem' },
-  { symbol: 'RATCHET', role: 'Infrastructure' },
+  { symbol: 'VIRTUAL', role: 'Virtuals Ecosystem' },
 ]
 
 // -- Helpers --
@@ -411,8 +411,8 @@ export default function AdvancedPage() {
         {/* About */}
         <div className="ct-about">
           <p className="ct-about-text">
-            $CHAOSLP is a high-risk coordination asset for ArbMe. Stake to earn from four reward streams
-            (CHAOSLP, ARBME, USDC, FLAY) sourced from LP fee revenue across three Uniswap V4 pools.
+            $CHAOSLP is a high-risk coordination asset for ArbMe. Stake to earn from five reward streams
+            (CHAOSLP, ARBME, CLANKER, FLAY, VIRTUAL) sourced from LP fee revenue across ChaosLP pools.
           </p>
           <div className="ct-about-links">
             <a href={CHAOSLP_INFO_URL} target="_blank" rel="noopener noreferrer" className="ct-link-pill">
@@ -451,14 +451,14 @@ export default function AdvancedPage() {
         {/* ═══════ CHAOS STAKING HUB (OLD) ═══════ */}
         <div className="ct-section">
           <div className="section-header">
-            <h2>CHAOS Staking (OLD)</h2>
-            <p className="ct-section-desc">Legacy staking for the original $CHAOS token. ChaosLP staking coming soon.</p>
+            <h2>ChaosLP Staking</h2>
+            <p className="ct-section-desc">Stake $CHAOSLP to earn from five reward streams. Rewards are distributed automatically — claim anytime.</p>
           </div>
         </div>
         {!isDeployed ? (
           <div className="empty-state">
-            <p>Deployment in progress</p>
-            <p className="hint">Hub + 7 reward gauge contracts deploying to Base. Staking will go live once the multisig confirms.</p>
+            <p>Contract not found</p>
+            <p className="hint">ChaosLP staking hub is being set up. Check back soon.</p>
           </div>
         ) : !wallet ? (
           <div className="empty-state">
@@ -471,12 +471,12 @@ export default function AdvancedPage() {
             <div className="staking-user-info">
               <div className="user-stat">
                 <span className="user-stat-label">Your Stake</span>
-                <span className="user-stat-value">{formatNumber(stakingData!.staked)} CHAOS</span>
+                <span className="user-stat-value">{formatNumber(stakingData!.staked)} CHAOSLP</span>
               </div>
               {BigInt(stakingData!.earned) > 0n && (
                 <div className="user-stat">
-                  <span className="user-stat-label">CHAOS Earned</span>
-                  <span className="user-stat-value text-positive">{formatNumber(stakingData!.earned)} CHAOS</span>
+                  <span className="user-stat-label">CHAOSLP Earned</span>
+                  <span className="user-stat-value text-positive">{formatNumber(stakingData!.earned)} CHAOSLP</span>
                 </div>
               )}
               {gauges.filter(g => g.status === 'live' && BigInt(g.earned) > 0n).map(g => (
@@ -487,7 +487,7 @@ export default function AdvancedPage() {
               ))}
               <div className="user-stat">
                 <span className="user-stat-label">Wallet Balance</span>
-                <span className="user-stat-value">{formatNumber(stakingData!.balance)} CHAOS</span>
+                <span className="user-stat-value">{formatNumber(stakingData!.balance)} CHAOSLP</span>
               </div>
             </div>
 
@@ -511,7 +511,7 @@ export default function AdvancedPage() {
                     value={stakeAmount} onChange={e => setStakeAmount(e.target.value)}
                     min="0" step="any"
                   />
-                  <div className="input-token">CHAOS</div>
+                  <div className="input-token">CHAOSLP</div>
                 </div>
               </div>
               <div className="action-buttons">
@@ -545,7 +545,7 @@ export default function AdvancedPage() {
                     value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)}
                     min="0" step="any"
                   />
-                  <div className="input-token">CHAOS</div>
+                  <div className="input-token">CHAOSLP</div>
                 </div>
               </div>
               <div className="action-buttons">
@@ -569,7 +569,7 @@ export default function AdvancedPage() {
                 {BigInt(stakingData!.earned) > 0n && (
                   <div className="rewards-row">
                     <span className="rewards-amount">{formatNumber(stakingData!.earned)}</span>
-                    <span className="rewards-token">CHAOS (hub)</span>
+                    <span className="rewards-token">CHAOSLP (hub)</span>
                   </div>
                 )}
                 {gauges.filter(g => g.status === 'live').length === 0 && BigInt(stakingData!.earned) === 0n && (
@@ -741,7 +741,7 @@ export default function AdvancedPage() {
         {/* ═══════ REWARD GAUGES ═══════ */}
         <CollapsibleSection
           title="Reward Gauges"
-          description="Each gauge streams a different pair asset to $CHAOS stakers over 180 days. LP fees from 7 CHAOS pairs fund the gauges on a weekly rotation."
+          description="Each gauge streams a different reward token to $CHAOSLP stakers over 180 days. LP fees from ChaosLP pools fund the gauges."
         >
           <div className="rg-grid">
             {gauges.map((g) => (
@@ -784,8 +784,8 @@ export default function AdvancedPage() {
 
         {/* ═══════ ROTATION SCHEDULE ═══════ */}
         <CollapsibleSection
-          title="7-Week Rotation"
-          description="LP fees are collected from one pair each week. The collected tokens fund a 180-day reward stream. CHAOS from LP fees is reinvested, not distributed."
+          title="Reward Schedule"
+          description="LP fees collected from ChaosLP pools fund 180-day reward streams on each gauge. Streams can be topped up at any time."
         >
           <div className="rs-timeline">
             {gauges.map((g, i) => (
@@ -862,7 +862,7 @@ export default function AdvancedPage() {
 
         {/* Contract footer */}
         <div className="contract-info">
-          <span className="contract-label">CHAOS Staking Hub</span>
+          <span className="contract-label">ChaosLP Staking Hub</span>
           {CHAOS_STAKING_ADDRESS !== '0x0000000000000000000000000000000000000000' ? (
             <a href={`https://basescan.org/address/${CHAOS_STAKING_ADDRESS}`} target="_blank" rel="noopener noreferrer" className="contract-address">
               {CHAOS_STAKING_ADDRESS}

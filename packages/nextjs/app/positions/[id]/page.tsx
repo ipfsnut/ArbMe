@@ -208,9 +208,10 @@ export default function PositionDetailPage() {
       await sendTransaction(transaction)
       setTransferStatus('success')
 
-      setTimeout(async () => {
-        await invalidate()
-        router.push(ROUTES.MY_POOLS)
+      setTimeout(() => {
+        invalidate().catch(() => {}).finally(() => {
+          router.push(ROUTES.MY_POOLS)
+        })
       }, 3000)
     } catch (err: any) {
       console.error('[transferPosition] Error:', err)

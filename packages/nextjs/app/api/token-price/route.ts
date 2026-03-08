@@ -27,7 +27,7 @@ export async function GET(request: Request) {
 
   // Multiple token prices
   if (addresses) {
-    const addressList = addresses.split(',').map(a => a.trim())
+    const addressList = addresses.split(',').map(a => a.trim()).slice(0, 50)
 
     for (const addr of addressList) {
       if (!/^0x[a-fA-F0-9]{40}$/.test(addr)) {

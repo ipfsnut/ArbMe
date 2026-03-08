@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server'
 import { fetchPoolsForToken } from '@arbme/core-lib'
+import { CHAOSLP_ADDRESS } from '@/utils/constants'
 
 export const maxDuration = 60
-
-const CHAOSLP_ADDRESS = '0x8454d062506a27675706148ecdd194e45e44067a'
 
 export async function GET() {
   try {

@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
-import { fetchPoolsForToken } from '@arbme/core-lib'
+import { fetchPoolsForToken, ARBME } from '@arbme/core-lib'
 
 export const maxDuration = 60
 
 const ALCHEMY_KEY = process.env.ALCHEMY_API_KEY
-const ARBME_ADDRESS = '0xC647421C5Dc78D1c3960faA7A33f9aEFDF4B7B07'
+const ARBME_ADDRESS = ARBME.address
 
 export async function GET() {
   try {
