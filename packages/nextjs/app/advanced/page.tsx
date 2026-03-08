@@ -66,7 +66,6 @@ interface GaugeData {
   symbol: string
   decimals: number
   pool: string
-  week: number
   rewardRate: string
   periodFinish: number
   earned: string
@@ -776,16 +775,16 @@ export default function AdvancedPage() {
                     {formatCountdown(g.periodFinish)} remaining
                   </div>
                 )}
-                <div className="rg-week">Week {g.week} of rotation</div>
+                <div className="rg-week">180-day stream</div>
               </div>
             ))}
           </div>
         </CollapsibleSection>
 
-        {/* ═══════ ROTATION SCHEDULE ═══════ */}
+        {/* ═══════ REWARD SCHEDULE ═══════ */}
         <CollapsibleSection
           title="Reward Schedule"
-          description="LP fees collected from ChaosLP pools fund 180-day reward streams on each gauge. Streams can be topped up at any time."
+          description="All gauges run simultaneously. LP fees from ChaosLP pools fund 180-day reward streams that can be topped up at any time."
         >
           <div className="rs-timeline">
             {gauges.map((g, i) => (
@@ -796,7 +795,6 @@ export default function AdvancedPage() {
                 </div>
                 <div className={`rs-card ${g.status === 'live' ? 'rs-card-active' : ''}`}>
                   <div className="rs-card-top">
-                    <span className="rs-week-label">Week {g.week}</span>
                     <span className={`rg-badge rg-badge-${g.status}`}>
                       {g.status === 'live' ? 'Live' : g.status === 'ended' ? 'Ended' : 'Pending'}
                     </span>
@@ -805,7 +803,12 @@ export default function AdvancedPage() {
                     <span className="rs-token">{g.symbol}</span>
                     <span className="rs-pool">{g.pool}</span>
                   </div>
-                  <div className="rs-stream">180-day stream</div>
+                  {g.status === 'live' && g.periodFinish > 0 && (
+                    <div className="rs-stream">{formatCountdown(g.periodFinish)} remaining</div>
+                  )}
+                  {g.status !== 'live' && (
+                    <div className="rs-stream">180-day stream</div>
+                  )}
                 </div>
               </div>
             ))}

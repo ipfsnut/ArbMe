@@ -65,15 +65,14 @@ export interface GaugeConfig {
   gaugeAddress: string;
   decimals: number;
   pool: string;
-  week: number;
 }
 
 export const CHAOS_GAUGES: GaugeConfig[] = [
-  { symbol: 'CHAOSLP', tokenAddress: CHAOSLP_ADDRESS, gaugeAddress: '0x48D9eC58746aD41731De91Efb1e315c8fcF5d20a', decimals: 18, pool: 'Hub Reward',       week: 1 },
-  { symbol: 'ARBME',   tokenAddress: ARBME_ADDRESS,   gaugeAddress: '0xecf0307ed8d64cEEc82B1A2488D9c7969c0B26f2', decimals: 18, pool: 'CHAOSLP / ARBME',    week: 2 },
-  { symbol: 'CLANKER', tokenAddress: CLANKER_ADDRESS,  gaugeAddress: '0xb9135C878DA7f229E39CD16121B5F7796eE7DB53', decimals: 18, pool: 'CHAOSLP / CLANKER',  week: 3 },
-  { symbol: 'FLAY',    tokenAddress: FLAY_ADDRESS,    gaugeAddress: '0xE2aCDb1dea6422671e95500834eBc21dbbDf5F7D', decimals: 18, pool: 'CHAOSLP / FLAY',     week: 4 },
-  { symbol: 'VIRTUAL', tokenAddress: VIRTUAL_ADDRESS,  gaugeAddress: '0x839ac3EB369D7f5d55f01Fb13770D515841439d6', decimals: 18, pool: 'CHAOSLP / VIRTUAL',  week: 5 },
+  { symbol: 'CHAOSLP', tokenAddress: CHAOSLP_ADDRESS, gaugeAddress: '0x48D9eC58746aD41731De91Efb1e315c8fcF5d20a', decimals: 18, pool: 'Hub Reward' },
+  { symbol: 'ARBME',   tokenAddress: ARBME_ADDRESS,   gaugeAddress: '0xecf0307ed8d64cEEc82B1A2488D9c7969c0B26f2', decimals: 18, pool: 'CHAOSLP / ARBME' },
+  { symbol: 'CLANKER', tokenAddress: CLANKER_ADDRESS,  gaugeAddress: '0xb9135C878DA7f229E39CD16121B5F7796eE7DB53', decimals: 18, pool: 'CHAOSLP / CLANKER' },
+  { symbol: 'FLAY',    tokenAddress: FLAY_ADDRESS,    gaugeAddress: '0xE2aCDb1dea6422671e95500834eBc21dbbDf5F7D', decimals: 18, pool: 'CHAOSLP / FLAY' },
+  { symbol: 'VIRTUAL', tokenAddress: VIRTUAL_ADDRESS,  gaugeAddress: '0x839ac3EB369D7f5d55f01Fb13770D515841439d6', decimals: 18, pool: 'CHAOSLP / VIRTUAL' },
 ];
 
 // Routes
