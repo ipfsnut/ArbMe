@@ -56,8 +56,6 @@ export function AppHeader() {
     { href: ROUTES.MY_POOLS, label: 'Positions' },
     { href: ROUTES.ADD_LIQUIDITY, label: '+ Add' },
     { href: ROUTES.TRAFFIC, label: 'Traffic' },
-    { href: ROUTES.TREASURY, label: 'Treasury' },
-    { href: '/blog', label: 'Blog' },
   ]
 
   const isActive = (href: string) =>
