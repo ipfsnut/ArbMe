@@ -44,10 +44,39 @@ export async function POST(request: NextRequest) {
       hooks,
     })
 
-    // Validate the swap by simulating with minAmountOut=1 (no slippage check)
-    // This catches approval issues, pool problems, and balance issues
-    // without failing on stale quotes. On-chain slippage protection still applies.
     const client = getClient()
+
+    // For V4: pre-check Permit2 allowance before simulating (revert data is empty, can't detect otherwise)
+    if (normalizedVersion === 'V4') {
+      try {
+        const PERMIT2 = '0x000000000022D473030F116dDEE9F6B43aC78BA3' as const
+        const UNIVERSAL_ROUTER = '0x6ff5693b99212da76ad316178a184ab56d299b43' as const
+        const permit2Result = await client.readContract({
+          address: PERMIT2,
+          abi: [{ name: 'allowance', type: 'function', stateMutability: 'view', inputs: [{ name: 'owner', type: 'address' }, { name: 'token', type: 'address' }, { name: 'spender', type: 'address' }], outputs: [{ name: 'amount', type: 'uint160' }, { name: 'expiration', type: 'uint48' }, { name: 'nonce', type: 'uint48' }] }] as const,
+          functionName: 'allowance',
+          args: [recipient as `0x${string}`, tokenIn as `0x${string}`, UNIVERSAL_ROUTER],
+        })
+        const [allowanceAmount, expiration] = permit2Result
+        const now = Math.floor(Date.now() / 1000)
+        if (allowanceAmount < BigInt(amountIn)) {
+          return NextResponse.json({
+            error: `Permit2 allowance insufficient (have ${allowanceAmount.toString()}, need ${amountIn}). Please approve first.`,
+            needsApproval: true,
+          }, { status: 400 })
+        }
+        if (Number(expiration) > 0 && Number(expiration) <= now) {
+          return NextResponse.json({
+            error: 'Permit2 approval expired. Please re-approve.',
+            needsApproval: true,
+          }, { status: 400 })
+        }
+      } catch (e) {
+        console.warn('[swap] Permit2 pre-check failed, proceeding with simulation:', e)
+      }
+    }
+
+    // Validate the swap by simulating with minAmountOut=1 (no slippage check)
     const validationTx = buildSwapTransaction({
       poolAddress,
       version: normalizedVersion as 'V2' | 'V3' | 'V4',
