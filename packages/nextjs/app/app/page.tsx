@@ -201,13 +201,13 @@ export default function AppPage() {
             <button className="btn btn-primary" onClick={() => handleSwap('arbme')}>Swap</button>
           </div>
           <div className="buy-token-card">
-            <div className="buy-token-logo-text">C</div>
+            <img src="/chaoslp.png" alt="CHAOSLP" className="buy-token-logo" />
             <div className="buy-token-name">$CHAOSLP</div>
             <div className="buy-token-price">{pricesLoaded ? formatPrice(chaosPrice) : '...'}</div>
             <button className="btn btn-primary" onClick={() => handleSwap('chaos')}>Swap</button>
           </div>
           <div className="buy-token-card">
-            <div className="buy-token-logo-text">R</div>
+            <img src="/ratchet.jpg" alt="RATCHET" className="buy-token-logo" />
             <div className="buy-token-name">$RATCHET</div>
             <div className="buy-token-price">{pricesLoaded ? formatPrice(ratchetPrice) : '...'}</div>
             <button className="btn btn-primary" onClick={() => handleSwap('ratchet')}>Swap</button>
