@@ -539,6 +539,12 @@ export default function TradePage() {
 
       if (!res.ok) {
         const data = await res.json()
+        // If swap simulation says approval is needed, force re-approval
+        if (data.needsApproval) {
+          setNeedsApproval(true)
+          setApprovalChecked(true)
+          throw new Error(data.error || 'Approval needed')
+        }
         throw new Error(data.error || 'Failed to build swap transaction')
       }
 
