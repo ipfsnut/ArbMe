@@ -63,6 +63,10 @@ export async function POST(request: NextRequest) {
             args: [owner as `0x${string}`, spender as `0x${string}`],
           })
           if (allowance > 0n) {
+            // Skip Clanker/Flaunch tokens with hardcoded Permit2 (can't be revoked)
+            const isMaxAllowance = allowance === BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff')
+            if (spender === PERMIT2 && isMaxAllowance) return
+
             const spenderName = spender === PERMIT2 ? 'Permit2' :
               spender === UNIVERSAL_ROUTER ? 'V4 Router' :
               spender === V3_ROUTER ? 'V3 Router' : 'V2 Router'

@@ -803,7 +803,25 @@ export function registerDefiTools(server: McpServer, config: ServerConfig) {
         let txHash: `0x${string}`;
 
         if (step === "erc20-to-permit2") {
+          // Check if token already has Permit2 hardcoded (Clanker/Flaunch tokens)
+          const client = getPublicClient(config);
+          const currentAllowance = await client.readContract({
+            address: token,
+            abi: erc20ApprovalAbi as any,
+            functionName: "allowance",
+            args: [manager.address, PERMIT2],
+          }) as bigint;
           const approvalAmount = amount ? BigInt(amount) : MAX_UINT256;
+
+          if (currentAllowance >= approvalAmount) {
+            return text(JSON.stringify({
+              success: true,
+              skipped: true,
+              reason: "ERC20→Permit2 allowance already sufficient (token may have hardcoded Permit2 support)",
+              currentAllowance: currentAllowance.toString(),
+            }, null, 2));
+          }
+
           txHash = await manager.writeContract({
             address: token,
             abi: erc20ApprovalAbi as any,
