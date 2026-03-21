@@ -611,6 +611,8 @@ function AddLiquidityPage() {
     const needsPermit2Key = token === 'token0' ? 'token0NeedsPermit2Approval' : 'token1NeedsPermit2Approval'
     const needsErc20 = token === 'token0' ? state.token0NeedsErc20Approval : state.token1NeedsErc20Approval
     const needsPermit2 = token === 'token0' ? state.token0NeedsPermit2Approval : state.token1NeedsPermit2Approval
+    const tokenAmount = token === 'token0' ? state.amount0 : state.amount1
+    const tokenAmountWei = tokenAmount ? parseUnits(tokenAmount, tokenInfo.decimals).toString() : undefined
 
     // Set to signing state
     updateState({ [statusKey]: 'signing', [errorKey]: null })
@@ -629,6 +631,7 @@ function AddLiquidityPage() {
               token: tokenInfo.address,
               version: 'V4',
               approvalType: 'erc20',
+              amount: tokenAmountWei,
             }),
           })
 
@@ -682,6 +685,7 @@ function AddLiquidityPage() {
               token: tokenInfo.address,
               version: 'V4',
               approvalType: 'permit2',
+              amount: tokenAmountWei,
             }),
           })
 
@@ -743,7 +747,7 @@ function AddLiquidityPage() {
         body: JSON.stringify({
           token: tokenInfo.address,
           spender,
-          unlimited: true,
+          amount: tokenAmountWei,
         }),
       })
 
@@ -1314,13 +1318,14 @@ function AddLiquidityPage() {
                 balance={state.token0Info?.balance}
                 value={state.amount0}
                 usdValue={state.token0FetchedUsdPrice && state.amount0 ? parseFloat(state.amount0) * state.token0FetchedUsdPrice : null}
+                disabled={state.token0ApprovalStatus === 'confirmed' || state.token0ApprovalStatus === 'signing' || state.token0ApprovalStatus === 'confirming'}
                 onChange={(amount0) => {
                   // Auto-calculate amount1 based on price ratio
                   if (effectivePriceRatio && amount0 && parseFloat(amount0) > 0) {
                     const calculatedAmount1 = parseFloat(amount0) * effectivePriceRatio
-                    updateState({ amount0, amount1: formatDecimal(calculatedAmount1) })
+                    updateState({ amount0, amount1: formatDecimal(calculatedAmount1), approvalsChecked: false })
                   } else {
-                    updateState({ amount0 })
+                    updateState({ amount0, approvalsChecked: false })
                   }
                 }}
               />
@@ -1331,13 +1336,14 @@ function AddLiquidityPage() {
                 balance={state.token1Info?.balance}
                 value={state.amount1}
                 usdValue={state.token1FetchedUsdPrice && state.amount1 ? parseFloat(state.amount1) * state.token1FetchedUsdPrice : null}
+                disabled={state.token1ApprovalStatus === 'confirmed' || state.token1ApprovalStatus === 'signing' || state.token1ApprovalStatus === 'confirming'}
                 onChange={(amount1) => {
                   // Auto-calculate amount0 based on price ratio
                   if (effectivePriceRatio && effectivePriceRatio > 0 && amount1 && parseFloat(amount1) > 0) {
                     const calculatedAmount0 = parseFloat(amount1) / effectivePriceRatio
-                    updateState({ amount1, amount0: formatDecimal(calculatedAmount0) })
+                    updateState({ amount1, amount0: formatDecimal(calculatedAmount0), approvalsChecked: false })
                   } else {
-                    updateState({ amount1 })
+                    updateState({ amount1, approvalsChecked: false })
                   }
                 }}
               />

@@ -80,6 +80,7 @@ export default function TradePage() {
   const [needsPermit2Approval, setNeedsPermit2Approval] = useState(false)
   const [approvalLoading, setApprovalLoading] = useState(false)
   const [approvalStep, setApprovalStep] = useState<'erc20' | 'permit2' | null>(null)
+  const [approvedSwapAmount, setApprovedSwapAmount] = useState<string | null>(null)
 
   // Balance state
   const [balanceIn, setBalanceIn] = useState<string | null>(null) // formatted (human-readable)
@@ -343,6 +344,7 @@ export default function TradePage() {
               version: 'V4',
               approvalType: 'erc20',
               v4Spender: 'universal-router',
+              amount: amountInWei,
             }),
           })
 
@@ -367,6 +369,7 @@ export default function TradePage() {
               version: 'V4',
               approvalType: 'permit2',
               v4Spender: 'universal-router',
+              amount: amountInWei,
             }),
           })
 
@@ -382,6 +385,7 @@ export default function TradePage() {
 
         setNeedsApproval(false)
         setApprovalStep(null)
+        setApprovedSwapAmount(swapAmount)
       } else {
         // V2/V3: single ERC20 approval to router
         const res = await fetch(`${API_BASE}/build-approval`, {
@@ -390,7 +394,7 @@ export default function TradePage() {
           body: JSON.stringify({
             token: tokenIn.address,
             spender: approvalSpender,
-            unlimited: true,
+            amount: amountInWei,
           }),
         })
 
@@ -402,6 +406,7 @@ export default function TradePage() {
         const { transaction } = await res.json()
         await sendTransaction(transaction)
         setNeedsApproval(false)
+        setApprovedSwapAmount(swapAmount)
       }
     } catch (err: any) {
       console.error('[TradePage] Approval error:', err)
@@ -686,9 +691,9 @@ export default function TradePage() {
                 type="number"
                 className="amount-input"
                 placeholder="0.0"
-                value={swapAmount}
-                onChange={(e) => setSwapAmount(e.target.value)}
-                disabled={swapStatus === 'pending'}
+                value={approvedSwapAmount ?? swapAmount}
+                onChange={(e) => { setSwapAmount(e.target.value); setApprovedSwapAmount(null) }}
+                disabled={swapStatus === 'pending' || approvedSwapAmount !== null}
               />
             </div>
 
@@ -799,11 +804,11 @@ export default function TradePage() {
                 {approvalLoading ? (
                   <><span className="loading-spinner small" /> Approving {tokenIn?.symbol}...</>
                 ) : version === 'V4' && approvalStep === 'permit2' ? (
-                  `Approve ${tokenIn?.symbol} for Swap (Step 2/2)`
+                  `Approve ${swapAmount} ${tokenIn?.symbol} for Swap (Step 2/2)`
                 ) : version === 'V4' && needsErc20Approval && needsPermit2Approval ? (
-                  `Approve ${tokenIn?.symbol} (Step 1/2)`
+                  `Approve ${swapAmount} ${tokenIn?.symbol} (Step 1/2)`
                 ) : (
-                  `Approve ${tokenIn?.symbol}`
+                  `Approve ${swapAmount} ${tokenIn?.symbol}`
                 )}
               </button>
             ) : swapStatus === 'success' ? null : (
@@ -823,6 +828,13 @@ export default function TradePage() {
                 )}
                 {swapStatus === 'error' && 'Failed - Try Again'}
                 {swapStatus === 'idle' && (swapQuote ? 'Execute Swap' : (quoteLoading ? 'Getting quote...' : 'Enter amount'))}
+              </button>
+            )}
+            {approvedSwapAmount !== null && !needsApproval && swapStatus !== 'success' && (
+              <button onClick={() => { setApprovedSwapAmount(null); setNeedsApproval(false) }}
+                disabled={swapStatus === 'pending'}
+                style={{ marginTop: 'var(--spacing-sm)', fontSize: 'var(--text-sm)', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', width: '100%', textAlign: 'center' }}>
+                Change amount
               </button>
             )}
           </div>

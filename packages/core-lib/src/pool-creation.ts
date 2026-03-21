@@ -406,11 +406,13 @@ export async function checkV4PoolExists(
 /**
  * Build ERC20 approval transaction
  */
-export function buildApproveTransaction(token: Address, spender: Address): Transaction {
-  // approve(address,uint256) - max uint256
+export function buildApproveTransaction(token: Address, spender: Address, amount?: bigint): Transaction {
+  const amountHex = amount !== undefined
+    ? amount.toString(16).padStart(64, '0')
+    : 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
   const data = '0x095ea7b3' +
     spender.slice(2).padStart(64, '0') +
-    'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
+    amountHex;
 
   return {
     to: token,

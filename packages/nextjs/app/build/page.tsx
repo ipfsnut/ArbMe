@@ -189,7 +189,7 @@ export default function BuildPage() {
     setActionLoading('approve')
     setActionError(null)
     try {
-      await executeStakingAction('/api/staking/approve')
+      await executeStakingAction('/api/staking/approve', { amount: parseToWei(stakeAmount) })
       setApprovedAmount(stakeAmount)
       setStakeStep('approved')
     } catch (err: any) {
@@ -267,14 +267,14 @@ export default function BuildPage() {
         const errorData = await res.json().catch(() => ({}))
         throw new Error(errorData.error || 'Failed to build compound transactions')
       }
-      const { transactions, needsApproval } = await res.json()
+      const { transactions, needsApproval, earnedAmount } = await res.json()
 
       // Handle approval if needed
       if (needsApproval) {
         const approveRes = await fetch('/api/staking/approve', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({}),
+          body: JSON.stringify({ amount: earnedAmount }),
         })
         if (!approveRes.ok) throw new Error('Failed to build approval transaction')
         const { transaction: approveTx } = await approveRes.json()
@@ -447,6 +447,32 @@ export default function BuildPage() {
             )}
 
             {/* Stake Section */}
+            {stakeStep === 'approved' ? (
+            <div className="staking-section">
+              <h3>Stake</h3>
+              <div style={{ padding: 'var(--spacing-md)', border: '1px solid var(--accent)', borderRadius: 'var(--radius)', marginBottom: 'var(--spacing-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>Approved Amount</div>
+                  <div style={{ fontSize: 'var(--text-lg)', fontWeight: 600 }}>{approvedAmount} RATCHET</div>
+                </div>
+                <span style={{ color: 'var(--accent)', fontSize: 'var(--text-sm)' }}>Approved</span>
+              </div>
+              <div className="action-buttons">
+                <button
+                  className="btn btn-primary full-width"
+                  onClick={handleStake}
+                  disabled={actionLoading !== null}
+                >
+                  {actionLoading === 'stake' ? 'Staking...' : `Stake ${approvedAmount} RATCHET`}
+                </button>
+              </div>
+              <button onClick={() => { setStakeStep('input'); setApprovedAmount('') }}
+                disabled={actionLoading !== null}
+                style={{ marginTop: 'var(--spacing-sm)', fontSize: 'var(--text-sm)', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+                Change amount
+              </button>
+            </div>
+            ) : (
             <div className="staking-section">
               <h3>Stake</h3>
               <div className="input-group">
@@ -474,21 +500,22 @@ export default function BuildPage() {
                   <button
                     className="btn btn-primary full-width"
                     onClick={handleApprove}
-                    disabled={actionLoading === 'approve' || !stakeAmount}
+                    disabled={actionLoading !== null || !stakeAmount}
                   >
-                    {actionLoading === 'approve' ? 'Approving...' : 'Approve'}
+                    {actionLoading === 'approve' ? 'Approving...' : `Approve ${stakeAmount} RATCHET`}
                   </button>
                 ) : (
                   <button
                     className="btn btn-primary full-width"
                     onClick={handleStake}
-                    disabled={actionLoading === 'stake' || !stakeAmount}
+                    disabled={actionLoading !== null || !stakeAmount}
                   >
                     {actionLoading === 'stake' ? 'Staking...' : 'Stake'}
                   </button>
                 )}
               </div>
             </div>
+            )}
 
             {/* Withdraw Section */}
             <div className="staking-section">

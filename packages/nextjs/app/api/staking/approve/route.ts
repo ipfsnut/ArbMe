@@ -5,6 +5,10 @@ export async function POST(request: NextRequest) {
   try {
     const { amount } = await request.json().catch(() => ({}))
 
+    if (!amount) {
+      return NextResponse.json({ error: 'Missing amount' }, { status: 400 })
+    }
+
     // Check if staking contract is deployed
     if (RATCHET_STAKING_ADDRESS === '0x0000000000000000000000000000000000000000') {
       return NextResponse.json(
@@ -13,7 +17,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Build approval transaction (defaults to unlimited if no amount specified)
+    // Build approval transaction with exact amount
     const transaction = buildStakingApprovalTransaction(amount)
 
     return NextResponse.json({

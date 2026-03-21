@@ -788,8 +788,9 @@ export function registerDefiTools(server: McpServer, config: ServerConfig) {
       step: z
         .enum(["erc20-to-permit2", "permit2-to-router"])
         .describe("Which approval step to execute"),
+      amount: z.string().optional().describe("Amount to approve in wei. Defaults to unlimited if not specified."),
     },
-    async ({ token: tokenRaw, step }: { token: string; step: string }) => {
+    async ({ token: tokenRaw, step, amount }: { token: string; step: string; amount?: string }) => {
       try {
         const manager = getWalletManager(config);
         const token = getAddress(tokenRaw);
@@ -799,21 +800,21 @@ export function registerDefiTools(server: McpServer, config: ServerConfig) {
         let txHash: `0x${string}`;
 
         if (step === "erc20-to-permit2") {
-          // Approve Permit2 to spend token
+          const approvalAmount = amount ? BigInt(amount) : MAX_UINT256;
           txHash = await manager.writeContract({
             address: token,
             abi: erc20ApprovalAbi as any,
             functionName: "approve",
-            args: [PERMIT2, MAX_UINT256],
+            args: [PERMIT2, approvalAmount],
           });
         } else {
-          // Permit2 approve Universal Router
+          const approvalAmount = amount ? BigInt(amount) : MAX_UINT160;
           const expiration = Math.floor(Date.now() / 1000) + 86400 * 30; // 30 days
           txHash = await manager.writeContract({
             address: PERMIT2,
             abi: permit2Abi as any,
             functionName: "approve",
-            args: [token, UNIVERSAL_ROUTER, MAX_UINT160, expiration],
+            args: [token, UNIVERSAL_ROUTER, approvalAmount, expiration],
           });
         }
 
