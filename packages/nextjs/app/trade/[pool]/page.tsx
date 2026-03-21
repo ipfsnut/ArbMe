@@ -260,60 +260,100 @@ export default function TradePage() {
 
     try {
       if (version === 'V4') {
-        // V4 Step 1: ERC20 approve token → Permit2
-        const res1 = await fetch(`${API_BASE}/build-approval`, {
+        // Check which V4 approval steps are actually needed
+        const checkRes = await fetch(`${API_BASE}/check-approvals`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            token: tokenIn.address,
-            version: 'V4',
-            approvalType: 'erc20',
-            v4Spender: 'universal-router',
-            amount: amountInWei,
-          }),
-        })
-        if (!res1.ok) {
-          const data = await res1.json()
-          throw new Error(data.error || 'Failed to build ERC20 approval')
-        }
-        const { transaction: tx1 } = await res1.json()
-        await sendTransaction(tx1)
-
-        // V4 Step 2: Permit2.approve token → Universal Router
-        const res2 = await fetch(`${API_BASE}/build-approval`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            token: tokenIn.address,
-            version: 'V4',
-            approvalType: 'permit2',
-            v4Spender: 'universal-router',
-            amount: amountInWei,
-          }),
-        })
-        if (!res2.ok) {
-          const data = await res2.json()
-          throw new Error(data.error || 'Failed to build Permit2 approval')
-        }
-        const { transaction: tx2 } = await res2.json()
-        await sendTransaction(tx2)
-      } else {
-        // V2/V3: single ERC20 approval
-        const res = await fetch(`${API_BASE}/build-approval`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            token: tokenIn.address,
+            token0: tokenIn.address,
+            token1: tokenIn.address,
+            owner: wallet,
             spender: approvalSpender,
-            amount: amountInWei,
+            amount0Required: amountInWei,
+            amount1Required: '0',
+            version: 'V4',
+            v4Spender: 'universal-router',
           }),
         })
-        if (!res.ok) {
-          const data = await res.json()
-          throw new Error(data.error || 'Failed to build approval')
+        const checkData = checkRes.ok ? await checkRes.json() : { token0: { needsErc20Approval: true, needsPermit2Approval: true } }
+        const needsErc20 = checkData.token0?.needsErc20Approval ?? true
+        const needsPermit2 = checkData.token0?.needsPermit2Approval ?? true
+
+        // V4 Step 1: ERC20 approve token → Permit2 (only if needed)
+        if (needsErc20) {
+          const res1 = await fetch(`${API_BASE}/build-approval`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              token: tokenIn.address,
+              version: 'V4',
+              approvalType: 'erc20',
+              v4Spender: 'universal-router',
+              amount: amountInWei,
+            }),
+          })
+          if (!res1.ok) {
+            const data = await res1.json()
+            throw new Error(data.error || 'Failed to build ERC20 approval')
+          }
+          const { transaction: tx1 } = await res1.json()
+          await sendTransaction(tx1)
         }
-        const { transaction } = await res.json()
-        await sendTransaction(transaction)
+
+        // V4 Step 2: Permit2.approve token → Universal Router (only if needed)
+        if (needsPermit2) {
+          const res2 = await fetch(`${API_BASE}/build-approval`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              token: tokenIn.address,
+              version: 'V4',
+              approvalType: 'permit2',
+              v4Spender: 'universal-router',
+              amount: amountInWei,
+            }),
+          })
+          if (!res2.ok) {
+            const data = await res2.json()
+            throw new Error(data.error || 'Failed to build Permit2 approval')
+          }
+          const { transaction: tx2 } = await res2.json()
+          await sendTransaction(tx2)
+        }
+      } else {
+        // V2/V3: check if approval is needed
+        const checkRes = await fetch(`${API_BASE}/check-approvals`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            token0: tokenIn.address,
+            token1: tokenIn.address,
+            owner: wallet,
+            spender: approvalSpender,
+            amount0Required: amountInWei,
+            amount1Required: '0',
+            version,
+          }),
+        })
+        const checkData = checkRes.ok ? await checkRes.json() : { token0: { needsApproval: true } }
+
+        if (checkData.token0?.needsApproval) {
+          const res = await fetch(`${API_BASE}/build-approval`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              token: tokenIn.address,
+              spender: approvalSpender,
+              amount: amountInWei,
+            }),
+          })
+          if (!res.ok) {
+            const data = await res.json()
+            throw new Error(data.error || 'Failed to build approval')
+          }
+          const { transaction } = await res.json()
+          await sendTransaction(transaction)
+        }
       }
 
       // Approval succeeded — lock the amount and move to approved step
@@ -442,9 +482,9 @@ export default function TradePage() {
       const slippageBps = BigInt(Math.round(slippage * 100)) // e.g., 0.5% = 50 bps
       const minAmountOut = (BigInt(swapQuote.amountOut) * (10000n - slippageBps) / 10000n).toString()
 
-      // Use detected pool params from quote response (V4 auto-detection)
-      const swapFee = swapQuote.fee || fee
-      const swapTickSpacing = swapQuote.tickSpacing || tickSpacing
+      // Use detected pool params from quote response, fall back to URL params, then defaults
+      const swapFee = swapQuote.fee ?? fee ?? 3000
+      const swapTickSpacing = swapQuote.tickSpacing ?? tickSpacing ?? 60
       const swapHooks = swapQuote.hooks || hooks
 
       const res = await fetch(`${API_BASE}/swap`, {

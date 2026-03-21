@@ -57,8 +57,8 @@ export async function POST(request: NextRequest) {
       amountIn,
       minAmountOut,
       recipient,
-      fee: fee || 3000,
-      tickSpacing: tickSpacing || 60,
+      fee: fee ?? 3000,
+      tickSpacing: tickSpacing ?? 60,
       hooks,
     })
 
