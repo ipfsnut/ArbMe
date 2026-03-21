@@ -259,16 +259,31 @@ export default function TradePage() {
 
     try {
       if (version === 'V4') {
-        // V4 Step 1: ERC20 → Permit2 (exact amount, always send)
-        const res1 = await fetch(`${API_BASE}/build-approval`, {
+        // V4 Step 1: ERC20 → Permit2
+        // Some tokens (Clanker/Flaunch) have Permit2 hardcoded at infinity — skip if so
+        const checkRes = await fetch(`${API_BASE}/check-approvals`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token: tokenIn.address, version: 'V4', approvalType: 'erc20', v4Spender: 'universal-router', amount: amountInWei }),
+          body: JSON.stringify({
+            token0: tokenIn.address, token1: tokenIn.address,
+            owner: wallet, spender: approvalSpender,
+            amount0Required: amountInWei, amount1Required: '0',
+            version: 'V4', v4Spender: 'universal-router',
+          }),
         })
-        if (!res1.ok) throw new Error((await res1.json().catch(() => ({}))).error || 'ERC20 approval failed')
-        const hash1 = await sendTransaction((await res1.json()).transaction)
-        const ok1 = await waitForReceipt(hash1, { isSafe })
-        if (!ok1) throw new Error('ERC20 approval failed on-chain')
+        const checkData = checkRes.ok ? await checkRes.json() : { token0: { needsErc20Approval: true } }
+
+        if (checkData.token0?.needsErc20Approval) {
+          const res1 = await fetch(`${API_BASE}/build-approval`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: tokenIn.address, version: 'V4', approvalType: 'erc20', v4Spender: 'universal-router', amount: amountInWei }),
+          })
+          if (!res1.ok) throw new Error((await res1.json().catch(() => ({}))).error || 'ERC20 approval failed')
+          const hash1 = await sendTransaction((await res1.json()).transaction)
+          const ok1 = await waitForReceipt(hash1, { isSafe })
+          if (!ok1) throw new Error('ERC20 approval failed on-chain')
+        }
 
         // V4 Step 2: Permit2 → Router (exact amount, always send)
         const res2 = await fetch(`${API_BASE}/build-approval`, {
