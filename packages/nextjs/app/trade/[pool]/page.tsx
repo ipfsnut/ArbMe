@@ -249,15 +249,15 @@ export default function TradePage() {
     }
   })()
 
-  // Check allowance when quote is ready
-  // Only re-check when wallet, token, amount, or version changes — NOT on every quote refresh
-  const hasQuote = !!swapQuote
+  // Check allowance whenever we have all required data
+  // Using a ref to avoid race conditions with the cancelled flag
+  const approvalCheckId = useRef(0)
   useEffect(() => {
-    if (!wallet || !tokenIn || amountInWei === '0' || !hasQuote) {
-      return // Don't clear approval state — preserve it across quote refreshes
+    if (!wallet || !tokenIn || amountInWei === '0' || !swapQuote) {
+      return
     }
 
-    let cancelled = false
+    const checkId = ++approvalCheckId.current
 
     async function checkAllowance() {
       try {
@@ -266,60 +266,58 @@ export default function TradePage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             token0: tokenIn!.address,
-            token1: tokenIn!.address, // only checking tokenIn
+            token1: tokenIn!.address,
             owner: wallet,
             spender: approvalSpender,
             amount0Required: amountInWei,
             amount1Required: '0',
             version,
-            // For V4 swaps, check Permit2 allowance for Universal Router (not Position Manager)
             ...(version === 'V4' && { v4Spender: 'universal-router' }),
           }),
         })
 
+        // Only apply results from the latest check
+        if (checkId !== approvalCheckId.current) return
+
         if (!res.ok) {
           console.error('[TradePage] Approval check failed:', res.status)
-          if (!cancelled) {
-            setNeedsApproval(true)
-            if (version === 'V4') {
-              setNeedsErc20Approval(true)
-              setApprovalStep('erc20')
-            }
-          }
-          return
-        }
-        const data = await res.json()
-
-        if (!cancelled) {
-          if (version === 'V4') {
-            const erc20 = data.token0?.needsErc20Approval || false
-            const permit2 = data.token0?.needsPermit2Approval || false
-            setNeedsErc20Approval(erc20)
-            setNeedsPermit2Approval(permit2)
-            setNeedsApproval(erc20 || permit2)
-            setApprovalStep(erc20 ? 'erc20' : permit2 ? 'permit2' : null)
-          } else {
-            setNeedsApproval(data.token0?.needsApproval || false)
-            setNeedsErc20Approval(false)
-            setNeedsPermit2Approval(false)
-            setApprovalStep(null)
-          }
-        }
-      } catch (err) {
-        console.error('[TradePage] Approval check error:', err)
-        if (!cancelled) {
           setNeedsApproval(true)
           if (version === 'V4') {
             setNeedsErc20Approval(true)
             setApprovalStep('erc20')
           }
+          return
+        }
+        const data = await res.json()
+
+        if (checkId !== approvalCheckId.current) return
+
+        if (version === 'V4') {
+          const erc20 = data.token0?.needsErc20Approval || false
+          const permit2 = data.token0?.needsPermit2Approval || false
+          setNeedsErc20Approval(erc20)
+          setNeedsPermit2Approval(permit2)
+          setNeedsApproval(erc20 || permit2)
+          setApprovalStep(erc20 ? 'erc20' : permit2 ? 'permit2' : null)
+        } else {
+          setNeedsApproval(data.token0?.needsApproval || false)
+          setNeedsErc20Approval(false)
+          setNeedsPermit2Approval(false)
+          setApprovalStep(null)
+        }
+      } catch (err) {
+        console.error('[TradePage] Approval check error:', err)
+        if (checkId !== approvalCheckId.current) return
+        setNeedsApproval(true)
+        if (version === 'V4') {
+          setNeedsErc20Approval(true)
+          setApprovalStep('erc20')
         }
       }
     }
 
     checkAllowance()
-    return () => { cancelled = true }
-  }, [wallet, tokenIn?.address, amountInWei, hasQuote, approvalSpender, version])
+  }, [wallet, tokenIn, amountInWei, swapQuote, approvalSpender, version])
 
   const handleApprove = async () => {
     if (!tokenIn || !wallet) return
