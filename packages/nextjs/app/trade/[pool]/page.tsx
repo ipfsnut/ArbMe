@@ -355,6 +355,45 @@ export default function TradePage() {
     }
   }
 
+  const handleRevokeApprovals = async () => {
+    if (!tokenIn || !wallet) return
+    setApprovalLoading(true)
+    setError(null)
+    try {
+      // Revoke ERC20 → Permit2
+      const res1 = await fetch(`${API_BASE}/revoke-approval`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: tokenIn.address, step: 'erc20' }),
+      })
+      if (res1.ok) {
+        const { transaction } = await res1.json()
+        await sendTransaction(transaction)
+      }
+
+      // Revoke Permit2 → Universal Router
+      if (version === 'V4') {
+        const res2 = await fetch(`${API_BASE}/revoke-approval`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: tokenIn.address, spender: '0x6ff5693b99212da76ad316178a184ab56d299b43', step: 'permit2' }),
+        })
+        if (res2.ok) {
+          const { transaction } = await res2.json()
+          await sendTransaction(transaction)
+        }
+      }
+
+      // Re-check approvals — should now show approve button
+      setApprovalChecked(false)
+      setNeedsApproval(true)
+    } catch (err: any) {
+      setError(err.message || 'Revoke failed')
+    } finally {
+      setApprovalLoading(false)
+    }
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
   // Fetch token info on mount
   // ═══════════════════════════════════════════════════════════════════════════
@@ -771,6 +810,16 @@ export default function TradePage() {
             {!swapQuote && swapStatus !== 'success' && (
               <button className="btn btn-primary full-width" disabled>
                 {quoteLoading ? 'Getting quote...' : 'Enter amount'}
+              </button>
+            )}
+
+            {/* Reset approvals — for clearing stale approval state */}
+            {wallet && tokenIn && swapStatus !== 'success' && (
+              <button
+                onClick={handleRevokeApprovals}
+                disabled={approvalLoading}
+                style={{ marginTop: 'var(--spacing-sm)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', width: '100%', textAlign: 'center' }}>
+                {approvalLoading ? 'Revoking...' : 'Reset approvals'}
               </button>
             )}
           </div>
