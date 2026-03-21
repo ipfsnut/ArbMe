@@ -355,42 +355,44 @@ export default function TradePage() {
     }
   }
 
-  const handleRevokeApprovals = async () => {
-    if (!tokenIn || !wallet) return
-    setApprovalLoading(true)
+  const [revokeLoading, setRevokeLoading] = useState(false)
+  const [revokeStatus, setRevokeStatus] = useState('')
+
+  const handleRevokeAll = async () => {
+    if (!wallet) return
+    setRevokeLoading(true)
+    setRevokeStatus('Checking approvals...')
     setError(null)
     try {
-      // Revoke ERC20 → Permit2
-      const res1 = await fetch(`${API_BASE}/revoke-approval`, {
+      const res = await fetch(`${API_BASE}/revoke-all`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: tokenIn.address, step: 'erc20' }),
+        body: JSON.stringify({ owner: wallet }),
       })
-      if (res1.ok) {
-        const { transaction } = await res1.json()
-        await sendTransaction(transaction)
+      if (!res.ok) throw new Error('Failed to check approvals')
+      const { revokeTxs, count } = await res.json()
+
+      if (count === 0) {
+        setRevokeStatus('No active approvals found')
+        setTimeout(() => setRevokeStatus(''), 3000)
+        return
       }
 
-      // Revoke Permit2 → Universal Router
-      if (version === 'V4') {
-        const res2 = await fetch(`${API_BASE}/revoke-approval`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token: tokenIn.address, spender: '0x6ff5693b99212da76ad316178a184ab56d299b43', step: 'permit2' }),
-        })
-        if (res2.ok) {
-          const { transaction } = await res2.json()
-          await sendTransaction(transaction)
-        }
+      for (let i = 0; i < revokeTxs.length; i++) {
+        const tx = revokeTxs[i]
+        setRevokeStatus(`Revoking ${tx.symbol} ${tx.type} (${i + 1}/${count})...`)
+        await sendTransaction(tx.transaction)
       }
 
-      // Re-check approvals — should now show approve button
+      setRevokeStatus(`Revoked ${count} approvals`)
       setApprovalChecked(false)
       setNeedsApproval(true)
+      setTimeout(() => setRevokeStatus(''), 3000)
     } catch (err: any) {
       setError(err.message || 'Revoke failed')
+      setRevokeStatus('')
     } finally {
-      setApprovalLoading(false)
+      setRevokeLoading(false)
     }
   }
 
@@ -813,14 +815,21 @@ export default function TradePage() {
               </button>
             )}
 
-            {/* Reset approvals — for clearing stale approval state */}
-            {wallet && tokenIn && swapStatus !== 'success' && (
-              <button
-                onClick={handleRevokeApprovals}
-                disabled={approvalLoading}
-                style={{ marginTop: 'var(--spacing-sm)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', width: '100%', textAlign: 'center' }}>
-                {approvalLoading ? 'Revoking...' : 'Reset approvals'}
-              </button>
+            {/* Reset all approvals — for clearing stale approval state */}
+            {wallet && swapStatus !== 'success' && (
+              <>
+                <button
+                  onClick={handleRevokeAll}
+                  disabled={revokeLoading}
+                  style={{ marginTop: 'var(--spacing-sm)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', width: '100%', textAlign: 'center' }}>
+                  {revokeLoading ? 'Revoking...' : 'Revoke all token approvals'}
+                </button>
+                {revokeStatus && (
+                  <div style={{ marginTop: '4px', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', textAlign: 'center' }}>
+                    {revokeStatus}
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
