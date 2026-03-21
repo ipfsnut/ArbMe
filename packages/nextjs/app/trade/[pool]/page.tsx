@@ -395,7 +395,7 @@ export default function TradePage() {
   // Transaction handling
   // ═══════════════════════════════════════════════════════════════════════════
 
-  const sendTransaction = async (tx: { to: string; data: string; value: string }) => {
+  const sendTransaction = async (tx: { to: string; data: string; value: string; gas?: string }) => {
     if (!wallet) throw new Error('No wallet connected')
 
     try {
@@ -420,6 +420,7 @@ export default function TradePage() {
           to: tx.to as `0x${string}`,
           data: tx.data as `0x${string}`,
           value: tx.value !== '0' ? BigInt(tx.value) : 0n,
+          ...(tx.gas ? { gas: BigInt(tx.gas) } : {}),
         })
 
         return txHash
