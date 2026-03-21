@@ -162,7 +162,10 @@ function getTickSpacing(fee: number): number {
     500: 10,
     3000: 60,
     10000: 200,
+    25000: 500,
+    30000: 600,
     50000: 1000,
+    100000: 2000,
     8388608: 200,
   };
   return spacings[fee] || 60;
@@ -241,7 +244,7 @@ function getPoolConfigs(fee?: number, tickSpacing?: number, hooks?: Address): Po
   });
 
   // Standard hookless pools
-  const standardFees = fee ? [fee] : [3000, 10000, 500, 50000];
+  const standardFees = fee ? [fee] : [3000, 10000, 500, 30000, 50000, 25000, 100000];
   for (const f of standardFees) {
     configs.push({
       fee: f,
