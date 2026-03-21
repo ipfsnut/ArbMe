@@ -46,8 +46,10 @@ export default function TradePage() {
   const token0Address = searchParams.get('t0') || ''
   const token1Address = searchParams.get('t1') || ''
   const version = (searchParams.get('v') || 'V4') as 'V2' | 'V3' | 'V4'
-  const fee = parseInt(searchParams.get('fee') || '3000', 10)
-  const tickSpacing = parseInt(searchParams.get('ts') || '60', 10)
+  const feeParam = searchParams.get('fee')
+  const tsParam = searchParams.get('ts')
+  const fee = feeParam ? parseInt(feeParam, 10) : undefined
+  const tickSpacing = tsParam ? parseInt(tsParam, 10) : undefined
   const hooks = searchParams.get('hooks') || ''
   const pairName = searchParams.get('pair') || 'Token Swap'
 
@@ -590,7 +592,8 @@ export default function TradePage() {
           <h1>Trade {pairName}</h1>
           <div className="pool-meta">
             <span className={`version-badge ${version.toLowerCase()}`}>{version}</span>
-            <span className="fee-badge">{(fee / 10000).toFixed(2)}% fee</span>
+            {fee !== undefined && <span className="fee-badge">{(fee / 10000).toFixed(2)}% fee</span>}
+            {swapQuote?.fee && !fee && <span className="fee-badge">{(swapQuote.fee / 10000).toFixed(2)}% fee</span>}
           </div>
         </div>
 
