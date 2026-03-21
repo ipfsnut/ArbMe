@@ -76,10 +76,10 @@ export default function TradePage() {
   const [quoteError, setQuoteError] = useState<string | null>(null)
   const quoteAbortRef = useRef<AbortController | null>(null)
 
-  // Approval state — approval is always a visible step
-  const [swapStep, setSwapStep] = useState<'input' | 'approved'>('input')
+  // Approval state
+  const [needsApproval, setNeedsApproval] = useState(false)
   const [approvalLoading, setApprovalLoading] = useState(false)
-  const [approvedSwapAmount, setApprovedSwapAmount] = useState('')
+  const [approvalChecked, setApprovalChecked] = useState(false)
 
   // Balance state
   const [balanceIn, setBalanceIn] = useState<string | null>(null) // formatted (human-readable)
@@ -246,11 +246,48 @@ export default function TradePage() {
     }
   })()
 
-  // Reset to input step when amount or token changes
+  // Check approval when we have all the data
   useEffect(() => {
-    setSwapStep('input')
-    setApprovedSwapAmount('')
-  }, [tokenIn?.address, amountInWei])
+    if (!wallet || !tokenIn || amountInWei === '0' || !swapQuote) {
+      setNeedsApproval(false)
+      setApprovalChecked(false)
+      return
+    }
+
+    let stale = false
+    async function check() {
+      try {
+        const res = await fetch(`${API_BASE}/check-approvals`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            token0: tokenIn!.address,
+            token1: tokenIn!.address,
+            owner: wallet,
+            spender: approvalSpender,
+            amount0Required: amountInWei,
+            amount1Required: '0',
+            version,
+            ...(version === 'V4' && { v4Spender: 'universal-router' }),
+          }),
+        })
+        if (stale) return
+        if (res.ok) {
+          const data = await res.json()
+          setNeedsApproval(data.anyNeedsApproval ?? data.token0?.needsApproval ?? false)
+        } else {
+          setNeedsApproval(true) // assume needed if check fails
+        }
+      } catch {
+        if (!stale) setNeedsApproval(true)
+      }
+      if (!stale) setApprovalChecked(true)
+    }
+
+    setApprovalChecked(false)
+    check()
+    return () => { stale = true }
+  }, [wallet, tokenIn?.address, amountInWei, !!swapQuote, approvalSpender, version])
 
   const handleApprove = async () => {
     if (!tokenIn || !wallet || amountInWei === '0') return
@@ -260,106 +297,56 @@ export default function TradePage() {
 
     try {
       if (version === 'V4') {
-        // Check which V4 approval steps are actually needed
+        // V4 Step 1: ERC20 → Permit2 (unlimited, one-time per token — Balancer standard)
+        // Check first, skip if already set
         const checkRes = await fetch(`${API_BASE}/check-approvals`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            token0: tokenIn.address,
-            token1: tokenIn.address,
-            owner: wallet,
-            spender: approvalSpender,
-            amount0Required: amountInWei,
-            amount1Required: '0',
-            version: 'V4',
-            v4Spender: 'universal-router',
+            token0: tokenIn.address, token1: tokenIn.address,
+            owner: wallet, spender: approvalSpender,
+            amount0Required: amountInWei, amount1Required: '0',
+            version: 'V4', v4Spender: 'universal-router',
           }),
         })
         const checkData = checkRes.ok ? await checkRes.json() : { token0: { needsErc20Approval: true, needsPermit2Approval: true } }
-        const needsErc20 = checkData.token0?.needsErc20Approval ?? true
-        const needsPermit2 = checkData.token0?.needsPermit2Approval ?? true
 
-        // V4 Step 1: ERC20 approve token → Permit2 (exact amount)
-        if (needsErc20) {
-          const res1 = await fetch(`${API_BASE}/build-approval`, {
+        if (checkData.token0?.needsErc20Approval) {
+          const res = await fetch(`${API_BASE}/build-approval`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              token: tokenIn.address,
-              version: 'V4',
-              approvalType: 'erc20',
-              v4Spender: 'universal-router',
-              amount: amountInWei,
-            }),
+            body: JSON.stringify({ token: tokenIn.address, version: 'V4', approvalType: 'erc20', v4Spender: 'universal-router' }),
           })
-          if (!res1.ok) {
-            const data = await res1.json()
-            throw new Error(data.error || 'Failed to build ERC20 approval')
-          }
-          const { transaction: tx1 } = await res1.json()
-          await sendTransaction(tx1)
+          if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'ERC20 approval failed')
+          await sendTransaction((await res.json()).transaction)
         }
 
-        // V4 Step 2: Permit2.approve token → Universal Router (ALWAYS send)
-        // This is the user's control point — sets exact amount + 30-day expiry
-        {
-          const res2 = await fetch(`${API_BASE}/build-approval`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              token: tokenIn.address,
-              version: 'V4',
-              approvalType: 'permit2',
-              v4Spender: 'universal-router',
-              amount: amountInWei,
-            }),
-          })
-          if (!res2.ok) {
-            const data = await res2.json()
-            throw new Error(data.error || 'Failed to build Permit2 approval')
-          }
-          const { transaction: tx2 } = await res2.json()
-          await sendTransaction(tx2)
-        }
-      } else {
-        // V2/V3: check if approval is needed
-        const checkRes = await fetch(`${API_BASE}/check-approvals`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            token0: tokenIn.address,
-            token1: tokenIn.address,
-            owner: wallet,
-            spender: approvalSpender,
-            amount0Required: amountInWei,
-            amount1Required: '0',
-            version,
-          }),
-        })
-        const checkData = checkRes.ok ? await checkRes.json() : { token0: { needsApproval: true } }
-
-        if (checkData.token0?.needsApproval) {
+        // V4 Step 2: Permit2 → Router (MaxUint159, 24h expiry — Balancer standard)
+        if (checkData.token0?.needsPermit2Approval) {
           const res = await fetch(`${API_BASE}/build-approval`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              token: tokenIn.address,
-              spender: approvalSpender,
-              amount: amountInWei,
+              token: tokenIn.address, version: 'V4', approvalType: 'permit2',
+              v4Spender: 'universal-router',
+              expiration: Math.floor(Date.now() / 1000) + 86400, // 24 hours
             }),
           })
-          if (!res.ok) {
-            const data = await res.json()
-            throw new Error(data.error || 'Failed to build approval')
-          }
-          const { transaction } = await res.json()
-          await sendTransaction(transaction)
+          if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Permit2 approval failed')
+          await sendTransaction((await res.json()).transaction)
         }
+      } else {
+        // V2/V3: standard ERC20 approval
+        const res = await fetch(`${API_BASE}/build-approval`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: tokenIn.address, spender: approvalSpender }),
+        })
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Approval failed')
+        await sendTransaction((await res.json()).transaction)
       }
 
-      // Approval succeeded — lock the amount and move to approved step
-      setApprovedSwapAmount(swapAmount)
-      setSwapStep('approved')
+      setNeedsApproval(false)
     } catch (err: any) {
       console.error('[TradePage] Approval error:', err)
       setError(err.message || 'Approval failed')
@@ -645,9 +632,9 @@ export default function TradePage() {
                 type="number"
                 className="amount-input"
                 placeholder="0.0"
-                value={approvedSwapAmount || swapAmount}
-                onChange={(e) => { setSwapAmount(e.target.value); setApprovedSwapAmount(''); setSwapStep('input') }}
-                disabled={swapStatus === 'pending' || swapStep === 'approved'}
+                value={swapAmount}
+                onChange={(e) => setSwapAmount(e.target.value)}
+                disabled={swapStatus === 'pending'}
               />
             </div>
 
@@ -748,46 +735,36 @@ export default function TradePage() {
               </div>
             )}
 
-            {/* Step 1: Approve — always shown first when there's a quote */}
-            {swapStep === 'input' && swapQuote && swapStatus !== 'success' && (
+            {/* Approve button — only when approval is needed */}
+            {needsApproval && approvalChecked && swapQuote && swapStatus !== 'success' && (
               <button
                 className="btn btn-secondary full-width"
                 onClick={handleApprove}
-                disabled={approvalLoading || !swapAmount || amountInWei === '0'}
+                disabled={approvalLoading}
               >
                 {approvalLoading ? (
                   <><span className="loading-spinner small" /> Approving {tokenIn?.symbol}...</>
                 ) : (
-                  `Approve ${swapAmount} ${tokenIn?.symbol}`
+                  `Approve ${tokenIn?.symbol}`
                 )}
               </button>
             )}
 
-            {/* Step 2: Swap — only after approval is confirmed */}
-            {swapStep === 'approved' && swapStatus !== 'success' && (
-              <>
-                <div style={{ padding: 'var(--spacing-sm)', border: '1px solid var(--accent)', borderRadius: 'var(--radius)', marginBottom: 'var(--spacing-sm)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-sm)' }}>
-                  <span>Approved: {approvedSwapAmount} {tokenIn?.symbol}</span>
-                  <span style={{ color: 'var(--accent)' }}>Ready</span>
-                </div>
-                <button
-                  className="btn btn-primary full-width"
-                  onClick={handleExecuteSwap}
-                  disabled={swapStatus === 'pending' || swapStatus === 'building'}
-                >
-                  {swapStatus === 'building' && 'Building...'}
-                  {swapStatus === 'pending' && (
-                    <><span className="loading-spinner small" /> Swapping...</>
-                  )}
-                  {swapStatus === 'error' && 'Failed - Try Again'}
-                  {swapStatus === 'idle' && `Swap ${approvedSwapAmount} ${tokenIn?.symbol}`}
-                </button>
-                <button onClick={() => { setSwapStep('input'); setApprovedSwapAmount('') }}
-                  disabled={swapStatus === 'pending'}
-                  style={{ marginTop: 'var(--spacing-sm)', fontSize: 'var(--text-sm)', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', width: '100%', textAlign: 'center' }}>
-                  Change amount
-                </button>
-              </>
+            {/* Swap button — when no approval needed */}
+            {!needsApproval && swapQuote && swapStatus !== 'success' && (
+              <button
+                className="btn btn-primary full-width"
+                onClick={handleExecuteSwap}
+                disabled={swapStatus === 'pending' || swapStatus === 'building' || !approvalChecked ||
+                  (!!balanceInWei && amountInWei !== '0' && BigInt(amountInWei) > BigInt(balanceInWei))}
+              >
+                {swapStatus === 'building' && 'Building...'}
+                {swapStatus === 'pending' && (
+                  <><span className="loading-spinner small" /> Swapping...</>
+                )}
+                {swapStatus === 'error' && 'Failed - Try Again'}
+                {swapStatus === 'idle' && (approvalChecked ? 'Swap' : 'Checking approval...')}
+              </button>
             )}
 
             {/* No quote yet */}
