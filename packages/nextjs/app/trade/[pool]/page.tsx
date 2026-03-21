@@ -250,13 +250,11 @@ export default function TradePage() {
   })()
 
   // Check allowance when quote is ready
+  // Only re-check when wallet, token, amount, or version changes — NOT on every quote refresh
+  const hasQuote = !!swapQuote
   useEffect(() => {
-    if (!wallet || !tokenIn || amountInWei === '0' || !swapQuote) {
-      setNeedsApproval(false)
-      setNeedsErc20Approval(false)
-      setNeedsPermit2Approval(false)
-      setApprovalStep(null)
-      return
+    if (!wallet || !tokenIn || amountInWei === '0' || !hasQuote) {
+      return // Don't clear approval state — preserve it across quote refreshes
     }
 
     let cancelled = false
@@ -281,7 +279,6 @@ export default function TradePage() {
 
         if (!res.ok) {
           console.error('[TradePage] Approval check failed:', res.status)
-          // If check fails, assume approval is needed to be safe
           if (!cancelled) {
             setNeedsApproval(true)
             if (version === 'V4') {
@@ -295,7 +292,6 @@ export default function TradePage() {
 
         if (!cancelled) {
           if (version === 'V4') {
-            // V4: two-step approval (ERC20 → Permit2, then Permit2 → Universal Router)
             const erc20 = data.token0?.needsErc20Approval || false
             const permit2 = data.token0?.needsPermit2Approval || false
             setNeedsErc20Approval(erc20)
@@ -303,7 +299,6 @@ export default function TradePage() {
             setNeedsApproval(erc20 || permit2)
             setApprovalStep(erc20 ? 'erc20' : permit2 ? 'permit2' : null)
           } else {
-            // V2/V3: single ERC20 approval
             setNeedsApproval(data.token0?.needsApproval || false)
             setNeedsErc20Approval(false)
             setNeedsPermit2Approval(false)
@@ -312,7 +307,6 @@ export default function TradePage() {
         }
       } catch (err) {
         console.error('[TradePage] Approval check error:', err)
-        // If check fails, assume approval needed
         if (!cancelled) {
           setNeedsApproval(true)
           if (version === 'V4') {
@@ -325,7 +319,7 @@ export default function TradePage() {
 
     checkAllowance()
     return () => { cancelled = true }
-  }, [wallet, tokenIn, amountInWei, swapQuote, approvalSpender, version])
+  }, [wallet, tokenIn?.address, amountInWei, hasQuote, approvalSpender, version])
 
   const handleApprove = async () => {
     if (!tokenIn || !wallet) return
