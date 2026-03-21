@@ -7,6 +7,7 @@ import { Footer } from '@/components/Footer'
 import { BackButton } from '@/components/BackButton'
 import { TokenLeaderboard } from '@/components/TokenLeaderboard'
 import { ROUTES } from '@/utils/constants'
+import { waitForReceipt } from '@/utils/waitForReceipt'
 import { buyRatchet } from '@/lib/actions'
 // SDK imported dynamically to avoid module-level crashes on mobile
 import { useSendTransaction } from 'wagmi'
@@ -82,6 +83,8 @@ export default function BuildPage() {
   const [withdrawAmount, setWithdrawAmount] = useState('')
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [stakeStep, setStakeStep] = useState<'input' | 'approved'>('input')
+  const [approvedAmount, setApprovedAmount] = useState('')
 
   // Reward calculator state
   const [calcAmount, setCalcAmount] = useState('')
@@ -160,19 +163,7 @@ export default function BuildPage() {
     ? BigInt(data.allowance) < BigInt(parseToWei(stakeAmount || '0'))
     : false
 
-  // Wait for tx to be mined before refreshing data
-  const waitAndRefresh = async () => {
-    if (isSafe) {
-      // Safe txs are proposals — refresh after a short delay to show current state
-      await new Promise(r => setTimeout(r, 2000))
-    } else {
-      // Wait for the tx to likely be mined on Base (~2s blocks)
-      await new Promise(r => setTimeout(r, 4000))
-    }
-    await fetchData()
-  }
-
-  // Helper to build and send a staking transaction
+  // Helper to build, send, and confirm a staking transaction
   const executeStakingAction = async (endpoint: string, body: object = {}): Promise<void> => {
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -186,7 +177,10 @@ export default function BuildPage() {
     }
 
     const { transaction } = await response.json()
-    await sendTx(transaction)
+    const hash = await sendTx(transaction)
+    const success = await waitForReceipt(hash, { isSafe })
+    if (!success) throw new Error('Transaction failed on-chain')
+    await fetchData()
   }
 
   // Action handlers
@@ -196,7 +190,8 @@ export default function BuildPage() {
     setActionError(null)
     try {
       await executeStakingAction('/api/staking/approve')
-      await waitAndRefresh()
+      setApprovedAmount(stakeAmount)
+      setStakeStep('approved')
     } catch (err: any) {
       console.error('[Stake] Approve error:', err)
       setActionError(err.message || 'Approval failed')
@@ -206,8 +201,9 @@ export default function BuildPage() {
   }
 
   const handleStake = async () => {
-    if (!wallet || !stakeAmount) return
-    const amount = parseToWei(stakeAmount)
+    if (!wallet) return
+    const amt = stakeStep === 'approved' ? approvedAmount : stakeAmount
+    const amount = parseToWei(amt)
     if (amount === '0') return
 
     setActionLoading('stake')
@@ -215,7 +211,8 @@ export default function BuildPage() {
     try {
       await executeStakingAction('/api/staking/stake', { amount })
       setStakeAmount('')
-      await waitAndRefresh()
+      setApprovedAmount('')
+      setStakeStep('input')
     } catch (err: any) {
       console.error('[Stake] Stake error:', err)
       setActionError(err.message || 'Staking failed')
@@ -234,7 +231,6 @@ export default function BuildPage() {
     try {
       await executeStakingAction('/api/staking/withdraw', { amount })
       setWithdrawAmount('')
-      await waitAndRefresh()
     } catch (err: any) {
       console.error('[Stake] Withdraw error:', err)
       setActionError(err.message || 'Withdrawal failed')
@@ -249,7 +245,6 @@ export default function BuildPage() {
     setActionError(null)
     try {
       await executeStakingAction('/api/staking/claim')
-      await waitAndRefresh()
     } catch (err: any) {
       console.error('[Stake] Claim error:', err)
       setActionError(err.message || 'Claim failed')
@@ -283,17 +278,23 @@ export default function BuildPage() {
         })
         if (!approveRes.ok) throw new Error('Failed to build approval transaction')
         const { transaction: approveTx } = await approveRes.json()
-        await sendTx(approveTx)
-        await waitAndRefresh()
+        const approveHash = await sendTx(approveTx)
+        const approveOk = await waitForReceipt(approveHash, { isSafe })
+        if (!approveOk) throw new Error('Approval failed on-chain')
+        await fetchData()
       }
 
       // Step 1: Claim rewards
-      await sendTx(transactions[0])
-      await waitAndRefresh()
+      const claimHash = await sendTx(transactions[0])
+      const claimOk = await waitForReceipt(claimHash, { isSafe })
+      if (!claimOk) throw new Error('Claim step failed on-chain')
+      await fetchData()
 
       // Step 2: Stake the claimed rewards
-      await sendTx(transactions[1])
-      await waitAndRefresh()
+      const stakeHash = await sendTx(transactions[1])
+      const stakeOk = await waitForReceipt(stakeHash, { isSafe })
+      if (!stakeOk) throw new Error('Stake step failed on-chain')
+      await fetchData()
     } catch (err: any) {
       console.error('[Stake] Compound error:', err)
       setActionError(err.message || 'Compound failed')
@@ -308,7 +309,6 @@ export default function BuildPage() {
     setActionError(null)
     try {
       await executeStakingAction('/api/staking/exit')
-      await waitAndRefresh()
     } catch (err: any) {
       console.error('[Stake] Exit error:', err)
       setActionError(err.message || 'Exit failed')
