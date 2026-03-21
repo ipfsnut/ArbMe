@@ -631,7 +631,6 @@ function AddLiquidityPage() {
               token: tokenInfo.address,
               version: 'V4',
               approvalType: 'erc20',
-              amount: tokenAmountWei,
             }),
           })
 
