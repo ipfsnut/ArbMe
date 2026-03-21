@@ -309,8 +309,15 @@ export async function POST(request: NextRequest) {
           sqrtPriceX96 = slot0[0]
           quoteParams.sqrtPriceX96 = sqrtPriceX96.toString()
           detectedHooks = hooks || NO_HOOK
-          detectedFee = fee || 3000
-          detectedTickSpacing = tickSpacing || 60
+          // slot0 returns (sqrtPriceX96, tick, protocolFee, lpFee)
+          // lpFee (slot0[3]) is the actual pool fee
+          detectedFee = fee ?? (slot0[3] ? Number(slot0[3]) : undefined)
+          detectedTickSpacing = tickSpacing
+          // If we got the fee from slot0 but not tickSpacing, derive it
+          if (detectedFee && !detectedTickSpacing) {
+            const spacings: Record<number, number> = { 100: 1, 500: 10, 3000: 60, 10000: 200, 50000: 1000, 8388608: 200 }
+            detectedTickSpacing = spacings[detectedFee] || 60
+          }
         } catch (e) {
           console.error('[quote] V4 direct poolId lookup failed:', e)
         }
