@@ -279,7 +279,7 @@ export default function TradePage() {
         const needsErc20 = checkData.token0?.needsErc20Approval ?? true
         const needsPermit2 = checkData.token0?.needsPermit2Approval ?? true
 
-        // V4 Step 1: ERC20 approve token → Permit2 (unlimited, one-time per token)
+        // V4 Step 1: ERC20 approve token → Permit2 (exact amount)
         if (needsErc20) {
           const res1 = await fetch(`${API_BASE}/build-approval`, {
             method: 'POST',
@@ -289,6 +289,7 @@ export default function TradePage() {
               version: 'V4',
               approvalType: 'erc20',
               v4Spender: 'universal-router',
+              amount: amountInWei,
             }),
           })
           if (!res1.ok) {
