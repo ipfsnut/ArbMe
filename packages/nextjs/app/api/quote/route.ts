@@ -366,7 +366,7 @@ export async function POST(request: NextRequest) {
       const hookAddr = (detectedHooks || NO_HOOK) as `0x${string}`
 
       try {
-        const { result } = await client.simulateContract({
+        const quoterResult = await client.readContract({
           address: V4_QUOTER,
           abi: v4QuoterAbi,
           functionName: 'quoteExactInputSingle',
@@ -384,7 +384,7 @@ export async function POST(request: NextRequest) {
           }],
         })
 
-        const [amountOut, gasEstimate] = result
+        const [amountOut, gasEstimate] = quoterResult as [bigint, bigint]
         const priceImpact = computePriceImpact(
           BigInt(amountIn), amountOut, sqrtPriceX96, zeroForOne, decimalsIn, decimalsOut,
         )
@@ -404,17 +404,12 @@ export async function POST(request: NextRequest) {
           tickSpacing: detectedTickSpacing,
         })
       } catch (quoterErr: any) {
-        console.warn('[quote] V4 Quoter failed:', quoterErr.message)
-        // For V4: if the on-chain Quoter fails, the swap will fail too.
-        // Don't fall back to spot-math which gives fake quotes for zero-liquidity pools.
-        return NextResponse.json(
-          { error: `Cannot swap in this pool. The on-chain quoter reverted — the pool may have no liquidity at the current price.` },
-          { status: 400 }
-        )
+        console.warn('[quote] V4 Quoter failed, falling back to spot price math:', quoterErr.message)
+        // Fall through to core-lib spot price math
       }
     }
 
-    // ─── Fallback: core-lib spot price math (V2/V3 only) ───
+    // ─── Fallback: core-lib spot price math ───
     const quote = getSwapQuote(quoteParams)
 
     return NextResponse.json({

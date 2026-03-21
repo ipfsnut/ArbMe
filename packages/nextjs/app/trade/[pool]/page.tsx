@@ -77,10 +77,9 @@ export default function TradePage() {
   const [quoteError, setQuoteError] = useState<string | null>(null)
   const quoteAbortRef = useRef<AbortController | null>(null)
 
-  // Approval state
-  const [needsApproval, setNeedsApproval] = useState(false)
+  // Approval state — approval is always step 1
+  const [swapStep, setSwapStep] = useState<'approve' | 'swap'>('approve')
   const [approvalLoading, setApprovalLoading] = useState(false)
-  const [approvalChecked, setApprovalChecked] = useState(false)
 
   // Balance state
   const [balanceIn, setBalanceIn] = useState<string | null>(null) // formatted (human-readable)
@@ -247,48 +246,10 @@ export default function TradePage() {
     }
   })()
 
-  // Check approval when we have all the data
+  // Reset to approve step when amount or token changes
   useEffect(() => {
-    if (!wallet || !tokenIn || amountInWei === '0' || !swapQuote) {
-      setNeedsApproval(false)
-      setApprovalChecked(false)
-      return
-    }
-
-    let stale = false
-    async function check() {
-      try {
-        const res = await fetch(`${API_BASE}/check-approvals`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            token0: tokenIn!.address,
-            token1: tokenIn!.address,
-            owner: wallet,
-            spender: approvalSpender,
-            amount0Required: amountInWei,
-            amount1Required: '0',
-            version,
-            ...(version === 'V4' && { v4Spender: 'universal-router' }),
-          }),
-        })
-        if (stale) return
-        if (res.ok) {
-          const data = await res.json()
-          setNeedsApproval(data.anyNeedsApproval ?? data.token0?.needsApproval ?? false)
-        } else {
-          setNeedsApproval(true) // assume needed if check fails
-        }
-      } catch {
-        if (!stale) setNeedsApproval(true)
-      }
-      if (!stale) setApprovalChecked(true)
-    }
-
-    setApprovalChecked(false)
-    check()
-    return () => { stale = true }
-  }, [wallet, tokenIn?.address, amountInWei, !!swapQuote, approvalSpender, version])
+    setSwapStep('approve')
+  }, [tokenIn?.address, amountInWei])
 
   const handleApprove = async () => {
     if (!tokenIn || !wallet || amountInWei === '0') return
@@ -349,7 +310,7 @@ export default function TradePage() {
         if (!ok) throw new Error('Approval failed on-chain')
       }
 
-      setNeedsApproval(false)
+      setSwapStep('swap')
     } catch (err: any) {
       console.error('[TradePage] Approval error:', err)
       setError(err.message || 'Approval failed')
@@ -388,8 +349,7 @@ export default function TradePage() {
       }
 
       setRevokeStatus(`Revoked ${count} approvals`)
-      setApprovalChecked(false)
-      setNeedsApproval(true)
+      setSwapStep('approve')
       setTimeout(() => setRevokeStatus(''), 3000)
     } catch (err: any) {
       setError(err.message || 'Revoke failed')
@@ -539,10 +499,9 @@ export default function TradePage() {
 
       if (!res.ok) {
         const data = await res.json()
-        // If swap simulation says approval is needed, force re-approval
+        // If swap simulation says approval is needed, force back to approve step
         if (data.needsApproval) {
-          setNeedsApproval(true)
-          setApprovalChecked(true)
+          setSwapStep('approve')
           throw new Error(data.error || 'Approval needed')
         }
         throw new Error(data.error || 'Failed to build swap transaction')
@@ -786,27 +745,27 @@ export default function TradePage() {
               </div>
             )}
 
-            {/* Approve button — only when approval is needed */}
-            {needsApproval && approvalChecked && swapQuote && swapStatus !== 'success' && (
+            {/* Step 1: Approve — always shown first */}
+            {swapStep === 'approve' && swapQuote && swapStatus !== 'success' && (
               <button
                 className="btn btn-secondary full-width"
                 onClick={handleApprove}
-                disabled={approvalLoading}
+                disabled={approvalLoading || !swapAmount || amountInWei === '0'}
               >
                 {approvalLoading ? (
                   <><span className="loading-spinner small" /> Approving {tokenIn?.symbol}...</>
                 ) : (
-                  `Approve ${tokenIn?.symbol}`
+                  `Approve ${swapAmount} ${tokenIn?.symbol}`
                 )}
               </button>
             )}
 
-            {/* Swap button — when no approval needed */}
-            {!needsApproval && swapQuote && swapStatus !== 'success' && (
+            {/* Step 2: Swap — only after approve step completed */}
+            {swapStep === 'swap' && swapQuote && swapStatus !== 'success' && (
               <button
                 className="btn btn-primary full-width"
                 onClick={handleExecuteSwap}
-                disabled={swapStatus === 'pending' || swapStatus === 'building' || !approvalChecked ||
+                disabled={swapStatus === 'pending' || swapStatus === 'building' ||
                   (!!balanceInWei && amountInWei !== '0' && BigInt(amountInWei) > BigInt(balanceInWei))}
               >
                 {swapStatus === 'building' && 'Building...'}
@@ -814,7 +773,7 @@ export default function TradePage() {
                   <><span className="loading-spinner small" /> Swapping...</>
                 )}
                 {swapStatus === 'error' && 'Failed - Try Again'}
-                {swapStatus === 'idle' && (approvalChecked ? 'Swap' : 'Checking approval...')}
+                {swapStatus === 'idle' && `Swap ${swapAmount} ${tokenIn?.symbol}`}
               </button>
             )}
 
