@@ -76,7 +76,7 @@ export const CHAOS_GAUGES: GaugeConfig[] = [
   { symbol: 'CLANKER', tokenAddress: CLANKER_ADDRESS,  gaugeAddress: '0xb9135C878DA7f229E39CD16121B5F7796eE7DB53', decimals: 18, pool: 'CHAOSLP / CLANKER' },
   { symbol: 'FLAY',    tokenAddress: FLAY_ADDRESS,    gaugeAddress: '0xE2aCDb1dea6422671e95500834eBc21dbbDf5F7D', decimals: 18, pool: 'CHAOSLP / FLAY' },
   { symbol: 'VIRTUAL', tokenAddress: VIRTUAL_ADDRESS,  gaugeAddress: '0x839ac3EB369D7f5d55f01Fb13770D515841439d6', decimals: 18, pool: 'CHAOSLP / VIRTUAL' },
-  { symbol: 'VENDYZ', tokenAddress: VENDYZ_ADDRESS,   gaugeAddress: '0x0000000000000000000000000000000000000000', decimals: 18, pool: 'CHAOSLP / VENDYZ' },
+  { symbol: 'VENDYZ', tokenAddress: VENDYZ_ADDRESS,   gaugeAddress: '0x087e68a1c6c5978aab73056f7dcd69fc55d72839', decimals: 18, pool: 'CHAOSLP / VENDYZ' },
 ];
 
 // Routes
