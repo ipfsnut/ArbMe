@@ -35,16 +35,36 @@ export async function POST(request: NextRequest) {
     if (BigInt(minAmountOut) <= 0n) return NextResponse.json({ error: 'minAmountOut must be positive' }, { status: 400 })
     if (hooks && !addressRegex.test(hooks)) return NextResponse.json({ error: 'Invalid hooks address' }, { status: 400 })
 
+    const client = getClient()
+
+    // For V4 with a bytes32 poolId: read the actual fee from on-chain if not provided
+    let resolvedFee = fee ?? 3000
+    let resolvedTickSpacing = tickSpacing ?? 60
+    if (normalizedVersion === 'V4' && poolAddress && poolAddress.length === 66 && !fee) {
+      try {
+        const STATE_VIEW = '0xa3c0c9b65bad0b08107aa264b0f3db444b867a71' as const
+        const slot0 = await client.readContract({
+          address: STATE_VIEW,
+          abi: [{ name: 'getSlot0', type: 'function', stateMutability: 'view', inputs: [{ name: 'poolId', type: 'bytes32' }], outputs: [{ name: 'sqrtPriceX96', type: 'uint160' }, { name: 'tick', type: 'int24' }, { name: 'protocolFee', type: 'uint24' }, { name: 'lpFee', type: 'uint24' }] }] as const,
+          functionName: 'getSlot0',
+          args: [poolAddress as `0x${string}`],
+        })
+        resolvedFee = Number(slot0[3]) || resolvedFee
+        const spacings: Record<number, number> = { 100: 1, 500: 10, 3000: 60, 10000: 200, 25000: 500, 30000: 600, 50000: 1000, 100000: 2000, 8388608: 200 }
+        resolvedTickSpacing = spacings[resolvedFee] || resolvedTickSpacing
+      } catch (e) {
+        console.warn('[swap] Failed to read fee from slot0, using defaults:', e)
+      }
+    }
+
     const transaction = buildSwapTransaction({
       poolAddress,
       version: normalizedVersion as 'V2' | 'V3' | 'V4',
       tokenIn, tokenOut, amountIn, minAmountOut, recipient,
-      fee: fee ?? 3000,
-      tickSpacing: tickSpacing ?? 60,
+      fee: resolvedFee,
+      tickSpacing: resolvedTickSpacing,
       hooks,
     })
-
-    const client = getClient()
 
     // For V4: pre-check Permit2 allowance before simulating (revert data is empty, can't detect otherwise)
     if (normalizedVersion === 'V4') {
@@ -81,10 +101,10 @@ export async function POST(request: NextRequest) {
       poolAddress,
       version: normalizedVersion as 'V2' | 'V3' | 'V4',
       tokenIn, tokenOut, amountIn,
-      minAmountOut: '1', // validation only — real tx uses user's slippage
+      minAmountOut: '1',
       recipient,
-      fee: fee ?? 3000,
-      tickSpacing: tickSpacing ?? 60,
+      fee: resolvedFee,
+      tickSpacing: resolvedTickSpacing,
       hooks,
     })
 
