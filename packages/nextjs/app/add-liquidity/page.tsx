@@ -534,6 +534,7 @@ function AddLiquidityPage() {
             to: tx.to as `0x${string}`,
             data: tx.data as `0x${string}`,
             value: tx.value !== '0' ? `0x${BigInt(tx.value).toString(16)}` as `0x${string}` : '0x0',
+            ...(tx.gas ? { gas: `0x${BigInt(tx.gas).toString(16)}` } : {}),
           }],
         })
 
@@ -1383,7 +1384,7 @@ function AddLiquidityPage() {
                       onClick={() => handleApprove('token0')}
                       disabled={isApproving}
                     >
-                      {state.token0ApprovalStatus === 'error' ? 'Retry Approve' : `Approve ${state.amount0 || ''} ${state.token0Info?.symbol}`}
+                      {state.token0ApprovalStatus === 'error' ? 'Retry Approve' : `Approve${state.amount0 ? ` ${state.amount0}` : ''} ${state.token0Info?.symbol}`}
                     </button>
                     {state.token0ApprovalError && (
                       <span className="approval-error">{state.token0ApprovalError}</span>
@@ -1419,7 +1420,7 @@ function AddLiquidityPage() {
                       onClick={() => handleApprove('token1')}
                       disabled={isApproving}
                     >
-                      {state.token1ApprovalStatus === 'error' ? 'Retry Approve' : `Approve ${state.amount1 || ''} ${state.token1Info?.symbol}`}
+                      {state.token1ApprovalStatus === 'error' ? 'Retry Approve' : `Approve${state.amount1 ? ` ${state.amount1}` : ''} ${state.token1Info?.symbol}`}
                     </button>
                     {state.token1ApprovalError && (
                       <span className="approval-error">{state.token1ApprovalError}</span>

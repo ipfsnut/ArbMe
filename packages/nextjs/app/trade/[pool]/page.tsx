@@ -8,6 +8,7 @@ import { Footer } from '@/components/Footer'
 import { BackButton } from '@/components/BackButton'
 import { useSendTransaction } from 'wagmi'
 import { parseUnits, formatUnits } from 'viem'
+import { waitForReceipt } from '@/utils/waitForReceipt'
 
 const API_BASE = '/api'
 
@@ -297,8 +298,7 @@ export default function TradePage() {
 
     try {
       if (version === 'V4') {
-        // V4 Step 1: ERC20 → Permit2 (unlimited, one-time per token — Balancer standard)
-        // Check first, skip if already set
+        // Check which steps are needed
         const checkRes = await fetch(`${API_BASE}/check-approvals`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -311,39 +311,42 @@ export default function TradePage() {
         })
         const checkData = checkRes.ok ? await checkRes.json() : { token0: { needsErc20Approval: true, needsPermit2Approval: true } }
 
+        // V4 Step 1: ERC20 → Permit2 (with exact amount)
         if (checkData.token0?.needsErc20Approval) {
           const res = await fetch(`${API_BASE}/build-approval`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token: tokenIn.address, version: 'V4', approvalType: 'erc20', v4Spender: 'universal-router' }),
+            body: JSON.stringify({ token: tokenIn.address, version: 'V4', approvalType: 'erc20', v4Spender: 'universal-router', amount: amountInWei }),
           })
           if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'ERC20 approval failed')
-          await sendTransaction((await res.json()).transaction)
+          const hash = await sendTransaction((await res.json()).transaction)
+          const ok = await waitForReceipt(hash, { isSafe })
+          if (!ok) throw new Error('ERC20 approval failed on-chain')
         }
 
-        // V4 Step 2: Permit2 → Router (MaxUint159, 24h expiry — Balancer standard)
+        // V4 Step 2: Permit2 → Router (with exact amount, 30-day expiry)
         if (checkData.token0?.needsPermit2Approval) {
           const res = await fetch(`${API_BASE}/build-approval`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              token: tokenIn.address, version: 'V4', approvalType: 'permit2',
-              v4Spender: 'universal-router',
-              expiration: Math.floor(Date.now() / 1000) + 86400, // 24 hours
-            }),
+            body: JSON.stringify({ token: tokenIn.address, version: 'V4', approvalType: 'permit2', v4Spender: 'universal-router', amount: amountInWei }),
           })
           if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Permit2 approval failed')
-          await sendTransaction((await res.json()).transaction)
+          const hash = await sendTransaction((await res.json()).transaction)
+          const ok = await waitForReceipt(hash, { isSafe })
+          if (!ok) throw new Error('Permit2 approval failed on-chain')
         }
       } else {
-        // V2/V3: standard ERC20 approval
+        // V2/V3: standard ERC20 approval (with exact amount)
         const res = await fetch(`${API_BASE}/build-approval`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token: tokenIn.address, spender: approvalSpender }),
+          body: JSON.stringify({ token: tokenIn.address, spender: approvalSpender, amount: amountInWei }),
         })
         if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Approval failed')
-        await sendTransaction((await res.json()).transaction)
+        const hash = await sendTransaction((await res.json()).transaction)
+        const ok = await waitForReceipt(hash, { isSafe })
+        if (!ok) throw new Error('Approval failed on-chain')
       }
 
       setNeedsApproval(false)
@@ -480,6 +483,7 @@ export default function TradePage() {
             to: tx.to as `0x${string}`,
             data: tx.data as `0x${string}`,
             value: tx.value !== '0' ? `0x${BigInt(tx.value).toString(16)}` as `0x${string}` : '0x0',
+            ...(tx.gas ? { gas: `0x${BigInt(tx.gas).toString(16)}` } : {}),
           }],
         })
 
