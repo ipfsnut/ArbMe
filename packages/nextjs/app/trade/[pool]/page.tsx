@@ -280,7 +280,6 @@ export default function TradePage() {
         const needsPermit2 = checkData.token0?.needsPermit2Approval ?? true
 
         // V4 Step 1: ERC20 approve token → Permit2 (unlimited, one-time per token)
-        // Permit2 is the security layer — step 2 controls the actual amount
         if (needsErc20) {
           const res1 = await fetch(`${API_BASE}/build-approval`, {
             method: 'POST',
@@ -300,8 +299,9 @@ export default function TradePage() {
           await sendTransaction(tx1)
         }
 
-        // V4 Step 2: Permit2.approve token → Universal Router (only if needed)
-        if (needsPermit2) {
+        // V4 Step 2: Permit2.approve token → Universal Router (ALWAYS send)
+        // This is the user's control point — sets exact amount + 30-day expiry
+        {
           const res2 = await fetch(`${API_BASE}/build-approval`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
