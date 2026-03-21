@@ -68,6 +68,7 @@ export async function POST(request: NextRequest) {
         to: transaction.to,
         data: transaction.data,
         value: transaction.value,
+        gas: '500000',
       },
     })
   } catch (error: any) {
