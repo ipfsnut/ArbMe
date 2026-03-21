@@ -77,9 +77,11 @@ export default function TradePage() {
   const [quoteError, setQuoteError] = useState<string | null>(null)
   const quoteAbortRef = useRef<AbortController | null>(null)
 
-  // Approval state — approval is always step 1
-  const [swapStep, setSwapStep] = useState<'approve' | 'swap'>('approve')
+  // Approval state — derived reactively from on-chain allowance (Uniswap pattern)
+  const [allowanceOk, setAllowanceOk] = useState(false)
+  const [allowanceLoading, setAllowanceLoading] = useState(false)
   const [approvalLoading, setApprovalLoading] = useState(false)
+  const [allowanceCheckCounter, setAllowanceCheckCounter] = useState(0)
 
   // Balance state
   const [balanceIn, setBalanceIn] = useState<string | null>(null) // formatted (human-readable)
@@ -246,10 +248,46 @@ export default function TradePage() {
     }
   })()
 
-  // Reset to approve step when amount or token changes
+  // Reactively check allowance whenever inputs change
   useEffect(() => {
-    setSwapStep('approve')
-  }, [tokenIn?.address, amountInWei])
+    if (!wallet || !tokenIn || amountInWei === '0') {
+      setAllowanceOk(false)
+      setAllowanceLoading(false)
+      return
+    }
+
+    let stale = false
+    setAllowanceLoading(true)
+    setAllowanceOk(false)
+
+    async function check() {
+      try {
+        const res = await fetch(`${API_BASE}/check-approvals`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            token0: tokenIn!.address, token1: tokenIn!.address,
+            owner: wallet, spender: approvalSpender,
+            amount0Required: amountInWei, amount1Required: '0',
+            version,
+            ...(version === 'V4' && { v4Spender: 'universal-router' }),
+          }),
+        })
+        if (stale) return
+        if (res.ok) {
+          const data = await res.json()
+          const needed = data.anyNeedsApproval ?? data.token0?.needsApproval ?? true
+          setAllowanceOk(!needed)
+        }
+      } catch {
+        if (!stale) setAllowanceOk(false)
+      }
+      if (!stale) setAllowanceLoading(false)
+    }
+
+    check()
+    return () => { stale = true }
+  }, [wallet, tokenIn?.address, amountInWei, version, approvalSpender, allowanceCheckCounter])
 
   const handleApprove = async () => {
     if (!tokenIn || !wallet || amountInWei === '0') return
@@ -308,7 +346,8 @@ export default function TradePage() {
         if (!ok) throw new Error('Approval failed on-chain')
       }
 
-      setSwapStep('swap')
+      // Trigger re-check — allowanceOk will update reactively
+      setAllowanceCheckCounter(c => c + 1)
     } catch (err: any) {
       console.error('[TradePage] Approval error:', err)
       setError(err.message || 'Approval failed')
@@ -347,7 +386,8 @@ export default function TradePage() {
       }
 
       setRevokeStatus(`Revoked ${count} approvals`)
-      setSwapStep('approve')
+      setAllowanceOk(false)
+      setAllowanceCheckCounter(c => c + 1)
       setTimeout(() => setRevokeStatus(''), 3000)
     } catch (err: any) {
       setError(err.message || 'Revoke failed')
@@ -497,10 +537,11 @@ export default function TradePage() {
 
       if (!res.ok) {
         const data = await res.json()
-        // If swap simulation says approval is needed, force back to approve step
+        // If swap says approval insufficient, re-check allowance
         if (data.needsApproval) {
-          setSwapStep('approve')
-          throw new Error(data.error || 'Approval needed')
+          setAllowanceOk(false)
+          setAllowanceCheckCounter(c => c + 1)
+          throw new Error(data.error || 'Approval needed — please approve again')
         }
         throw new Error(data.error || 'Failed to build swap transaction')
       }
@@ -743,8 +784,8 @@ export default function TradePage() {
               </div>
             )}
 
-            {/* Step 1: Approve — always shown first */}
-            {swapStep === 'approve' && swapQuote && swapStatus !== 'success' && (
+            {/* Approve — shown when allowance is insufficient */}
+            {!allowanceOk && !allowanceLoading && swapQuote && swapStatus !== 'success' && (
               <button
                 className="btn btn-secondary full-width"
                 onClick={handleApprove}
@@ -758,8 +799,15 @@ export default function TradePage() {
               </button>
             )}
 
-            {/* Step 2: Swap — only after approve step completed */}
-            {swapStep === 'swap' && swapQuote && swapStatus !== 'success' && (
+            {/* Checking allowance */}
+            {allowanceLoading && swapQuote && swapStatus !== 'success' && (
+              <button className="btn btn-secondary full-width" disabled>
+                <span className="loading-spinner small" /> Checking approval...
+              </button>
+            )}
+
+            {/* Swap — shown when allowance is sufficient */}
+            {allowanceOk && swapQuote && swapStatus !== 'success' && (
               <button
                 className="btn btn-primary full-width"
                 onClick={handleExecuteSwap}
