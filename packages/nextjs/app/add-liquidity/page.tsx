@@ -517,7 +517,7 @@ function AddLiquidityPage() {
     checkApprovals()
   }, [state.step, wallet, state.token0Info?.address, state.token1Info?.address, state.amount0, state.amount1, state.version, state.approvalsChecked])
 
-  const sendTransaction = async (tx: { to: string; data: string; value: string }) => {
+  const sendTransaction = async (tx: { to: string; data: string; value: string; gas?: string }) => {
     if (!wallet) throw new Error('No wallet connected')
 
     try {
@@ -544,6 +544,7 @@ function AddLiquidityPage() {
           to: tx.to as `0x${string}`,
           data: tx.data as `0x${string}`,
           value: tx.value !== '0' ? BigInt(tx.value) : 0n,
+          ...(tx.gas ? { gas: BigInt(tx.gas) } : {}),
         })
 
         return txHash
@@ -1382,7 +1383,7 @@ function AddLiquidityPage() {
                       onClick={() => handleApprove('token0')}
                       disabled={isApproving}
                     >
-                      {state.token0ApprovalStatus === 'error' ? 'Retry Approve' : `Approve ${state.token0Info?.symbol}`}
+                      {state.token0ApprovalStatus === 'error' ? 'Retry Approve' : `Approve ${state.amount0 || ''} ${state.token0Info?.symbol}`}
                     </button>
                     {state.token0ApprovalError && (
                       <span className="approval-error">{state.token0ApprovalError}</span>
@@ -1418,7 +1419,7 @@ function AddLiquidityPage() {
                       onClick={() => handleApprove('token1')}
                       disabled={isApproving}
                     >
-                      {state.token1ApprovalStatus === 'error' ? 'Retry Approve' : `Approve ${state.token1Info?.symbol}`}
+                      {state.token1ApprovalStatus === 'error' ? 'Retry Approve' : `Approve ${state.amount1 || ''} ${state.token1Info?.symbol}`}
                     </button>
                     {state.token1ApprovalError && (
                       <span className="approval-error">{state.token1ApprovalError}</span>
