@@ -349,10 +349,11 @@ export function buildV4SwapTransaction(params: SwapParams): SwapTransaction {
   // V4_SWAP command = 0x10
   const commands = '0x10' as `0x${string}`;
 
-  // Actions: SWAP_EXACT_IN_SINGLE(6), SETTLE_ALL(12), TAKE_ALL(15)
+  // Actions: SWAP_EXACT_IN_SINGLE(0x06), SETTLE(0x0b), TAKE(0x0e)
+  // Using SETTLE+TAKE (not SETTLE_ALL+TAKE_ALL) to match Uniswap SDK behavior
   const actions = encodePacked(
     ['uint8', 'uint8', 'uint8'],
-    [0x06, 0x0c, 0x0f],
+    [0x06, 0x0b, 0x0e],
   );
 
   // Param 0: ExactInputSingleParams
@@ -396,18 +397,21 @@ export function buildV4SwapTransaction(params: SwapParams): SwapTransaction {
     ],
   );
 
-  // Param 1: SETTLE_ALL — pay the input currency
+  // Param 1: SETTLE — pay the input currency from user via Permit2
+  // amount=0 means "settle the full swap delta" (same as Uniswap SDK FULL_DELTA_AMOUNT)
+  // payerIsUser=true means pull from user via Permit2.transferFrom
   const currencyIn = zeroForOne ? currency0 : currency1;
   const settleParam = encodeAbiParameters(
-    [{ type: 'address' }, { type: 'uint256' }],
-    [currencyIn as Address, BigInt(amountIn)],
+    [{ type: 'address' }, { type: 'uint256' }, { type: 'bool' }],
+    [currencyIn as Address, 0n, true],
   );
 
-  // Param 2: TAKE_ALL — receive the output currency
+  // Param 2: TAKE — send output currency to recipient
+  // amount=0 means "take the full swap delta"
   const currencyOut = zeroForOne ? currency1 : currency0;
   const takeParam = encodeAbiParameters(
-    [{ type: 'address' }, { type: 'uint256' }],
-    [currencyOut as Address, BigInt(minAmountOut)],
+    [{ type: 'address' }, { type: 'address' }, { type: 'uint256' }],
+    [currencyOut as Address, recipient as Address, 0n],
   );
 
   // Wrap as abi.encode(bytes actions, bytes[] params) for V4_SWAP input
