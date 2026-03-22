@@ -132,8 +132,6 @@ export default function TradePage() {
           tokenIn: tokenIn.address,
           tokenOut: tokenOut.address,
           amountIn: amount,
-          fee,
-          tickSpacing,
           ...(hooks && { hooks }),
         }),
         signal: controller.signal,
@@ -155,7 +153,7 @@ export default function TradePage() {
     } finally {
       setQuoteLoading(false)
     }
-  }, [tokenIn, tokenOut, poolAddress, version, fee, tickSpacing, hooks])
+  }, [tokenIn, tokenOut, poolAddress, version, hooks])
 
   // Quote refresh countdown
   const QUOTE_REFRESH_INTERVAL = 12 // seconds
@@ -513,9 +511,9 @@ export default function TradePage() {
       const slippageBps = BigInt(Math.round(slippage * 100)) // e.g., 0.5% = 50 bps
       const minAmountOut = (BigInt(swapQuote.amountOut) * (10000n - slippageBps) / 10000n).toString()
 
-      // Use detected pool params from quote response, fall back to URL params, then defaults
-      const swapFee = swapQuote.fee ?? fee ?? 3000
-      const swapTickSpacing = swapQuote.tickSpacing ?? tickSpacing ?? 60
+      // Use detected pool params from quote response (swap API also reads slot0 as fallback)
+      const swapFee = swapQuote.fee
+      const swapTickSpacing = swapQuote.tickSpacing
       const swapHooks = swapQuote.hooks || hooks
 
       const res = await fetch(`${API_BASE}/swap`, {
@@ -591,8 +589,7 @@ export default function TradePage() {
           <h1>Trade {pairName}</h1>
           <div className="pool-meta">
             <span className={`version-badge ${version.toLowerCase()}`}>{version}</span>
-            {fee !== undefined && <span className="fee-badge">{(fee / 10000).toFixed(2)}% fee</span>}
-            {swapQuote?.fee && !fee && <span className="fee-badge">{(swapQuote.fee / 10000).toFixed(2)}% fee</span>}
+            {(swapQuote?.fee || fee) && <span className="fee-badge">{((swapQuote?.fee ?? fee ?? 0) / 10000).toFixed(2)}% fee</span>}
           </div>
         </div>
 
