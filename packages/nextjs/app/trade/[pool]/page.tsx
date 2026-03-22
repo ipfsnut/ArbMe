@@ -591,7 +591,7 @@ export default function TradePage() {
           <h1>Trade {pairName}</h1>
           <div className="pool-meta">
             <span className={`version-badge ${version.toLowerCase()}`}>{version}</span>
-            {(swapQuote?.fee || fee) && <span className="fee-badge">{((swapQuote?.fee ?? fee ?? 0) / 10000).toFixed(2)}% fee</span>}
+            {swapQuote?.fee && <span className="fee-badge">{(swapQuote.fee / 10000).toFixed(2)}% fee</span>}
           </div>
         </div>
 
