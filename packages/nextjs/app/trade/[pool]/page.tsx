@@ -321,16 +321,18 @@ export default function TradePage() {
           if (!ok1) throw new Error('ERC20 approval failed on-chain')
         }
 
-        // V4 Step 2: Permit2 → Router (exact amount, always send)
-        const res2 = await fetch(`${API_BASE}/build-approval`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token: tokenIn.address, version: 'V4', approvalType: 'permit2', v4Spender: 'universal-router', amount: amountInWei }),
-        })
-        if (!res2.ok) throw new Error((await res2.json().catch(() => ({}))).error || 'Permit2 approval failed')
-        const hash2 = await sendTransaction((await res2.json()).transaction)
-        const ok2 = await waitForReceipt(hash2, { isSafe })
-        if (!ok2) throw new Error('Permit2 approval failed on-chain')
+        // V4 Step 2: Permit2 → Router (only if needed)
+        if (checkData.token0?.needsPermit2Approval) {
+          const res2 = await fetch(`${API_BASE}/build-approval`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: tokenIn.address, version: 'V4', approvalType: 'permit2', v4Spender: 'universal-router', amount: amountInWei }),
+          })
+          if (!res2.ok) throw new Error((await res2.json().catch(() => ({}))).error || 'Permit2 approval failed')
+          const hash2 = await sendTransaction((await res2.json()).transaction)
+          const ok2 = await waitForReceipt(hash2, { isSafe })
+          if (!ok2) throw new Error('Permit2 approval failed on-chain')
+        }
       } else {
         // V2/V3: ERC20 approval (exact amount, always send)
         const res = await fetch(`${API_BASE}/build-approval`, {
