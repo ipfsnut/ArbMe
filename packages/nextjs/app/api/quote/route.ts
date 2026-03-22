@@ -105,6 +105,7 @@ function computePriceImpact(
   sqrtPriceX96: bigint,
   zeroForOne: boolean,
   decimalsIn: number, decimalsOut: number,
+  poolFeeBps: number = 0,
 ): number {
   if (amountIn === 0n || amountOut === 0n || sqrtPriceX96 === 0n) return 0
 
@@ -122,17 +123,20 @@ function computePriceImpact(
   // We need it in the same direction as execution price (tokenOut per tokenIn)
   let spotPrice: number
   if (zeroForOne) {
-    // Selling token0 → getting token1. Spot price of token0 in token1 terms.
     spotPrice = rawSpotPrice * Math.pow(10, decimalsIn - decimalsOut)
   } else {
-    // Selling token1 → getting token0. Invert.
     spotPrice = (1 / rawSpotPrice) * Math.pow(10, decimalsIn - decimalsOut)
   }
 
   if (spotPrice === 0 || !isFinite(spotPrice)) return 0
 
-  const impact = Math.abs((execPrice - spotPrice) / spotPrice) * 100
-  return Math.min(impact, 100)
+  // Subtract the pool fee from spot price so we measure actual price impact,
+  // not fee + impact combined. The fee is already shown separately in the UI.
+  const feeMultiplier = 1 - (poolFeeBps / 1_000_000) // fee is in hundredths of a bip (e.g., 50000 = 5%)
+  const spotPriceAfterFee = spotPrice * feeMultiplier
+
+  const impact = Math.abs((execPrice - spotPriceAfterFee) / spotPriceAfterFee) * 100
+  return Math.round(impact * 100) / 100 // round to 2 decimal places
 }
 
 // Pool config for auto-detection
@@ -276,7 +280,7 @@ export async function POST(request: NextRequest) {
         const [amountOut, , , gasEstimate] = result
         const zeroForOne = tokenIn.toLowerCase() === token0.toLowerCase()
         const priceImpact = computePriceImpact(
-          BigInt(amountIn), amountOut, sqrtPriceX96, zeroForOne, decimalsIn, decimalsOut,
+          BigInt(amountIn), amountOut, sqrtPriceX96, zeroForOne, decimalsIn, decimalsOut, fee || 0,
         )
 
         const execPrice = Number(formatUnits(amountOut, decimalsOut)) /
@@ -386,7 +390,7 @@ export async function POST(request: NextRequest) {
 
         const [amountOut, gasEstimate] = quoterResult as [bigint, bigint]
         const priceImpact = computePriceImpact(
-          BigInt(amountIn), amountOut, sqrtPriceX96, zeroForOne, decimalsIn, decimalsOut,
+          BigInt(amountIn), amountOut, sqrtPriceX96, zeroForOne, decimalsIn, decimalsOut, detectedFee || 0,
         )
 
         const execPrice = Number(formatUnits(amountOut, decimalsOut)) /
