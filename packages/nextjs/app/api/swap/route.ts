@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     // For V4 with a bytes32 poolId: read the actual fee from on-chain if not provided
     let resolvedFee = fee ?? 3000
     let resolvedTickSpacing = tickSpacing ?? 60
-    if (normalizedVersion === 'V4' && poolAddress && poolAddress.length === 66 && !fee) {
+    if (normalizedVersion === 'V4' && poolAddress && poolAddress.length === 66) {
       try {
         const STATE_VIEW = '0xa3c0c9b65bad0b08107aa264b0f3db444b867a71' as const
         const slot0 = await client.readContract({
