@@ -67,7 +67,7 @@ export default function TradePage() {
   const [txHash, setTxHash] = useState<string | null>(null)
 
   // Slippage settings
-  const [slippage, setSlippage] = useState(0.5) // percent
+  const [slippage, setSlippage] = useState(3) // percent
   const [showSlippageSettings, setShowSlippageSettings] = useState(false)
   const [customSlippage, setCustomSlippage] = useState('')
 
@@ -551,11 +551,23 @@ export default function TradePage() {
       setSwapStatus('pending')
       const hash = await sendTransaction(transaction)
       setTxHash(typeof hash === 'string' ? hash : null)
+
+      // Wait for receipt to confirm success
+      const ok = await waitForReceipt(hash, { isSafe })
+      if (!ok) {
+        throw new Error(`Swap reverted on-chain. This usually means the price moved beyond your ${slippage}% slippage tolerance. Try increasing slippage in settings.`)
+      }
+
       setSwapStatus('success')
       setSwapAmount('')
     } catch (err: any) {
       console.error('[executeSwap] Error:', err)
-      setError(err.message || 'Swap failed')
+      const msg = err.message || 'Swap failed'
+      if (msg.includes('TooLittleReceived') || msg.includes('slippage')) {
+        setError(`Price moved beyond your ${slippage}% slippage tolerance. Increase slippage in settings and try again.`)
+      } else {
+        setError(msg)
+      }
       setSwapStatus('error')
     }
   }
@@ -612,7 +624,7 @@ export default function TradePage() {
             </div>
             {showSlippageSettings && (
               <div className="slippage-options">
-                {[0.1, 0.5, 1.0].map((s) => (
+                {[1, 3, 5].map((s) => (
                   <button
                     key={s}
                     className={`slippage-btn ${slippage === s ? 'active' : ''}`}
