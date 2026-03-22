@@ -9,7 +9,6 @@ import { PositionCard } from '@/components/PositionCard'
 import { TokenLeaderboard } from '@/components/TokenLeaderboard'
 import Link from 'next/link'
 import { ROUTES, CHAOS_FOUNDATION_MULTISIG, CHAOS_GAUGES, CHAOS_STAKING_ADDRESS } from '@/utils/constants'
-import { waitForReceipt } from '@/utils/waitForReceipt'
 import { useSendTransaction } from 'wagmi'
 import { formatUnits } from 'viem'
 import type { Position } from '@/utils/types'
@@ -236,6 +235,11 @@ export default function AdvancedPage() {
     }
   }
 
+  const waitAndRefresh = async () => {
+    await new Promise(r => setTimeout(r, isSafe ? 2000 : 4000))
+    await fetchStakingData()
+  }
+
   const executeAction = async (endpoint: string, body: object = {}) => {
     const res = await fetch(endpoint, {
       method: 'POST',
@@ -247,67 +251,59 @@ export default function AdvancedPage() {
       throw new Error(err.error || 'Transaction failed')
     }
     const { transaction } = await res.json()
-    const hash = await sendTx(transaction)
-    const success = await waitForReceipt(hash, { isSafe })
-    if (!success) throw new Error('Transaction failed on-chain')
-    await fetchStakingData()
+    await sendTx(transaction)
   }
 
   const handleApprove = async () => {
-    const amount = parseToWei(stakeAmount); if (amount === '0') return
     setActionLoading('approve'); setActionError(null)
-    try { await executeAction('/api/chaos-staking/approve', { amount }) }
+    const amount = parseToWei(stakeAmount); if (amount === '0') return
+    try { await executeAction('/api/chaos-staking/approve', { amount }); await waitAndRefresh() }
     catch (e: any) { setActionError(e.message) }
     finally { setActionLoading(null) }
   }
   const handleStake = async () => {
     const amount = parseToWei(stakeAmount); if (amount === '0') return
     setActionLoading('stake'); setActionError(null)
-    try { await executeAction('/api/chaos-staking/stake', { amount }); setStakeAmount('') }
+    try { await executeAction('/api/chaos-staking/stake', { amount }); setStakeAmount(''); await waitAndRefresh() }
     catch (e: any) { setActionError(e.message) }
     finally { setActionLoading(null) }
   }
   const handleWithdraw = async () => {
     const amount = parseToWei(withdrawAmount); if (amount === '0') return
     setActionLoading('withdraw'); setActionError(null)
-    try { await executeAction('/api/chaos-staking/withdraw', { amount }); setWithdrawAmount('') }
+    try { await executeAction('/api/chaos-staking/withdraw', { amount }); setWithdrawAmount(''); await waitAndRefresh() }
     catch (e: any) { setActionError(e.message) }
     finally { setActionLoading(null) }
   }
   const handleClaim = async () => {
     setActionLoading('claim'); setActionError(null)
-    try { await executeAction('/api/chaos-staking/claim') }
+    try { await executeAction('/api/chaos-staking/claim'); await waitAndRefresh() }
     catch (e: any) { setActionError(e.message) }
     finally { setActionLoading(null) }
   }
   const handleExit = async () => {
     setActionLoading('exit'); setActionError(null)
-    try { await executeAction('/api/chaos-staking/exit') }
+    try { await executeAction('/api/chaos-staking/exit'); await waitAndRefresh() }
     catch (e: any) { setActionError(e.message) }
     finally { setActionLoading(null) }
   }
 
-  // Admin actions — helper to send and confirm
-  const executeAdminAction = async (endpoint: string, body: object): Promise<void> => {
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    })
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}))
-      throw new Error(err.error || 'Failed to build transaction')
-    }
-    const { transaction } = await res.json()
-    const hash = await sendTx(transaction)
-    const success = await waitForReceipt(hash, { isSafe })
-    if (!success) throw new Error('Transaction failed on-chain')
-  }
-
+  // Admin actions
   const handleAdminApprove = async (gaugeIndex: number) => {
     setAdminActionLoading(`approve-${gaugeIndex}`); setAdminError(null)
     try {
-      await executeAdminAction('/api/chaos-staking/admin/approve-reward', { gaugeIndex })
+      const res = await fetch('/api/chaos-staking/admin/approve-reward', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gaugeIndex }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Failed to build approve tx')
+      }
+      const { transaction } = await res.json()
+      await sendTx(transaction)
+      await new Promise(r => setTimeout(r, isSafe ? 2000 : 4000))
       await fetchAdminInfo()
     } catch (e: any) { setAdminError(e.message) }
     finally { setAdminActionLoading(null) }
@@ -321,8 +317,19 @@ export default function AdvancedPage() {
     if (amount === '0') return
     setAdminActionLoading(`notify-${gaugeIndex}`); setAdminError(null)
     try {
-      await executeAdminAction('/api/chaos-staking/admin/notify-reward', { gaugeIndex, amount })
+      const res = await fetch('/api/chaos-staking/admin/notify-reward', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gaugeIndex, amount }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Failed to build notify tx')
+      }
+      const { transaction } = await res.json()
+      await sendTx(transaction)
       setRewardAmounts(prev => ({ ...prev, [gaugeIndex]: '' }))
+      await new Promise(r => setTimeout(r, isSafe ? 2000 : 4000))
       await fetchAdminInfo()
     } catch (e: any) { setAdminError(e.message) }
     finally { setAdminActionLoading(null) }
@@ -331,8 +338,18 @@ export default function AdvancedPage() {
   const handleDeployGauge = async (gaugeIndex: number) => {
     setAdminActionLoading(`deploy-${gaugeIndex}`); setAdminError(null)
     try {
-      await executeAdminAction('/api/chaos-staking/admin/deploy-gauge', { gaugeIndex })
-      setAdminError(`${CHAOS_GAUGES[gaugeIndex].symbol} gauge deployed and confirmed. Enter the deployed address below and click Register.`)
+      const res = await fetch('/api/chaos-staking/admin/deploy-gauge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gaugeIndex }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Failed to build deploy tx')
+      }
+      const { transaction } = await res.json()
+      await sendTx(transaction)
+      setAdminError(`${CHAOS_GAUGES[gaugeIndex].symbol} gauge deploy tx submitted. After confirmation, enter the deployed address below and click Register.`)
     } catch (e: any) { setAdminError(e.message) }
     finally { setAdminActionLoading(null) }
   }
@@ -345,8 +362,19 @@ export default function AdvancedPage() {
     }
     setAdminActionLoading(`register-${gaugeIndex}`); setAdminError(null)
     try {
-      await executeAdminAction('/api/chaos-staking/admin/register-gauge', { gaugeAddress })
+      const res = await fetch('/api/chaos-staking/admin/register-gauge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gaugeAddress }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Failed to build register tx')
+      }
+      const { transaction } = await res.json()
+      await sendTx(transaction)
       setPendingGaugeAddresses(prev => ({ ...prev, [gaugeIndex]: '' }))
+      await new Promise(r => setTimeout(r, isSafe ? 2000 : 4000))
       await fetchAdminInfo()
     } catch (e: any) { setAdminError(e.message) }
     finally { setAdminActionLoading(null) }
