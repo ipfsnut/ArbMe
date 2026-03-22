@@ -67,7 +67,7 @@ export default function TradePage() {
   const [txHash, setTxHash] = useState<string | null>(null)
 
   // Slippage settings
-  const [slippage, setSlippage] = useState(3) // percent
+  const [slippage, setSlippage] = useState(5) // percent
   const [showSlippageSettings, setShowSlippageSettings] = useState(false)
   const [customSlippage, setCustomSlippage] = useState('')
 
@@ -624,7 +624,7 @@ export default function TradePage() {
             </div>
             {showSlippageSettings && (
               <div className="slippage-options">
-                {[1, 3, 5].map((s) => (
+                {[3, 5, 7].map((s) => (
                   <button
                     key={s}
                     className={`slippage-btn ${slippage === s ? 'active' : ''}`}
