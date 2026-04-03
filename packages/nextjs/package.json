@@ -15,20 +15,19 @@
     "@mdx-js/loader": "3.1.1",
     "@metamask/sdk": "0.33.1",
     "@metamask/superstruct": "3.2.1",
-    "@next/mdx": "16.1.6",
+    "@next/mdx": "15.5.14",
     "@rainbow-me/rainbowkit": "2.2.10",
     "@safe-global/safe-apps-sdk": "9.1.0",
     "@tanstack/react-query": "5.90.20",
     "@types/mdx": "2.0.13",
     "@vanilla-extract/sprinkles": "1.6.4",
     "clsx": "2.1.1",
-    "ethers": "5.8.0",
     "fast-safe-stringify": "2.1.1",
     "feed": "5.2.0",
     "gray-matter": "4.0.3",
     "idb": "8.0.3",
     "mipd": "0.0.7",
-    "next": "15.1.4",
+    "next": "15.5.14",
     "pony-cause": "2.1.11",
     "react": "19.0.0",
     "react-dom": "19.0.0",
@@ -40,7 +39,7 @@
     "remark-frontmatter": "5.0.0",
     "remark-gfm": "4.0.1",
     "shiki": "3.22.0",
-    "viem": "2.45.0",
+    "viem": "2.45.1",
     "wagmi": "2.19.5"
   },
   "devDependencies": {
@@ -48,7 +47,7 @@
     "@types/react": "19.0.0",
     "@types/react-dom": "19.0.0",
     "eslint": "8.56.0",
-    "eslint-config-next": "15.1.4",
-    "typescript": "5.3.3"
+    "eslint-config-next": "15.5.14",
+    "typescript": "5.8.3"
   }
 }

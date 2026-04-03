@@ -109,8 +109,8 @@ function verifyAlchemySignature(
   // Use timing-safe comparison to prevent timing attacks
   try {
     return timingSafeEqual(
-      Buffer.from(signature),
-      Buffer.from(digest)
+      new Uint8Array(Buffer.from(signature)),
+      new Uint8Array(Buffer.from(digest))
     )
   } catch {
     return false
